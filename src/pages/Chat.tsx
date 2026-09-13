@@ -1378,7 +1378,7 @@ export function Chat() {
 
   return (
     <div
-      className={cn('chat-shell flex overflow-hidden z-10 fixed left-0 right-0 top-14 bottom-20 lg:relative lg:inset-auto lg:-mx-6 lg:-my-6 lg:rounded-2xl lg:border-2 lg:border-slate-200/70 lg:shadow-2xl', darkMode ? 'bg-[#111b21] chat-dark' : 'bg-slate-50')}
+      className={cn('chat-shell flex overflow-hidden z-10 fixed left-0 right-0 top-14 bottom-20 lg:relative lg:inset-auto lg:-mx-6 lg:-my-6 lg:h-[calc(100vh-56px)] lg:rounded-2xl lg:border-2 lg:border-slate-200/70 lg:shadow-2xl', darkMode ? 'bg-[#111b21] chat-dark' : 'bg-slate-50')}
       style={{ minHeight: 480 }}
     >
       {/* Lightbox */}
