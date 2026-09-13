@@ -21,7 +21,7 @@ export function Layout() {
   }, [location.pathname]);
 
   return (
-    <div className={isProjetos ? "h-dvh overflow-hidden relative" : "min-h-screen relative overflow-x-auto"}>
+    <div className={isProjetos ? "h-dvh overflow-hidden relative" : "min-h-screen relative overflow-x-hidden"}>
       {/* Gradient background */}
       <div className="fixed inset-0 z-0 layout-gradient" />
       <div className="fixed inset-0 z-0 layout-radial" />

@@ -204,7 +204,7 @@ export function Users() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total', value: stats.total, icon: UsersIcon, color: 'text-slate-700', bg: 'bg-slate-50' },
           { label: 'Ativos', value: stats.active, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -458,7 +458,7 @@ export function Users() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className={labelCls}>Nome completo *</label>
                   <input

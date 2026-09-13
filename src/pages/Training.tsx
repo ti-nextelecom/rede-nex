@@ -151,7 +151,7 @@ function TrainingForm({
               placeholder="https://drive.google.com/... ou link direto .pdf"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Categoria</label>
               <select
@@ -176,7 +176,7 @@ function TrainingForm({
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Duração (min)</label>
               <input
