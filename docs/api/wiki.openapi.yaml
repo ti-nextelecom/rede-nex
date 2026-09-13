@@ -1,0 +1,265 @@
+openapi: 3.0.3
+info:
+  title: Rede Nex Wiki API
+  version: 1.0.0
+  description: API REST para WIKI NEX 2.0 usando PostgreSQL local.
+servers:
+  - url: http://localhost:3333/api
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: API online
+  /wiki/categories:
+    get:
+      summary: Lista categorias da Wiki
+      responses:
+        "200":
+          description: Categorias retornadas
+    post:
+      summary: Cria categoria da Wiki
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WikiCategoryInput"
+      responses:
+        "201":
+          description: Categoria criada
+  /wiki/categories/{id}:
+    put:
+      summary: Atualiza categoria da Wiki
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WikiCategoryInput"
+      responses:
+        "200":
+          description: Categoria atualizada
+    delete:
+      summary: Remove categoria da Wiki
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Categoria removida
+  /wiki/articles:
+    get:
+      summary: Lista artigos da Wiki
+      parameters:
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, archived]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Artigos retornados
+    post:
+      summary: Cria artigo da Wiki
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WikiArticleInput"
+      responses:
+        "201":
+          description: Artigo criado
+  /wiki/search:
+    get:
+      summary: Busca global da Wiki
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resultado da busca
+  /wiki/articles/{id}:
+    get:
+      summary: Obtem artigo por ID
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Artigo retornado
+    put:
+      summary: Atualiza artigo por ID
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WikiArticleUpdateInput"
+      responses:
+        "200":
+          description: Artigo atualizado
+    delete:
+      summary: Arquiva artigo por ID
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Artigo arquivado
+  /wiki/articles/slug/{slug}:
+    get:
+      summary: Obtem artigo por slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Artigo retornado
+  /wiki/articles/{id}/status:
+    patch:
+      summary: Atualiza status do artigo
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, editor_id]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+                editor_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Status atualizado
+  /wiki/articles/{id}/versions:
+    get:
+      summary: Lista versoes do artigo
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Versoes retornadas
+  /wiki/articles/{id}/versions/{versionId}/restore:
+    post:
+      summary: Restaura uma versao do artigo
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Versao restaurada
+  /wiki/articles/{id}/attachments:
+    post:
+      summary: Envia anexo para artigo
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                owner_id:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Anexo criado
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    WikiCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        color:
+          type: string
+    WikiArticleInput:
+      type: object
+      required: [title, slug]
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        content:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        author_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [draft, published, archived]
+        tags:
+          type: array
+          items:
+            type: string
+    WikiArticleUpdateInput:
+      allOf:
+        - $ref: "#/components/schemas/WikiArticleInput"
+        - type: object
+          required: [editor_id]
+          properties:
+            editor_id:
+              type: string
+              format: uuid

@@ -1,0 +1,2351 @@
+import { createServer } from 'node:http';
+import { mkdirSync, writeFileSync, createReadStream, statSync } from 'node:fs';
+import { join, extname } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { WebSocketServer } from 'ws';
+import { URL } from 'node:url';
+import './env.js';
+import { sendPasswordResetEmail } from './email.js';
+import { getOrgChart } from './orgchart.repository.js';
+import { pool } from './db.js';
+import { changePassword, createPasswordResetToken, getUserByToken, heartbeat, listOnlineUsers, login, logout, resetPasswordByToken, updateMyProfile } from './auth.repository.js';
+import { fetchBitrixUsers } from './bitrix.client.js';
+import { importBitrixUsers, listBitrixImports, listBitrixUsers } from './bitrix.repository.js';
+import { getMediaContent, saveChatAvatar, saveChatMedia, saveUserAvatar, saveUserCover, saveWikiMedia } from './media.repository.js';
+import {
+  addParticipants, createConversation, deleteMessage, editMessage, getMessageEditHistory,
+  getNotes, listConversations, listGroupParticipants,
+  listMessages, pinConversation, pinMessage, removeParticipant, saveNotes, sendMessage,
+  toggleMuteConversation, updateConversation, updateParticipantRole,
+} from './chat.repository.js';
+import {
+  addChecklist, addChecklistItem, addTaskComment, createTask, deleteChecklist,
+  deleteChecklistItem, deleteTask, getTask, getTaskByProtocol, listTasks, updateChecklist, updateChecklistItem, updateTask,
+  listCustomLists, createCustomList, renameCustomList, deleteCustomList,
+  listTaskTemplates, createTaskTemplate, deleteTaskTemplate,
+  listTaskFiles, addTaskFile, deleteTaskFile,
+} from './tasks.repository.js';
+import { listNotifications, markAllNotificationsRead, markNotificationRead, notifyUsers } from './notifications.repository.js';
+import {
+  createFeedPost,
+  createPostComment,
+  createUser,
+  deactivateUser,
+  deleteFeedPost,
+  deletePostComment,
+  getDashboardData,
+  getAnalyticsData,
+  getTrainingData,
+  listAllTrainings,
+  createTraining,
+  updateTraining,
+  deleteTraining,
+  createDepartment,
+  deleteDepartment,
+  listDepartments,
+  listDepartmentsWithStats,
+  listFeedPosts,
+  listRoles,
+  listUsers,
+  toggleCommentReaction,
+  togglePostReaction,
+  updateDepartment,
+  updateFeedPost,
+  updatePostComment,
+  updateUser,
+  voteOnPoll,
+} from './app.repository.js';
+import {
+  archiveArticle,
+  createArticle,
+  createCategory,
+  deleteCategory,
+  getArticleById,
+  getArticleBySlug,
+  listArticles,
+  listCategories,
+  listVersions,
+  restoreVersion,
+  searchArticles,
+  updateArticle,
+  updateArticleStatus,
+  updateCategory,
+  createArticleComment,
+  listArticleComments,
+  listArticleLikes,
+  listArticleViews,
+  recordArticleView,
+  toggleArticleLike,
+  setArticleRoleRequired,
+  setArticleVisibility,
+  setCategoryVisibility,
+  deleteArticle,
+} from './wiki.repository.js';
+import {
+  awardXP, getUserGamificationProfile, getUserMissions, getGlobalRanking, getUserRankPosition,
+} from './gamification.repository.js';
+import { createEvent, deleteEvent, fetchGoogleCalendarEvents, getEvent, listEvents, updateEvent } from './calendar.repository.js';
+import { createFile, createFolder, deleteFile, deleteFolder, getFolderPath, listFiles, listFolders } from './drive.repository.js';
+import { createForm, deleteForm, getForm, hasResponded, listForms, listResponses, submitResponse, updateForm } from './forms.repository.js';
+import { createDocument, deleteDocument, getDocument, listDocuments, rejectDocument, signDocument } from './sign.repository.js';
+import { createWhiteboard, deleteWhiteboard, getWhiteboard, listWhiteboards, updateWhiteboard } from './whiteboard.repository.js';
+import { createChamado, listChamadosRecentes, ajudaConfigured } from './ajuda.repository.js';
+import { getMetricas, buscarCliente, getClienteFinanceiro, getClienteOS, getClienteAtendimentos } from './hubsoft.repository.js';
+import { getAllNavSettings, upsertNavSettings, deleteNavSettings } from './nav_settings.repository.js';
+import {
+  isPcAdmin, getUserPcPapel, hasPcAccess,
+  listPcPermissoes, createPcPermissao, deletePcPermissao,
+  listSetores, createSetor, updateSetor,
+  listPeriodos, createPeriodo, closePeriodo,
+  submitPeriodo, validarPeriodo, inconsistenciaPeriodo, corrigirPeriodo,
+  listComentariosPeriodo, createComentarioPeriodo,
+  listLancamentos, getLancamento, createLancamento, updateLancamento, deleteLancamento,
+  updateLancamentoStatus,
+  listComentarios, createComentario,
+  listAnexos, saveAnexo, deleteAnexo, streamAnexo,
+  getFatura, deleteSetor} from './pc.repository.js';
+import { listProjects, createProject, updateProject, deleteProject, listSteps, createStep, updateStep, deleteStep, addStepAssignee, removeStepAssignee, listStepHistory, addStepHistory, listComments, createComment, updateComment, deleteComment, listAttachments, createAttachment, deleteAttachment, getAttachmentForDownload, listRequests, createRequest } from './projects.repository.js';
+import { listJRHPosts, createJRHPost, recordJRHPostView, listJRHPostViews, toggleJRHReaction, createJRHComment, checkIsHR, getMonthBirthdays, autoPublishTodayBirthdays } from './jrh.repository.js';
+import { listStories, createStory, recordStoryView, listStoryViewers } from './stories.repository.js';
+
+const port = Number(process.env.PORT || 3333);
+const UPLOADS_JRH_DIR = '/opt/rede-nex/deploy_v2/uploads/jrh';
+mkdirSync(UPLOADS_JRH_DIR, { recursive: true });
+const ALLOWED_UPLOAD_MIME = new Set(['image/jpeg','image/jpg','image/png','image/gif','image/webp','video/mp4','video/webm','video/quicktime']);
+const MAX_JSON_BYTES = Number(process.env.MAX_JSON_BYTES || 25 * 1024 * 1024);
+const allowedOrigins = new Set((process.env.CORS_ORIGINS || 'http://127.0.0.1:5173,http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean));
+
+function getRealIP(req) {
+  const remote = req.socket.remoteAddress || '0.0.0.0';
+  const isTrustedProxy = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1'
+    || remote.startsWith('10.') || remote.startsWith('172.') || remote.startsWith('192.168.');
+  if (isTrustedProxy) {
+    const forwarded = req.headers['x-real-ip'] || req.headers['x-forwarded-for'];
+    if (forwarded) return String(forwarded).split(',')[0].trim();
+  }
+  return remote;
+}
+
+function responseHeaders(req, contentType = 'application/json; charset=utf-8') {
+  const origin = req.headers.origin;
+  const corsOrigin = origin && allowedOrigins.has(origin) ? origin : null;
+  const corsHeaders = corsOrigin ? {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  } : {};
+  return {
+    ...(contentType ? { 'Content-Type': contentType } : {}),
+    ...corsHeaders,
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), geolocation=()',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://ui-avatars.com https://cdn.bitrix24.com.br https://nextelecom.bitrix24.com.br; font-src 'self'; connect-src 'self' wss:; frame-src 'self' https://drive.google.com https://docs.google.com; frame-ancestors 'none'",
+  };
+}
+
+function parseCookies(req) {
+  const cookies = {};
+  (req.headers.cookie || '').split(';').forEach(pair => {
+    const idx = pair.indexOf('=');
+    if (idx < 0) return;
+    const k = pair.slice(0, idx).trim();
+    const v = decodeURIComponent(pair.slice(idx + 1).trim());
+    if (k) cookies[k] = v;
+  });
+  return cookies;
+}
+
+function sessionCookieHeader(token) {
+  const maxAge = 7 * 24 * 60 * 60;
+  return `session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+}
+
+function clearCookieHeader() {
+  return 'session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0';
+}
+
+function sendJson(req, res, status, payload, extraHeaders = {}) {
+  res.writeHead(status, { ...responseHeaders(req), ...extraHeaders });
+  res.end(JSON.stringify(payload));
+}
+
+function sendEmpty(req, res, status = 204, extraHeaders = {}) {
+  res.writeHead(status, { ...responseHeaders(req, null), ...extraHeaders });
+  res.end();
+}
+
+function sendBinary(req, res, status, buffer, contentType) {
+  res.writeHead(status, responseHeaders(req, contentType || 'application/octet-stream'));
+  res.end(buffer);
+}
+
+function sendError(req, res, status, code, message, details) {
+  sendJson(req, res, status, { error: { code, message, details } });
+}
+
+async function readJson(req) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_JSON_BYTES) {
+      const error = new Error('Payload muito grande');
+      error.statusCode = 413;
+      error.code = 'PAYLOAD_TOO_LARGE';
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (!raw.trim()) return {};
+  return JSON.parse(raw);
+}
+
+function getBearerToken(req) {
+  const cookie = parseCookies(req).session;
+  if (cookie) return cookie;
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+}
+
+function validatePasswordComplexity(password) {
+  if (String(password).length < 8) return 'A senha precisa ter pelo menos 8 caracteres';
+  if (String(password).length > 128) return 'A senha deve ter no máximo 128 caracteres';
+  if (!/[A-Z]/.test(password)) return 'A senha precisa ter pelo menos uma letra maiúscula';
+  if (!/[0-9]/.test(password)) return 'A senha precisa ter pelo menos um número';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'A senha precisa ter pelo menos um caractere especial (!@#$%...)';
+  return null;
+}
+
+async function optionalUser(req) {
+  const token = getBearerToken(req);
+  return token ? getUserByToken(token) : null;
+}
+
+const ALLOW_WHILE_MUSTCHANGE = new Set([
+  '/api/auth/change-password',
+  '/api/auth/me',
+  '/api/auth/logout',
+  '/api/auth/heartbeat',
+]);
+
+async function requireUser(req, res) {
+  const user = await optionalUser(req);
+  if (!user) {
+    sendError(req, res, 401, 'UNAUTHORIZED', 'Login obrigatorio');
+    return null;
+  }
+  if (user.must_change_password) {
+    const reqPath = new URL(req.url || '/', `http://${req.headers.host}`).pathname.replace(/\/+$/, '') || '/';
+    if (!ALLOW_WHILE_MUSTCHANGE.has(reqPath)) {
+      sendError(req, res, 403, 'PASSWORD_CHANGE_REQUIRED', 'Troque sua senha antes de continuar');
+      return null;
+    }
+  }
+  return user;
+}
+
+const ADMIN_ROLES = ['Administrador', 'Gestor'];
+
+async function requireAdmin(req, res) {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+  if (!ADMIN_ROLES.includes(user.role_name)) {
+    sendError(req, res, 403, 'FORBIDDEN', 'Apenas administradores podem executar esta acao');
+    return null;
+  }
+  return user;
+}
+
+// Simple in-memory brute-force guard for login (max 10 attempts per IP per 15min)
+const loginAttempts = new Map();
+setInterval(() => loginAttempts.clear(), 30 * 1000);
+function checkLoginRateLimit(ip) {
+  const count = (loginAttempts.get(ip) || 0) + 1;
+  loginAttempts.set(ip, count);
+  return count <= 10;
+}
+
+// General API rate limit (max 300 req/min per IP)
+const apiRateMap = new Map();
+setInterval(() => apiRateMap.clear(), 60 * 1000);
+function checkApiRateLimit(ip) {
+  const count = (apiRateMap.get(ip) || 0) + 1;
+  apiRateMap.set(ip, count);
+  return count <= 300;
+}
+
+function validateRequired(payload, fields) {
+  const missing = fields.filter(field => !payload[field]);
+  return missing.length ? `Campos obrigatorios: ${missing.join(', ')}` : null;
+}
+
+async function route(req, res) {
+  if (req.method === 'OPTIONS') return sendEmpty(req, res);
+
+  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  const segments = path.split('/').filter(Boolean);
+
+  if (path.startsWith('/api/') && path !== '/api/health') {
+    const ip = getRealIP(req);
+    if (!checkApiRateLimit(ip)) {
+      return sendError(req, res, 429, 'RATE_LIMITED', 'Limite de requisições excedido. Aguarde 1 minuto.');
+    }
+  }
+
+  try {
+    if (req.method === 'GET' && path === '/api/health') {
+      await pool.query('select 1');
+      return sendJson(req, res, 200, { status: 'ok', service: 'rede-nex-api' });
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/check') {
+      const u = await requireUser(req, res);
+      if (!u) return;
+      return sendJson(req, res, 200, { ok: true });
+    }
+
+    
+    // Public file downloads (desktop app distribution & auto-update)
+    if (path.startsWith('/api/downloads/') && req.method === 'GET') {
+      const { createReadStream } = await import('node:fs');
+      const { stat } = await import('node:fs/promises');
+      const { join: pjoin } = await import('node:path');
+      const fileName = decodeURIComponent(path.replace('/api/downloads/', ''));
+      if (!/^[\w .%-]+\.(zip|yml|exe)$/i.test(fileName)) return sendError(req, res, 404, 'NOT_FOUND', 'Not found');
+      const filePath = pjoin('/opt/rede-nex/downloads', fileName);
+      try {
+        const stats = await stat(filePath);
+        res.writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': stats.size,
+          'Content-Disposition': 'attachment; filename=' + JSON.stringify(fileName),
+          'Cache-Control': 'public, max-age=3600',
+        });
+        createReadStream(filePath).pipe(res);
+      } catch { return sendError(req, res, 404, 'NOT_FOUND', 'File not found'); }
+      return;
+    }
+
+    if (path === '/api/auth/login' && req.method === 'POST') {
+      const ip = getRealIP(req);
+      if (!checkLoginRateLimit(ip)) {
+        return sendError(req, res, 429, 'RATE_LIMITED', 'Muitas tentativas de login. Aguarde alguns minutos.');
+      }
+      const payload = await readJson(req);
+      const error = validateRequired(payload, ['email', 'password']);
+      if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+      const data = await login({
+        email: payload.email,
+        password: payload.password,
+        userAgent: req.headers['user-agent'],
+        ipAddress: ip,
+      });
+      if (!data) return sendError(req, res, 401, 'INVALID_CREDENTIALS', 'E-mail ou senha invalidos');
+      const { token: _t, ...safeLoginData } = data;
+      return sendJson(req, res, 200, { data: safeLoginData }, { 'Set-Cookie': sessionCookieHeader(data.token) });
+    }
+
+    if (path === '/api/auth/forgot-password' && req.method === 'POST') {
+      const payload = await readJson(req);
+      if (!payload.email) return sendError(req, res, 400, 'VALIDATION_ERROR', 'E-mail obrigatorio');
+      const result = await createPasswordResetToken(payload.email);
+      if (result) {
+        const proto = req.headers['x-forwarded-proto'] || 'http';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || '170.84.39.232';
+        const resetUrl = proto + '://' + host + '/redefinir-senha?token=' + result.token;
+        sendPasswordResetEmail({ to: result.user.email, name: result.user.name, resetUrl }).catch(() => {});
+      }
+      return sendJson(req, res, 200, { data: { sent: true } });
+    }
+
+    if (path === '/api/auth/reset-password' && req.method === 'POST') {
+      const payload = await readJson(req);
+      const err = validateRequired(payload, ['token', 'new_password']);
+      if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+      const pwError = validatePasswordComplexity(payload.new_password);
+      if (pwError) return sendError(req, res, 400, 'VALIDATION_ERROR', pwError);
+      const ok = await resetPasswordByToken(payload.token, payload.new_password);
+      return ok
+        ? sendJson(req, res, 200, { data: { reset: true } })
+        : sendError(req, res, 400, 'INVALID_TOKEN', 'Link invalido ou expirado');
+    }
+
+    if (path === '/api/auth/me' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: user });
+    }
+
+    if (path === '/api/auth/heartbeat' && req.method === 'POST') {
+      const data = await heartbeat(getBearerToken(req));
+      if (data?.user_id) awardXP(data.user_id, 'login', null).catch(() => {});
+      return data
+        ? sendJson(req, res, 200, { data })
+        : sendError(req, res, 401, 'UNAUTHORIZED', 'Sessao invalida');
+    }
+
+    if (path === '/api/users/me' && req.method === 'PUT') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const payload = await readJson(req);
+      const error = validateRequired(payload, ['name', 'email']);
+      if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+      return sendJson(req, res, 200, { data: await updateMyProfile(user.id, payload) });
+    }
+
+    if (path === '/api/users/me/dark-mode' && req.method === 'PATCH') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const { dark_mode } = await readJson(req);
+      await pool.query('UPDATE users SET dark_mode = $2 WHERE id = $1', [user.id, !!dark_mode]);
+      return sendEmpty(req, res);
+    }
+    if (path === '/api/users/me/chat-theme' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const { rows } = await pool.query('SELECT chat_theme FROM users WHERE id = $1', [user.id]);
+      return sendJson(req, res, 200, { data: rows[0]?.chat_theme || null });
+    }
+
+    if (path === '/api/users/me/chat-theme' && req.method === 'PUT') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const payload = await readJson(req);
+      if (!payload || typeof payload !== 'object') return sendError(req, res, 400, 'VALIDATION_ERROR', 'Invalid theme');
+      await pool.query('UPDATE users SET chat_theme = $2 WHERE id = $1', [user.id, JSON.stringify(payload)]);
+      return sendJson(req, res, 200, { data: payload });
+    }
+
+    if (path === '/api/auth/logout' && req.method === 'POST') {
+      const user = await optionalUser(req);
+      await logout(getBearerToken(req), user?.id);
+      return sendEmpty(req, res, 204, { 'Set-Cookie': clearCookieHeader() });
+    }
+
+    if (path === '/api/auth/change-password' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const payload = await readJson(req);
+      const error = validateRequired(payload, ['current_password', 'new_password']);
+      if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+      const pwError = validatePasswordComplexity(payload.new_password);
+      if (pwError) return sendError(req, res, 400, 'VALIDATION_ERROR', pwError);
+      const changed = await changePassword(user.id, payload.current_password, payload.new_password);
+      return changed
+        ? sendJson(req, res, 200, { data: { changed: true } })
+        : sendError(req, res, 403, 'INVALID_PASSWORD', 'Senha atual invalida');
+    }
+
+    if (path === '/api/users/me/avatar' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const media = await saveUserAvatar(user, await readJson(req));
+      return sendJson(req, res, 201, { data: media });
+    }
+
+    if (path === '/api/users/me/cover' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const media = await saveUserCover(user, await readJson(req));
+      return sendJson(req, res, 201, { data: media });
+    }
+
+    if (path === '/api/wiki/media' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const media = await saveWikiMedia(user, await readJson(req));
+      return sendJson(req, res, 201, { data: media });
+    }
+
+    if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'media' && segments[2] && segments[3] === 'content') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const media = await getMediaContent(segments[2]);
+      return media?.file_data
+        ? sendBinary(req, res, 200, media.file_data, media.file_type)
+        : sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
+    }
+
+    if (req.method === 'GET' && path === '/api/dashboard') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await getDashboardData() });
+    }
+    if (req.method === 'GET' && path === '/api/analytics') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const _p = ["week","month","quarter","year"].includes(url.searchParams.get("period")) ? url.searchParams.get("period") : "week"; return sendJson(req, res, 200, { data: await getAnalyticsData(_p) });
+    }
+
+    if (req.method === 'GET' && path === '/api/users') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const search = url.searchParams.get('q') || '';
+      const limit = url.searchParams.get('limit') || 500;
+      return sendJson(req, res, 200, { data: await listUsers({ search, limit }) });
+    }
+
+    if (req.method === 'POST' && path === '/api/users') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      const payload = await readJson(req);
+      if (payload.password) {
+        const pwErr = validatePasswordComplexity(payload.password);
+        if (pwErr) return sendError(req, res, 400, 'VALIDATION_ERROR', pwErr);
+      }
+      return sendJson(req, res, 201, { data: await createUser(payload) });
+    }
+
+    if (req.method === 'GET' && path === '/api/roles') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await listRoles() });
+    }
+
+    if (req.method === 'GET' && path === '/api/nav-settings') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await getAllNavSettings() });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'nav-settings' && segments[2]) {
+      const roleName = decodeURIComponent(segments[2]);
+      if (req.method === 'PUT') {
+        const admin = await requireAdmin(req, res);
+        if (!admin) return;
+        const { visible_routes } = await readJson(req);
+        const result = await upsertNavSettings(roleName, Array.isArray(visible_routes) ? visible_routes : null);
+        return sendJson(req, res, 200, { data: result });
+      }
+      if (req.method === 'DELETE') {
+        const admin = await requireAdmin(req, res);
+        if (!admin) return;
+        await deleteNavSettings(roleName);
+        return sendEmpty(req, res);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'users' && segments[2] && segments[2] !== 'me' && segments[2] !== 'online') {
+      const userId = segments[2];
+      if (req.method === 'PUT') {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const payload = await readJson(req);
+        const { name, email, role_id, department_id, position, phone, admission_date, birth_date, status, password } = payload;
+        if (password) {
+          const pwErr = validatePasswordComplexity(password);
+          if (pwErr) return sendError(req, res, 400, 'VALIDATION_ERROR', pwErr);
+        }
+        const updated = await updateUser(userId, { name, email, role_id, department_id, position, phone, admission_date, birth_date, status, password });
+        return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Usuário não encontrado');
+      }
+      if (req.method === 'DELETE') {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const ok = await deactivateUser(userId);
+        return ok ? sendEmpty(req, res) : sendError(req, res, 404, 'NOT_FOUND', 'Usuário não encontrado');
+      }
+    }
+
+    if (req.method === 'GET' && path === '/api/users/online') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await listOnlineUsers() });
+    }
+
+    if (path === '/api/notifications') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listNotifications(user.id) });
+      if (req.method === 'PATCH') return sendJson(req, res, 200, { data: await markAllNotificationsRead(user.id) });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'notifications' && segments[2]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (segments[3] === 'read' && req.method === 'PATCH') {
+        const notification = await markNotificationRead(user.id, segments[2]);
+        return notification ? sendJson(req, res, 200, { data: notification }) : sendError(req, res, 404, 'NOT_FOUND', 'Notificação não encontrada');
+      }
+    }
+
+    if (path === '/api/chat/media' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const media = await saveChatMedia(user.id, await readJson(req));
+      return sendJson(req, res, 201, { data: { public_url: media.public_url } });
+    }
+
+    if (path === '/api/chat/conversations') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listConversations(user.id) });
+      if (req.method === 'POST') {
+        const payload = await readJson(req);
+        const error = payload.type !== 'direct' ? validateRequired(payload, ['name']) : null;
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        return sendJson(req, res, 201, { data: await createConversation(user.id, payload) });
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'chat' && segments[2] === 'conversations' && segments[3]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const conversationId = segments[3];
+
+      if (segments[4] === 'messages') {
+        if (!segments[5]) {
+          if (req.method === 'GET') {
+            const beforeId = url.searchParams.get('before_id') || null;
+            const result = await listMessages(user.id, conversationId, { beforeId });
+            return result
+              ? sendJson(req, res, 200, { data: result.messages, has_more: result.has_more })
+              : sendError(req, res, 404, 'NOT_FOUND', 'Conversa não encontrada');
+          }
+          if (req.method === 'POST') {
+            const payload = await readJson(req);
+            if (!payload.content?.trim() && !payload.attachment_url) {
+              return sendError(req, res, 400, 'VALIDATION_ERROR', 'content ou attachment_url obrigatorio');
+            }
+            const message = await sendMessage(user.id, conversationId, payload.content, payload.attachment_url || null, payload.reply_to_id || null);
+            const xpMsg = message ? await awardXP(user.id, 'send_message', message.id).catch(() => null) : null;
+            if (message) {
+              const wsNotif = JSON.stringify({
+                type: 'message:incoming',
+                from: user.id,
+                senderName: user.name,
+                senderPhoto: user.photo_url,
+                preview: (payload.content || (payload.attachment_url ? '[arquivo]' : '')).slice(0, 100),
+                conversationId,
+              });
+              pool.query(
+                'SELECT user_id FROM chat_participants WHERE conversation_id = $1 AND user_id != $2',
+                [conversationId, user.id]
+              ).then(parts => {
+                for (const row of parts.rows) {
+                  const targets = callSessions.get(row.user_id);
+                  if (targets) {
+                    for (const s of targets) { if (s.readyState === 1) s.send(wsNotif); }
+                  }
+                }
+              }).catch(() => {});
+            }
+            return message ? sendJson(req, res, 201, { data: message, gamification: xpMsg }) : sendError(req, res, 404, 'NOT_FOUND', 'Conversa não encontrada');
+          }
+        }
+
+        const messageId = segments[5];
+        if (messageId) {
+          if (req.method === 'PUT') {
+            const payload = await readJson(req);
+            const error = validateRequired(payload, ['content']);
+            if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+            try {
+              const edited = await editMessage(user.id, messageId, payload.content);
+              return edited ? sendJson(req, res, 200, { data: edited }) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao para editar');
+            } catch (err) {
+              if (err.code === 'EDIT_EXPIRED') return sendError(req, res, 403, err.code, err.message);
+              throw err;
+            }
+          }
+          if (req.method === 'DELETE') {
+            const deleted = await deleteMessage(user.id, messageId);
+            return deleted ? sendEmpty(req, res) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão ou prazo expirado (máx 30 min)');
+          }
+          if (segments[6] === 'history' && req.method === 'GET') {
+            const history = await getMessageEditHistory(user.id, messageId);
+            return history !== null ? sendJson(req, res, 200, { data: history }) : sendError(req, res, 404, 'NOT_FOUND', 'Mensagem não encontrada');
+          }
+          if (segments[6] === 'readers' && req.method === 'GET') {
+            const msgRow = await pool.query(
+              'SELECT created_at FROM chat_messages WHERE id = $1 AND conversation_id = $2',
+              [messageId, conversationId]
+            );
+            if (!msgRow.rows[0]) return sendError(req, res, 404, 'NOT_FOUND', 'Mensagem não encontrada');
+            const readers = await pool.query(
+              `SELECT u.id, u.name, u.photo_url, cp.last_read_at
+               FROM chat_participants cp
+               JOIN users u ON u.id = cp.user_id
+               WHERE cp.conversation_id = $1 AND cp.user_id != $2 AND cp.last_read_at >= $3
+               ORDER BY cp.last_read_at ASC`,
+              [conversationId, user.id, msgRow.rows[0].created_at]
+            );
+            return sendJson(req, res, 200, { data: readers.rows });
+          }
+        }
+      }
+
+      if (segments[4] === 'read' && req.method === 'POST') {
+        await pool.query(
+          'update chat_participants set last_read_at = now() where conversation_id = $1 and user_id = $2',
+          [conversationId, user.id]
+        );
+        return sendEmpty(req, res);
+      }
+
+      if (segments[4] === 'mute' && req.method === 'POST') {
+        const isMuted = await toggleMuteConversation(conversationId, user.id);
+        return sendJson(req, res, 200, { data: { is_muted: isMuted } });
+      }
+
+      if (segments[4] === 'pin' && req.method === 'PUT') {
+        const isPinned = await pinConversation(user.id, conversationId);
+        return sendJson(req, res, 200, { data: { is_pinned: isPinned } });
+      }
+      if (segments[4] === 'pin-message' && req.method === 'PUT') {
+        const payload = await readJson(req);
+        const conv = await pinMessage(user.id, conversationId, payload.message_id ?? null);
+        return conv ? sendJson(req, res, 200, { data: conv }) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+      }
+      if (segments[4] === 'notes') {
+        if (req.method === 'GET') {
+          const notes = await getNotes(user.id, conversationId);
+          return sendJson(req, res, 200, { data: notes });
+        }
+        if (req.method === 'PUT') {
+          const payload = await readJson(req);
+          const notes = await saveNotes(user.id, conversationId, payload.content ?? '');
+          return sendJson(req, res, 200, { data: notes });
+        }
+      }
+      if (segments[4] === 'avatar' && req.method === 'POST') {
+        const media = await saveChatAvatar(user.id, conversationId, await readJson(req));
+        return sendJson(req, res, 201, { data: media });
+      }
+
+      if (segments[4] === 'participants') {
+        if (req.method === 'GET') {
+          const { rows: [member] } = await pool.query('SELECT 1 FROM chat_participants WHERE conversation_id=$1 AND user_id=$2', [conversationId, user.id]);
+          if (!member) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          const list = await listGroupParticipants(conversationId);
+          return sendJson(req, res, 200, { data: list });
+        }
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          const participantIds = Array.isArray(payload.participant_ids) ? payload.participant_ids : [];
+          if (!participantIds.length) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Informe participant_ids');
+          const result = await addParticipants(user.id, conversationId, participantIds);
+          return result ? sendJson(req, res, 200, { data: result }) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao para alterar participantes');
+        }
+        if (segments[5] && req.method === 'PATCH') {
+          const targetUserId = segments[5];
+          const payload = await readJson(req);
+          const result = await updateParticipantRole(user.id, conversationId, targetUserId, payload.role);
+          return result ? sendJson(req, res, 200, { data: result }) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao');
+        }
+        if (segments[5] && req.method === 'DELETE') {
+          const targetUserId = segments[5];
+          const ok = await removeParticipant(user.id, conversationId, targetUserId);
+          return ok ? sendEmpty(req, res) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao');
+        }
+      }
+
+      if (!segments[4] && req.method === 'PUT') {
+        const payload = await readJson(req);
+        const conv = await updateConversation(user.id, conversationId, payload);
+        return conv ? sendJson(req, res, 200, { data: conv }) : sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao');
+      }
+    }
+
+    // Task Templates
+    if (segments[0] === 'api' && segments[1] === 'tasks' && segments[2] === 'templates') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!segments[3]) {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listTaskTemplates(user.id) });
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          if (!payload.title?.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title obrigatorio');
+          return sendJson(req, res, 201, { data: await createTaskTemplate(user.id, payload) });
+        }
+      }
+      if (segments[3] && req.method === 'DELETE') { await deleteTaskTemplate(segments[3], user.id); return sendJson(req, res, 200, {}); }
+    }
+    // Tasks routes
+    // Custom task lists
+    if (segments[0] === 'api' && segments[1] === 'tasks' && segments[2] === 'lists') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listCustomLists(user.id) });
+      if (req.method === 'POST') {
+        const { name } = await readJson(req);
+        if (!name?.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'name obrigatório');
+        return sendJson(req, res, 201, { data: await createCustomList(user.id, name.trim()) });
+      }
+      if (segments[3] && req.method === 'PUT') {
+        const { name } = await readJson(req);
+        const list = await renameCustomList(segments[3], user.id, name?.trim() || '');
+        return list ? sendJson(req, res, 200, { data: list }) : sendError(req, res, 404, 'NOT_FOUND', 'Lista não encontrada');
+      }
+      if (segments[3] && req.method === 'DELETE') {
+        await deleteCustomList(segments[3], user.id);
+        return sendEmpty(req, res);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'tasks') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      if (segments[2] === 'by-protocol' && segments[3] && req.method === 'GET') {
+        const task = await getTaskByProtocol(segments[3].toUpperCase());
+        if (!task) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+        const isAdmin = ADMIN_ROLES.includes(user.role_name);
+        const isRelated = task.created_by === user.id || task.owner_id === user.id ||
+          (Array.isArray(task.assignees) && task.assignees.some(a => a.id === user.id));
+        if (!isRelated && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        return sendJson(req, res, 200, { data: task });
+      }
+
+      if (!segments[2]) {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listTasks(user.id) });
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          const error = validateRequired(payload, ['title']);
+          if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+          return sendJson(req, res, 201, { data: await createTask(user.id, payload) });
+        }
+      }
+
+      const taskId = segments[2];
+
+      if (!segments[3]) {
+        if (req.method === 'GET') {
+          const task = await getTask(taskId);
+          if (!task) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+          const isTaskAdmin = ADMIN_ROLES.includes(user.role_name);
+          const isTaskRelated = task.created_by === user.id || task.owner_id === user.id ||
+            (Array.isArray(task.assignees) && task.assignees.some(a => a.id === user.id));
+          if (!isTaskRelated && !isTaskAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          return sendJson(req, res, 200, { data: task });
+        }
+        if (req.method === 'PUT') {
+          const existing = await getTask(taskId);
+          if (!existing) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+          const isOwner = existing.created_by === user.id || existing.owner_id === user.id;
+          const isAdmin = ADMIN_ROLES.includes(user.role_name);
+          if (!isOwner && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao para editar esta tarefa');
+          const taskPayload = await readJson(req);
+          const task = await updateTask(taskId, taskPayload);
+          let xpTask = null;
+          if (task && taskPayload.status === 'done' && existing.status !== 'done') {
+            xpTask = await awardXP(user.id, 'complete_task', taskId).catch(() => null);
+          }
+          return task ? sendJson(req, res, 200, { data: task, gamification: xpTask }) : sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+        }
+        if (req.method === 'DELETE') {
+          const existing = await getTask(taskId);
+          if (!existing) return sendEmpty(req, res);
+          const isOwner = existing.created_by === user.id || existing.owner_id === user.id;
+          const isAdmin = ADMIN_ROLES.includes(user.role_name);
+          if (!isOwner && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao para excluir esta tarefa');
+          await deleteTask(taskId);
+          return sendEmpty(req, res);
+        }
+      }
+
+      if (segments[3] === 'comments' && req.method === 'POST') {
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['content']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        const task = await addTaskComment(taskId, user.id, payload.content);
+        return sendJson(req, res, 201, { data: task });
+      }
+
+      if (segments[3] === 'checklists') {
+        const taskForCl = await getTask(taskId);
+        if (!taskForCl) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+        const isOwnerCl = taskForCl.created_by === user.id || taskForCl.owner_id === user.id;
+        if (!isOwnerCl && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        if (!segments[4] && req.method === 'POST') {
+          const payload = await readJson(req);
+          const error = validateRequired(payload, ['title']);
+          if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+          const checklistId = await addChecklist(taskId, payload.title);
+          const task = await getTask(taskId);
+          return sendJson(req, res, 201, { data: task, checklistId });
+        }
+
+        const checklistId = segments[4];
+        if (checklistId && !segments[5] && req.method === 'PATCH') {
+          const payload = await readJson(req);
+          if (payload.title) await updateChecklist(checklistId, payload.title);
+          return sendJson(req, res, 200, { data: await getTask(taskId) });
+        }
+        if (checklistId && !segments[5] && req.method === 'DELETE') {
+          await deleteChecklist(checklistId);
+          return sendJson(req, res, 200, { data: await getTask(taskId) });
+        }
+
+        if (checklistId && segments[5] === 'items') {
+          if (!segments[6] && req.method === 'POST') {
+            const payload = await readJson(req);
+            const error = validateRequired(payload, ['content']);
+            if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+            await addChecklistItem(checklistId, payload.content);
+            return sendJson(req, res, 201, { data: await getTask(taskId) });
+          }
+          const itemId = segments[6];
+          if (itemId && req.method === 'PATCH') {
+            await updateChecklistItem(itemId, await readJson(req));
+            return sendJson(req, res, 200, { data: await getTask(taskId) });
+          }
+          if (itemId && req.method === 'DELETE') {
+            await deleteChecklistItem(itemId);
+            return sendJson(req, res, 200, { data: await getTask(taskId) });
+          }
+        }
+      }
+
+      if (segments[3] === 'files') {
+        if (!segments[4] && req.method === 'GET') {
+          return sendJson(req, res, 200, { data: await listTaskFiles(taskId) });
+        }
+        if (!segments[4] && req.method === 'POST') {
+          const payload = await readJson(req);
+          if (!payload.name || !payload.file_url) return sendError(req, res, 400, 'VALIDATION_ERROR', 'name e file_url são obrigatórios');
+          return sendJson(req, res, 201, { data: await addTaskFile(taskId, payload, user.id) });
+        }
+        if (segments[4] && req.method === 'DELETE') {
+          const deleted = await deleteTaskFile(segments[4]);
+          return deleted ? sendEmpty(req, res) : sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
+        }
+      }
+    }
+
+
+    if (req.method === 'GET' && path === '/api/integrations/bitrix/users') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      return sendJson(req, res, 200, { data: await listBitrixUsers() });
+    }
+
+    if (req.method === 'GET' && path === '/api/integrations/bitrix/imports') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      return sendJson(req, res, 200, { data: await listBitrixImports() });
+    }
+
+    if (path === '/api/integrations/bitrix/users/import' && req.method === 'POST') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      const payload = await readJson(req);
+      const users = Array.isArray(payload) ? payload : payload.users;
+      if (!Array.isArray(users)) {
+        return sendError(req, res, 400, 'VALIDATION_ERROR', 'Envie um array de usuarios ou { "users": [...] }');
+      }
+      return sendJson(req, res, 201, { data: await importBitrixUsers(users, payload.source || 'manual') });
+    }
+
+    if (path === '/api/integrations/bitrix/users/sync' && req.method === 'POST') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      const users = await fetchBitrixUsers();
+      return sendJson(req, res, 201, { data: await importBitrixUsers(users, 'webhook') });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'departments') {
+      const deptId = segments[2];
+      if (req.method === 'GET' && !deptId) {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        return sendJson(req, res, 200, { data: await listDepartmentsWithStats() });
+      }
+      if (req.method === 'POST' && !deptId) {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const payload = await readJson(req);
+        return sendJson(req, res, 201, { data: await createDepartment(payload.name, payload.description) });
+      }
+      if (req.method === 'PUT' && deptId) {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const payload = await readJson(req);
+        const updated = await updateDepartment(deptId, payload.name, payload.description, payload.manager_id, payload.parent_id);
+        return updated
+          ? sendJson(req, res, 200, { data: updated })
+          : sendError(req, res, 404, 'NOT_FOUND', 'Departamento não encontrado');
+      }
+      if (req.method === 'DELETE' && deptId) {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const ok = await deleteDepartment(deptId);
+        return ok ? sendEmpty(req, res) : sendError(req, res, 404, 'NOT_FOUND', 'Departamento não encontrado');
+      }
+    }
+
+    if (path === '/api/trainings' && !segments[2]) {
+      if (req.method === 'GET') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const all = url.searchParams.get('all') === '1' && ADMIN_ROLES.includes(user.role_name);
+        return sendJson(req, res, 200, { data: all ? { trainings: await listAllTrainings(), categories: (await getTrainingData()).categories } : await getTrainingData() });
+      }
+      if (req.method === 'POST') {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const payload = await readJson(req);
+        const training = await createTraining(payload, actor.id);
+        return sendJson(req, res, 201, { data: training });
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'trainings' && segments[2] && !segments[3]) {
+      const trainingId = segments[2];
+      if (req.method === 'PUT') {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        const payload = await readJson(req);
+        const training = await updateTraining(trainingId, payload);
+        return sendJson(req, res, 200, { data: training });
+      }
+      if (req.method === 'DELETE') {
+        const actor = await requireAdmin(req, res);
+        if (!actor) return;
+        await deleteTraining(trainingId);
+        return sendJson(req, res, 200, { data: { deleted: true } });
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'trainings' && segments[2] && segments[3] === 'progress') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const trainingId = segments[2];
+      await pool.query('CREATE TABLE IF NOT EXISTS training_progress (user_id text NOT NULL, training_id text NOT NULL, progress_pct int NOT NULL DEFAULT 0, completed_at timestamptz, PRIMARY KEY (user_id, training_id))');
+      if (req.method === 'GET') {
+        const pr = await pool.query('SELECT progress_pct, completed_at FROM training_progress WHERE user_id=$1 AND training_id=$2', [user.id, trainingId]);
+        return sendJson(req, res, 200, { data: pr.rows[0] || { progress_pct: 0, completed_at: null } });
+      }
+      if (req.method === 'POST') {
+        const { progress_pct } = await readJson(req);
+        const pct = Math.min(100, Math.max(0, Number(progress_pct) || 0));
+        await pool.query(
+          `INSERT INTO training_progress (user_id, training_id, progress_pct, completed_at)
+           VALUES ($1, $2, $3, CASE WHEN $3 >= 100 THEN NOW() ELSE NULL END)
+           ON CONFLICT (user_id, training_id) DO UPDATE
+             SET progress_pct = GREATEST(training_progress.progress_pct, EXCLUDED.progress_pct),
+                 completed_at = CASE WHEN EXCLUDED.progress_pct >= 100 AND training_progress.completed_at IS NULL THEN NOW() ELSE training_progress.completed_at END`,
+          [user.id, trainingId, pct]
+        );
+        const xpAction = pct >= 100 ? 'complete_training' : 'watch_training';
+        const xpTrain = await awardXP(user.id, xpAction, trainingId).catch(() => null);
+        return sendJson(req, res, 200, { data: { ok: true, progress_pct: pct }, gamification: xpTrain });
+      }
+    }
+
+    if (path === '/api/feed/posts') {
+      if (req.method === 'GET') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        return sendJson(req, res, 200, { data: await listFeedPosts() });
+      }
+      if (req.method === 'POST') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['content']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        delete payload.author_id;
+        const post = await createFeedPost(payload, user.id);
+        const xpPost = post ? await awardXP(user.id, 'post_feed', post.id).catch(() => null) : null;
+        return sendJson(req, res, 201, { data: post, gamification: xpPost });
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'feed' && segments[2] === 'posts' && segments[3]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const postId = segments[3];
+      if (segments[4] === 'comments' && segments[5] && segments[6] === 'reactions' && req.method === 'POST') {
+        const payload = await readJson(req);
+        const result = await toggleCommentReaction(segments[5], user.id, payload.reaction || 'like');
+        if (!result) return sendError(req, res, 404, 'NOT_FOUND', 'Comentário não encontrado');
+        return sendJson(req, res, 200, { data: result });
+      }
+      if (segments[4] === 'comments' && !segments[5] && req.method === 'POST') {
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['content']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        const comment = await createPostComment(postId, user.id, payload.content);
+        const xpComment = comment ? await awardXP(user.id, 'comment_post', comment.id).catch(() => null) : null;
+        return sendJson(req, res, 201, { data: comment, gamification: xpComment });
+      }
+      if (segments[4] === 'reactions' && req.method === 'POST') {
+        const payload = await readJson(req);
+        return sendJson(req, res, 200, { data: await togglePostReaction(postId, user.id, payload.reaction) });
+      }
+      if (!segments[4] && req.method === 'PATCH') {
+        const payload = await readJson(req);
+        const updated = await updateFeedPost(postId, user.id, payload.content || '');
+        return sendJson(req, res, 200, { data: updated });
+      }
+      if (!segments[4] && req.method === 'DELETE') {
+        await deleteFeedPost(postId, user.id);
+        return sendJson(req, res, 200, { data: { deleted: true } });
+      }
+      if (segments[4] === 'comments' && segments[5] && !segments[6] && req.method === 'PATCH') {
+        const payload = await readJson(req);
+        const updated = await updatePostComment(segments[5], user.id, payload.content || '');
+        return sendJson(req, res, 200, { data: updated });
+      }
+      if (segments[4] === 'comments' && segments[5] && !segments[6] && req.method === 'DELETE') {
+        await deletePostComment(segments[5], user.id);
+        return sendJson(req, res, 200, { data: { deleted: true } });
+      }
+    }
+
+    if (req.method === 'GET' && path === '/api/admin/logs') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+      const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') || '50')));
+      const entityType = url.searchParams.get('entityType') || '';
+      const action = url.searchParams.get('action') || '';
+      const userId = url.searchParams.get('userId') || '';
+      const offset = (page - 1) * pageSize;
+      const filters = [];
+      const params = [];
+      if (entityType) { params.push(entityType); filters.push(`a.entity_type = $${params.length}`); }
+      if (action) { params.push(action); filters.push(`a.action = $${params.length}`); }
+      if (userId) { params.push(userId); filters.push(`a.actor_id = $${params.length}`); }
+      const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+      const [logRows, countRow] = await Promise.all([
+        pool.query(
+          `SELECT a.id, a.action, a.entity_type, a.entity_id, a.old_data, a.new_data, a.ip_address, a.created_at,
+                  u.id AS actor_id, u.name AS actor_name, u.photo_url AS actor_photo
+           FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
+           ${where} ORDER BY a.created_at DESC
+           LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+          [...params, pageSize, offset]
+        ),
+        pool.query(`SELECT COUNT(*) FROM audit_logs a ${where}`, params),
+      ]);
+      return sendJson(req, res, 200, { data: logRows.rows, total: parseInt(countRow.rows[0].count), page, pageSize });
+    }
+
+    if (req.method === 'GET' && path === '/api/wiki/activity') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const { rows } = await pool.query(`
+        SELECT
+          a.id,
+          a.author_id,
+          a.title,
+          a.content,
+          a.created_at,
+          a.updated_at,
+          a.updated_at > a.created_at + interval '1 minute' AS was_edited,
+          json_build_object(
+            'id', u.id, 'name', u.name, 'photo_url', u.photo_url,
+            'email', COALESCE(u.email, ''), 'position', u.position,
+            'status', u.status, 'created_at', u.created_at, 'updated_at', u.updated_at
+          ) AS users,
+          json_build_object('id', c.id, 'name', c.name, 'color', c.color) AS categories
+        FROM wiki_articles a
+        LEFT JOIN users u ON u.id = a.author_id
+        LEFT JOIN wiki_categories c ON c.id = a.category_id
+        WHERE a.status = 'published'
+        ORDER BY a.updated_at DESC
+        LIMIT 30
+      `);
+      return sendJson(req, res, 200, { data: rows });
+    }
+
+    if (path === '/api/wiki/categories') {
+      if (req.method === 'GET') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        return sendJson(req, res, 200, { data: await listCategories(user.id, user.role_name) });
+      }
+      if (req.method === 'POST') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['name']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        return sendJson(req, res, 201, { data: await createCategory(payload) });
+      }
+    }
+
+
+    if (segments[0] === 'api' && segments[1] === 'wiki' && segments[2] === 'categories' && segments[3] && segments[4] === 'visibility') {
+      const catVisId = segments[3];
+      if (req.method === 'PUT') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+        const payload = await readJson(req);
+        const result = await setCategoryVisibility(catVisId, payload.allowed_user_ids ?? null, payload.role_required ?? null);
+        return result ? sendJson(req, res, 200, { data: result }) : sendError(req, res, 404, 'NOT_FOUND', 'Categoria não encontrada');
+      }
+    }
+
+        if (segments[0] === 'api' && segments[1] === 'wiki' && segments[2] === 'categories' && segments[3]) {
+      const id = segments[3];
+      if (req.method === 'PUT') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['name']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        const category = await updateCategory(id, payload);
+        return category ? sendJson(req, res, 200, { data: category }) : sendError(req, res, 404, 'NOT_FOUND', 'Categoria não encontrada');
+      }
+      if (req.method === 'DELETE') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+        const removed = await deleteCategory(id);
+        return removed ? sendEmpty(req, res) : sendError(req, res, 404, 'NOT_FOUND', 'Categoria não encontrada');
+      }
+    }
+
+    if (req.method === 'GET' && path === '/api/wiki/search') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const q = url.searchParams.get('q');
+      if (!q) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Parametro q e obrigatorio');
+      return sendJson(req, res, 200, await searchArticles(q));
+    }
+
+    if (path === '/api/wiki/articles') {
+      if (req.method === 'GET') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        return sendJson(req, res, 200, await listArticles({
+          categoryId: url.searchParams.get('categoryId'),
+          status: url.searchParams.get('status') || 'published',
+          search: url.searchParams.get('search'),
+          page: url.searchParams.get('page'),
+          pageSize: url.searchParams.get('pageSize'),
+          userRole: user.role_name,
+          userId: user.id,
+        }));
+      }
+      if (req.method === 'POST') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['title', 'slug']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        return sendJson(req, res, 201, { data: await createArticle({ ...payload, author_id: user.id }) });
+      }
+    }
+
+    if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'wiki' && segments[2] === 'articles' && segments[3] === 'slug' && segments[4]) {
+      const wikiUser = await requireUser(req, res);
+      if (!wikiUser) return;
+      const article = await getArticleBySlug(segments[4]);
+      if (article) {
+        const roleOk = !article.role_required
+          || wikiUser.role_name === 'Administrador'
+          || (wikiUser.role_name === 'Gestor' && ['Editor', 'Gestor'].includes(article.role_required))
+          || (wikiUser.role_name === 'Editor' && article.role_required === 'Editor');
+        const userOk = !article.allowed_user_ids?.length
+          || article.allowed_user_ids.includes(wikiUser.id)
+          || wikiUser.role_name === 'Administrador';
+        if (!roleOk || !userOk) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para visualizar este artigo');
+        awardXP(wikiUser.id, 'access_wiki', article.id).catch(() => {});
+      }
+      return article ? sendJson(req, res, 200, { data: article }) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'wiki' && segments[2] === 'articles' && segments[3]) {
+      const id = segments[3];
+
+      if (segments[4] === 'status' && req.method === 'PATCH') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const artStatus = await getArticleById(id);
+        if (!artStatus) return sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+        if (artStatus.author_id !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        const payload = await readJson(req);
+        const error = validateRequired(payload, ['status']);
+        if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+        const article = await updateArticleStatus(id, payload.status, user.id);
+        return article ? sendJson(req, res, 200, { data: article }) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+      }
+
+      if (segments[4] === 'visibility' && req.method === 'PUT') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        if (!ADMIN_ROLES.includes(user.role_name) && user.role_name !== 'Editor') return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        const payload = await readJson(req);
+        const result = await setArticleVisibility(id, payload.role_required ?? null, payload.allowed_user_ids ?? null);
+        return result ? sendJson(req, res, 200, { data: result }) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+      }
+
+      if (segments[4] === 'versions' && !segments[5] && req.method === 'GET') {
+        const vUser = await requireUser(req, res);
+        if (!vUser) return;
+        return sendJson(req, res, 200, { data: await listVersions(id) });
+      }
+
+      if (segments[4] === 'versions' && segments[5] && segments[6] === 'restore' && req.method === 'POST') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const artRestore = await getArticleById(id);
+        if (!artRestore) return sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+        if (artRestore.author_id !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        const article = await restoreVersion(id, segments[5], user.id);
+        return article ? sendJson(req, res, 200, { data: article }) : sendError(req, res, 404, 'NOT_FOUND', 'Versão não encontrada');
+      }
+
+      if (!segments[4] && req.method === "DELETE") {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        if (!ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, "FORBIDDEN", "Sem permissão");
+        const deleted = await deleteArticle(id);
+        return deleted ? sendJson(req, res, 200, {}) : sendError(req, res, 404, "NOT_FOUND", "Artigo não encontrado");
+      }
+
+      if (segments[4] === 'view' && req.method === 'POST') {
+        const user = await optionalUser(req);
+        const article = await recordArticleView(id, user?.id);
+        return article ? sendJson(req, res, 200, { data: article }) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+      }
+
+      if (segments[4] === 'like' && req.method === 'POST') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        return sendJson(req, res, 200, { data: await toggleArticleLike(id, user.id) });
+      }
+
+      if (segments[4] === 'likes' && !segments[5] && req.method === 'GET') {
+        const user = await requireUser(req, res); if (!user) return;
+        return sendJson(req, res, 200, { data: await listArticleLikes(id) });
+      }
+
+      if (segments[4] === 'views' && !segments[5] && req.method === 'GET') {
+        const user = await requireUser(req, res); if (!user) return;
+        return sendJson(req, res, 200, { data: await listArticleViews(id) });
+      }
+
+      if (segments[4] === 'comments') {
+        if (req.method === 'GET') {
+          const user = await requireUser(req, res); if (!user) return;
+          return sendJson(req, res, 200, { data: await listArticleComments(id) });
+        }
+        if (req.method === 'POST') {
+          const user = await requireUser(req, res);
+          if (!user) return;
+          const payload = await readJson(req);
+          const error = validateRequired(payload, ['content']);
+          if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+          const wikiComment = await createArticleComment(id, user.id, payload.content);
+          const xpWikiComment = wikiComment ? await awardXP(user.id, 'comment_wiki', wikiComment.id).catch(() => null) : null;
+          return sendJson(req, res, 201, { data: wikiComment, gamification: xpWikiComment });
+        }
+      }
+
+      if (req.method === 'GET') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const article = await getArticleById(id);
+        return article ? sendJson(req, res, 200, { data: article }) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+      }
+
+      if (req.method === 'PUT') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const artToEdit = await getArticleById(id);
+        if (!artToEdit) return sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+        if (artToEdit.author_id !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para editar este artigo');
+        const article = await updateArticle(id, { ...await readJson(req), editor_id: user.id });
+        return article ? sendJson(req, res, 200, { data: article }) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+      }
+
+      if (req.method === 'DELETE') {
+        const user = await requireUser(req, res);
+        if (!user) return;
+        const artToDel = await getArticleById(id);
+        if (!artToDel) return sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+        if (artToDel.author_id !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para arquivar este artigo');
+        const archived = await archiveArticle(id);
+        return archived ? sendEmpty(req, res) : sendError(req, res, 404, 'NOT_FOUND', 'Artigo não encontrado');
+      }
+    }
+
+    // ── Gamification ──────────────────────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'gamification') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      if (segments[2] === 'profile' && req.method === 'GET') {
+        const targetId = segments[3] || user.id;
+        const profile = await getUserGamificationProfile(targetId);
+        return sendJson(req, res, 200, { data: profile });
+      }
+
+      if (segments[2] === 'missions' && req.method === 'GET') {
+        const missions = await getUserMissions(user.id);
+        return sendJson(req, res, 200, { data: missions });
+      }
+
+      if (segments[2] === 'ranking' && req.method === 'GET') {
+        const ranking = await getGlobalRanking(100);
+        const myPosition = await getUserRankPosition(user.id);
+        return sendJson(req, res, 200, { data: { ranking, my_position: myPosition } });
+      }
+    }
+
+    // ── Calendário ────────────────────────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'calendar') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      if (segments[2] === 'events' && !segments[3]) {
+        if (req.method === 'GET') {
+          const from = url.searchParams.get('from') || undefined;
+          const to = url.searchParams.get('to') || undefined;
+          const internalEvents = await listEvents(user.id, { from, to });
+          if (user.google_ical_url) {
+            try {
+              const googleEvents = await fetchGoogleCalendarEvents(user.google_ical_url, { from, to });
+              const merged = [...internalEvents, ...googleEvents].sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+              return sendJson(req, res, 200, { data: merged });
+            } catch {}
+          }
+          return sendJson(req, res, 200, { data: internalEvents });
+        }
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          const error = validateRequired(payload, ['title', 'start_at', 'end_at']);
+          if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+          return sendJson(req, res, 201, { data: await createEvent(user.id, payload) });
+        }
+      }
+
+      if (segments[2] === 'events' && segments[3]) {
+        const eventId = segments[3];
+        const ev = await getEvent(eventId);
+        if (!ev) return sendError(req, res, 404, 'NOT_FOUND', 'Evento não encontrado');
+        const isEventOwner = ev.created_by === user.id;
+        const isEventParticipant = Array.isArray(ev.participants) && ev.participants.some(p => p.id === user.id);
+        const isEventAdmin = ADMIN_ROLES.includes(user.role_name);
+        if (!isEventOwner && !isEventParticipant && !isEventAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: ev });
+        if (!isEventOwner && !isEventAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Somente o criador pode editar');
+        if (req.method === 'PUT') {
+          const updated = await updateEvent(eventId, await readJson(req));
+          return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Evento não encontrado');
+        }
+        if (req.method === 'DELETE') {
+          await deleteEvent(eventId);
+          return sendEmpty(req, res);
+        }
+      }
+    }
+
+    // ── Drive ─────────────────────────────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'drive') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      if (segments[2] === 'folders' && !segments[3]) {
+        if (req.method === 'GET') {
+          const parentId = url.searchParams.get('parent_id') || null;
+          const [folders, files] = await Promise.all([listFolders(parentId), listFiles(parentId)]);
+          const path = parentId ? await getFolderPath(parentId) : [];
+          return sendJson(req, res, 200, { data: { folders, files, path } });
+        }
+        if (req.method === 'POST') {
+          const { name, parent_id } = await readJson(req);
+          if (!name) return sendError(req, res, 400, 'VALIDATION_ERROR', 'name é obrigatório');
+          return sendJson(req, res, 201, { data: await createFolder(user.id, name, parent_id) });
+        }
+      }
+
+      if (segments[2] === 'folders' && segments[3] && req.method === 'DELETE') {
+        const { rows: [folderRow] } = await pool.query('SELECT created_by FROM drive_folders WHERE id=$1', [segments[3]]);
+        if (!folderRow) return sendError(req, res, 404, 'NOT_FOUND', 'Pasta não encontrada');
+        if (folderRow.created_by !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        await deleteFolder(segments[3]);
+        return sendEmpty(req, res);
+      }
+
+      if (segments[2] === 'files' && !segments[3] && req.method === 'POST') {
+        const payload = await readJson(req);
+        if (!payload.name || !payload.file_url) return sendError(req, res, 400, 'VALIDATION_ERROR', 'name e file_url são obrigatórios');
+        const { name: fileName, file_url, folder_id, file_type, file_size } = payload;
+        return sendJson(req, res, 201, { data: await createFile(user.id, { name: fileName, file_url, folder_id, file_type, file_size }) });
+      }
+
+      if (segments[2] === 'files' && segments[3] && req.method === 'DELETE') {
+        const { rows: [fileRow] } = await pool.query('SELECT created_by FROM drive_files WHERE id=$1', [segments[3]]);
+        if (!fileRow) return sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
+        if (fileRow.created_by !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        await deleteFile(segments[3]);
+        return sendEmpty(req, res);
+      }
+
+      if (segments[2] === 'media' && req.method === 'POST') {
+        const payload = await readJson(req);
+        if (!payload.data || !payload.file_name) return sendError(req, res, 400, 'VALIDATION_ERROR', 'data e file_name são obrigatórios');
+        const url2 = await saveChatMedia(user.id, payload);
+        return sendJson(req, res, 200, { data: { public_url: url2.public_url } });
+      }
+    }
+
+    // ── Formulários ───────────────────────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'forms') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const isAdmin = ['Administrador', 'Gestor'].includes(user.role_name);
+
+      if (!segments[2]) {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listForms(user.id, isAdmin) });
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          if (!payload.title) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title é obrigatório');
+          return sendJson(req, res, 201, { data: await createForm(user.id, payload) });
+        }
+      }
+
+      if (segments[2] && !segments[3]) {
+        const formId = segments[2];
+        if (req.method === 'GET') {
+          const form = await getForm(formId);
+          return form ? sendJson(req, res, 200, { data: form }) : sendError(req, res, 404, 'NOT_FOUND', 'Formulário não encontrado');
+        }
+        if (req.method === 'PUT') {
+          const formToEdit = await getForm(formId);
+          if (!formToEdit) return sendError(req, res, 404, 'NOT_FOUND', 'Formulário não encontrado');
+          if (formToEdit.created_by !== user.id && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          const form = await updateForm(formId, await readJson(req));
+          return form ? sendJson(req, res, 200, { data: form }) : sendError(req, res, 404, 'NOT_FOUND', 'Formulário não encontrado');
+        }
+        if (req.method === 'DELETE') {
+          const formToDel = await getForm(formId);
+          if (!formToDel) return sendError(req, res, 404, 'NOT_FOUND', 'Formulário não encontrado');
+          if (formToDel.created_by !== user.id && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          await deleteForm(formId);
+          return sendEmpty(req, res);
+        }
+      }
+
+      if (segments[2] && segments[3] === 'responses') {
+        const formId = segments[2];
+        if (req.method === 'GET') {
+          const formForResp = await getForm(formId);
+          if (!formForResp) return sendError(req, res, 404, 'NOT_FOUND', 'Formulário não encontrado');
+          if (formForResp.created_by !== user.id && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para ver respostas');
+          return sendJson(req, res, 200, { data: await listResponses(formId) });
+        }
+        if (req.method === 'POST') {
+          const already = await hasResponded(formId, user.id);
+          if (already) return sendError(req, res, 409, 'CONFLICT', 'Você já respondeu este formulário');
+          const { answers } = await readJson(req);
+          return sendJson(req, res, 201, { data: await submitResponse(formId, user.id, answers || {}) });
+        }
+      }
+    }
+
+    // ── Assinatura Eletrônica ─────────────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'sign') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      if (segments[2] === 'documents' && !segments[3]) {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listDocuments(user.id) });
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          if (!payload.title || !payload.file_url) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title e file_url são obrigatórios');
+          return sendJson(req, res, 201, { data: await createDocument(user.id, payload) });
+        }
+      }
+
+      if (segments[2] === 'documents' && segments[3]) {
+        const docId = segments[3];
+        if (req.method === 'GET') {
+          const doc = await getDocument(docId);
+          if (!doc) return sendError(req, res, 404, 'NOT_FOUND', 'Documento não encontrado');
+          const isSigner = Array.isArray(doc.requests) && doc.requests.some(r => r.user?.id === user.id);
+          if (doc.creator?.id !== user.id && !isSigner && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          return sendJson(req, res, 200, { data: doc });
+        }
+        if (segments[4] === 'sign' && req.method === 'POST') {
+          const signTarget = await getDocument(docId);
+          if (!signTarget) return sendError(req, res, 404, 'NOT_FOUND', 'Documento não encontrado');
+          const canSign = (Array.isArray(signTarget.requests) && signTarget.requests.some(r => r.user?.id === user.id))
+            || ADMIN_ROLES.includes(user.role_name);
+          if (!canSign) return sendError(req, res, 403, 'FORBIDDEN', 'Você não está autorizado a assinar este documento');
+          const ip = getRealIP(req);
+          const signed = await signDocument(docId, user.id, ip);
+          return signed ? sendJson(req, res, 200, { data: signed }) : sendError(req, res, 500, 'SERVER_ERROR', 'Erro ao assinar');
+        }
+        if (segments[4] === 'reject' && req.method === 'POST') {
+          const rejectTarget = await getDocument(docId);
+          if (!rejectTarget) return sendError(req, res, 404, 'NOT_FOUND', 'Documento não encontrado');
+          const canReject = (Array.isArray(rejectTarget.requests) && rejectTarget.requests.some(r => r.user?.id === user.id))
+            || ADMIN_ROLES.includes(user.role_name);
+          if (!canReject) return sendError(req, res, 403, 'FORBIDDEN', 'Você não está autorizado a rejeitar este documento');
+          const rejected = await rejectDocument(docId, user.id);
+          return rejected ? sendJson(req, res, 200, { data: rejected }) : sendError(req, res, 500, 'SERVER_ERROR', 'Erro ao rejeitar');
+        }
+        if (req.method === 'DELETE') {
+          const docToDel = await getDocument(docId);
+          if (!docToDel) return sendError(req, res, 404, 'NOT_FOUND', 'Documento não encontrado');
+          if (docToDel.creator?.id !== user.id && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          await deleteDocument(docId);
+          return sendEmpty(req, res);
+        }
+      }
+
+      if (segments[2] === 'media' && req.method === 'POST') {
+        const payload = await readJson(req);
+        if (!payload.data || !payload.file_name) return sendError(req, res, 400, 'VALIDATION_ERROR', 'data e file_name são obrigatórios');
+        const signMedia = await saveChatMedia(user.id, payload);
+        return sendJson(req, res, 200, { data: { public_url: signMedia.public_url } });
+      }
+    }
+
+    // ── Whiteboards ───────────────────────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'whiteboards') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      if (!segments[2]) {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listWhiteboards(user.id) });
+        if (req.method === 'POST') {
+          const payload = await readJson(req);
+          if (!payload.title) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title é obrigatório');
+          return sendJson(req, res, 201, { data: await createWhiteboard(user.id, payload) });
+        }
+      }
+
+      if (segments[2] && !segments[3]) {
+        const wbId = segments[2];
+        const wb = await getWhiteboard(wbId, true);
+        if (!wb) return sendError(req, res, 404, 'NOT_FOUND', 'Whiteboard não encontrado');
+        const isWbOwner = wb.creator?.id === user.id;
+        const isWbParticipant = Array.isArray(wb.participants) && wb.participants.some(p => p.id === user.id);
+        const isWbAdmin = ADMIN_ROLES.includes(user.role_name);
+        if (!isWbOwner && !isWbParticipant && !isWbAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: wb });
+        if (!isWbOwner && !isWbAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Somente o criador pode editar');
+        if (req.method === 'PUT') {
+          const { title, data, thumbnail_url } = await readJson(req);
+          await updateWhiteboard(wbId, { title, data, thumbnail_url });
+          const updatedWb = await getWhiteboard(wbId, true);
+          return sendJson(req, res, 200, { data: updatedWb });
+        }
+        if (req.method === 'DELETE') {
+          await deleteWhiteboard(wbId);
+          return sendEmpty(req, res);
+        }
+      }
+    }
+
+    // Poll vote
+    if (req.method === 'POST') {
+      const voteMatch = path.match(/^\/api\/feed\/posts\/([^/]+)\/vote$/);
+      if (voteMatch) {
+        const vUser = await requireUser(req, res);
+        if (!vUser) return;
+        const { option_index } = await readJson(req);
+        if (typeof option_index !== 'number') return sendError(req, res, 400, 'VALIDATION_ERROR', 'option_index obrigatório');
+        const vPost = await voteOnPoll(voteMatch[1], vUser.id, option_index);
+        if (!vPost) return sendError(req, res, 404, 'NOT_FOUND', 'Post não encontrado');
+        return sendJson(req, res, 200, { data: vPost });
+      }
+    }
+
+    // Copiloto IA
+    if (path === '/api/copiloto' && req.method === 'POST') {
+      const user = await requireUser(req, res); if (!user) return;
+      const { message = '', history = [] } = await readJson(req);
+
+      const openRouterKey = process.env.OPENROUTER_API_KEY;
+      if (openRouterKey) {
+        try {
+          const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openRouterKey}`,
+              'HTTP-Referer': 'https://rede.nextelecom.net.br',
+              'X-Title': 'Rede Nex Copiloto',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [
+                { role: 'system', content: `Você é o Copiloto da Rede Nex, assistente inteligente da plataforma interna da NexTelecom. Responda sempre em português brasileiro, de forma clara, direta e amigável. Use markdown para formatar respostas longas.
+
+## NAVEGAÇÃO DA PLATAFORMA
+O menu lateral (sidebar) contém todos os módulos. No mobile, a navegação fica na barra inferior.
+
+### MÓDULOS E CAMINHOS
+- **Dashboard** (/) — visão geral com estatísticas, posts recentes e resumo de atividades
+- **Feed** (/feed) — mural de publicações: clique no campo de texto → escolha tipo (Publicação, Comunicado, Alerta, Atualização, Evento, Enquete) → escreva e publique. Para editar/excluir: clique nos 3 pontos no post. Para reagir: botão curtir. Para comentar: clique em "Comentar".
+- **Bate-papo** (/bate-papo) — chat em tempo real. À esquerda: lista de conversas. Botão "+" = nova conversa (individual ou grupo). Para criar grupo: "+" → "Novo grupo" → adicionar participantes → confirmar. Use @ para mencionar. Para silenciar: clique nos 3 pontos da conversa → Silenciar.
+- **Tarefas** (/tarefas) — gerenciador de tarefas. Botão "Nova Tarefa" → preencher título, descrição, prazo, prioridade, responsáveis. Aba "Checklists" = sublistas de itens. Aba "Minhas Listas" = listas personalizadas (criar via botão "+"). Filtros por status, prioridade e responsável disponíveis.
+- **Wiki** (/wiki) — base de conhecimento. Menu esquerdo = categorias. Botão "Novo Artigo" → escolher categoria → preencher título e conteúdo (suporta Markdown). Para editar artigo existente: abrir artigo → botão "Editar". Busca no topo da página.
+- **Calendário** (/calendario) — agenda. Vista mensal/semanal no canto superior direito. Para criar evento: clicar em um dia ou botão "Novo Evento" → preencher título, data, hora, descrição. Integração Google Calendar: Perfil → Config → cole o link iCal público do Google Calendar.
+- **Treinamentos** (/treinamentos) — capacitação. Cards de cursos com filtros por categoria e nível. Clique em um card → "Iniciar Treinamento" → vídeo/material reproduzido inline. Progresso salvo automaticamente. XP concedido ao concluir.
+- **Drive** (/drive) — repositório de arquivos. Botão "Upload" = enviar arquivo. Botão "Nova Pasta" = criar pasta. Para baixar: clique no arquivo → botão download. Para deletar: ícone de lixeira.
+- **Formulários** (/formularios) — criação e preenchimento de formulários internos. Admins podem criar; todos podem preencher.
+- **Assinatura Digital** (/assinatura) — fluxo de assinatura de documentos. Upload do documento → adicionar signatários → enviar para assinatura.
+- **Organograma** (/organograma) — estrutura hierárquica da empresa. Visualização interativa dos departamentos e líderes.
+- **Notas** (/notas) — bloco de notas pessoal. Salvo localmente no dispositivo (não sincronizado). Criar nota: botão "+".
+- **Ranking** (/ranking) — classificação de colaboradores por XP. Atualizado em tempo real.
+- **Analytics** (/analytics) — relatórios e métricas da plataforma (disponível para admins/gestores).
+- **Colaboradores** (/colaboradores) — lista de todos os usuários. Clique em um nome = ver perfil completo.
+- **Ajuda** (/ajuda) — central de suporte TI. Abre chamado diretamente na fila do HubSoft.
+- **Copiloto** (/copiloto) — esta página (versão completa do assistente IA).
+- **Perfil** (/perfil) — dados pessoais: foto, capa, bio, cargo, departamento, responsabilidades. Aba "Segurança" = alterar senha. Aba "Config" = Google Calendar iCal, preferências.
+
+### FUNCIONALIDADES ESPECIAIS
+- **Gamificação**: XP ganho ao criar posts, comentar, completar tarefas, contribuir na Wiki, participar de treinamentos. Ver missões e badges no Perfil.
+- **Notificações**: sino no topo → lista de notificações. Clique = ir para o item. "Marcar todas como lidas" disponível.
+- **Dark mode**: botão lua/sol no topo da navbar.
+- **Busca global**: lupa no topo → busca em toda a plataforma.
+- **Menções**: use @ seguido do nome em qualquer campo de texto (chat, comentários, tarefas).
+- **Chamados TI**: menu Ajuda → descreva o problema → abre automaticamente no HubSoft.
+
+### PERMISSÕES
+- Administrador/Gestor: acesso total, incluindo criar/editar/excluir conteúdo de outros, gerenciar usuários, ver Analytics e Logs.
+- Usuário padrão: criar/editar/excluir apenas o próprio conteúdo.
+
+Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na plataforma, informe claramente. Não invente funcionalidades.` },
+                ...history.slice(-10).map(m => ({ role: m.role, content: m.content })),
+                { role: 'user', content: message },
+              ],
+              max_tokens: 1000,
+              temperature: 0.7,
+            }),
+          });
+          const aiData = await aiRes.json();
+          const reply = aiData.choices?.[0]?.message?.content || 'Não consegui processar sua mensagem. Tente novamente.';
+          return sendJson(req, res, 200, { reply });
+        } catch (aiErr) {
+          console.error('[Copiloto] OpenRouter error:', aiErr.message);
+        }
+      }
+
+      // Fallback keyword-based
+      const q = message.toLowerCase();
+      let reply = '';
+      if (q.includes('wiki') && (q.includes('criar') || q.includes('como'))) {
+        reply = 'Para criar um artigo na Wiki, acesse o menu **Wiki** no lateral, clique em **Novo artigo**, escolha a categoria e preencha o título e o conteúdo. Após salvar, o artigo fica disponível para todos os colaboradores.';
+      } else if (q.includes('tarefa') || q.includes('task')) {
+        reply = 'Para criar uma tarefa, vá em **Tarefas** no menu lateral e clique em **Nova Tarefa**. Você pode definir título, descrição, prazo, prioridade, responsáveis e adicionar checklists. Use a aba **Minhas Listas** para criar grupos personalizados de tarefas.';
+      } else if (q.includes('xp') || q.includes('ponto') || q.includes('rank') || q.includes('gamif')) {
+        reply = 'Você ganha XP criando posts no Feed, completando tarefas, adicionando artigos na Wiki, participando de treinamentos e outras ações na plataforma. Acompanhe seu rank no **Perfil** → seção de gamificação, ou veja o ranking geral no menu **Ranking**.';
+      } else if (q.includes('chat') || q.includes('grupo') || q.includes('conversa') || q.includes('mensagem')) {
+        reply = 'No **Bate-papo**, você pode enviar mensagens individuais ou criar grupos. Para criar um grupo, clique em **Novo grupo**, adicione os participantes e confirme. Use **@** para mencionar alguém nas mensagens.';
+      } else if (q.includes('feed') || q.includes('post') || q.includes('publicar') || q.includes('publicação')) {
+        reply = 'No **Feed**, você pode criar Publicações, Comunicados e Eventos. Clique no campo de texto no topo da página, escolha o tipo de post e adicione o conteúdo. Você também pode criar **Enquetes** diretamente pelo botão correspondente.';
+      } else if (q.includes('calendário') || q.includes('evento') || q.includes('agenda')) {
+        reply = 'O **Calendário** mostra todos os eventos da empresa. Você pode alternar entre visualização mensal e semanal. Para criar um evento, clique em qualquer dia ou no botão **Novo Evento** e preencha os detalhes.';
+      } else if (q.includes('treinamento') || q.includes('curso')) {
+        reply = 'Os **Treinamentos** ficam disponíveis no menu lateral. Escolha um módulo e clique em Iniciar. Seu progresso é salvo automaticamente e você ganha XP ao completar módulos.';
+      } else if (q.includes('nota') || q.includes('anotação')) {
+        reply = 'As **Notas** são seu bloco de notas pessoal na plataforma. Acesse pelo menu **Notas** (ou **Mais** no mobile), crie notas com título e conteúdo. Suas notas ficam salvas localmente no seu dispositivo.';
+      } else if (q.includes('perfil') || q.includes('foto') || q.includes('senha')) {
+        reply = 'No **Perfil** você pode atualizar sua foto, nome, cargo, departamento e responsabilidades. Para alterar a senha, acesse Perfil → Segurança. Também é onde você acompanha suas missões e conquistas.';
+      } else if (q.includes('drive') || q.includes('arquivo') || q.includes('documento')) {
+        reply = 'O **Drive** é o repositório de arquivos da empresa. Você pode fazer upload de documentos, imagens e outros arquivos, e organizá-los em pastas. Todos os colaboradores com permissão podem acessar e baixar os arquivos.';
+      } else if (q.includes('ajuda') || q.includes('suporte') || q.includes('problema') || q.includes('ti')) {
+        reply = 'Para suporte técnico, você pode:\n1. Consultar a **Central de Ajuda** (menu lateral → Ajuda)\n2. Entrar em contato pelo **Bate-papo** com o time de TI\n3. Criar um post no Feed marcando o departamento de TI\n\nO time de TI está disponível em horário comercial.';
+      } else if (q.includes('oi') || q.includes('olá') || q.includes('tudo') || q.includes('bom dia') || q.includes('boa tarde') || q.includes('boa noite')) {
+        reply = 'Olá! Sou o Copiloto da Rede Nex 👋\n\nPosso te ajudar com dúvidas sobre a plataforma — Feed, Wiki, Tarefas, Bate-papo, Calendário, Gamificação e muito mais. O que você gostaria de saber?';
+      } else {
+        reply = 'Posso te ajudar com dúvidas sobre a plataforma Rede Nex! Experimente perguntar sobre:\n\n• **Feed** — como publicar, comunicados, eventos\n• **Wiki** — criar e editar artigos\n• **Tarefas** — criar, checklists, minhas listas\n• **Bate-papo** — grupos, menções\n• **Calendário** — eventos, visualizações\n• **Gamificação** — XP, rank, missões\n• **Treinamentos** — cursos disponíveis\n\n_Em breve: IA generativa para respostas ainda mais inteligentes!_';
+      }
+
+      return sendJson(req, res, 200, { reply });
+    }
+
+    // POST /api/ajuda/chamado — abrir chamado TI via HubSoft
+    if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'ajuda' && segments[2] === 'chamado') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const { tipo, descricao, urgente } = await readJson(req);
+      if (!tipo || !descricao) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Campos obrigatórios: tipo, descricao');
+      if (!ajudaConfigured()) return sendError(req, res, 503, 'NOT_CONFIGURED', 'Integração HubSoft não configurada. Preencha HUBSOFT_AJUDA_* no .env');
+      const result = await createChamado({ userName: user.name, tipo, descricao, urgente: !!urgente });
+      return sendJson(req, res, 201, { sucesso: true, ...result });
+    }
+
+    // GET /api/ajuda/chamados — listar chamados recentes do TI
+    if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'ajuda' && segments[2] === 'chamados') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!ajudaConfigured()) return sendJson(req, res, 200, { chamados: [], configurado: false });
+      const chamados = await listChamadosRecentes();
+      return sendJson(req, res, 200, { chamados, configurado: true });
+    }
+
+    // GET /api/ajuda/status — verificar se integração está configurada
+    if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'ajuda' && segments[2] === 'status') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { configurado: ajudaConfigured() });
+    }
+
+
+    // GET /api/org-chart — organograma hierárquico
+    if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'org-chart') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await getOrgChart() });
+    }
+
+
+    // ── HubSoft proxy — acesso centralizado, sem conexões diretas pelos agentes
+    if (path === '/api/hubsoft/metricas' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const data = await getMetricas();
+      return sendJson(req, res, 200, data);
+    }
+
+    if (path === '/api/hubsoft/clientes' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const q = url.searchParams.get('q') || '';
+      if (!q || !q.trim()) return sendError(req, res, 400, 'BAD_REQUEST', 'Parâmetro q é obrigatório');
+      const pagina = Number(url.searchParams.get('pagina') || 1);
+      const limite = Number(url.searchParams.get('limite') || 20);
+      const data = await buscarCliente(q.trim(), { pagina, limite });
+      return sendJson(req, res, 200, data);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'hubsoft' && segments[2] === 'cliente' && segments[4] === 'financeiro' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const data = await getClienteFinanceiro(segments[3]);
+      return sendJson(req, res, 200, data);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'hubsoft' && segments[2] === 'cliente' && segments[4] === 'os' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const pagina = Number(url.searchParams.get('pagina') || 1);
+      const limite = Number(url.searchParams.get('limite') || 20);
+      const data = await getClienteOS(segments[3], { pagina, limite });
+      return sendJson(req, res, 200, data);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'hubsoft' && segments[2] === 'cliente' && segments[4] === 'atendimentos' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const pagina = Number(url.searchParams.get('pagina') || 1);
+      const limite = Number(url.searchParams.get('limite') || 20);
+      const data = await getClienteAtendimentos(segments[3], { pagina, limite });
+      return sendJson(req, res, 200, data);
+    }
+
+
+    // ── Prestação de Contas ──────────────────────────────────
+
+    // minhas-permissoes — qualquer usuário autenticado pode verificar
+    if (segments[0] === 'api' && segments[1] === 'pc' && segments[2] === 'minhas-permissoes' && !segments[3] && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const papel = await getUserPcPapel(user.id);
+      return sendJson(req, res, 200, { data: { papel, hasAccess: papel !== null } });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'pc') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      // Permissões — admin only
+      if (segments[2] === 'permissoes' && !segments[3]) {
+        const papel = await getUserPcPapel(user.id);
+        if (papel !== 'admin') return sendError(req, res, 403, 'FORBIDDEN', 'Acesso restrito a administradores');
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listPcPermissoes() });
+        if (req.method === 'POST') {
+          const p = await readJson(req);
+          const err = validateRequired(p, ['user_id', 'papel']);
+          if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+          return sendJson(req, res, 201, { data: await createPcPermissao(p) });
+        }
+      }
+      if (segments[2] === 'permissoes' && segments[3] && !segments[4] && req.method === 'DELETE') {
+        const papel = await getUserPcPapel(user.id);
+        if (papel !== 'admin') return sendError(req, res, 403, 'FORBIDDEN', 'Acesso restrito a administradores');
+        await deletePcPermissao(segments[3]);
+        return sendEmpty(req, res);
+      }
+
+      // Para todos os demais endpoints: verificar acesso ao módulo
+      const papel = await getUserPcPapel(user.id);
+      if (!papel) return sendError(req, res, 403, 'FORBIDDEN', 'Sem acesso ao módulo de Prestação de Contas');
+
+      const isAdmin = papel === 'admin';
+      const canValidate = papel === 'admin' || papel === 'validador';
+
+      if (segments[2] === 'setores' && !segments[3]) {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listSetores() });
+        if (req.method === 'POST') {
+          if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas administradores podem criar setores');
+          const p = await readJson(req);
+          const err = validateRequired(p, ['nome']);
+          if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+          return sendJson(req, res, 201, { data: await createSetor(p) });
+        }
+      }
+      if (segments[2] === 'setores' && segments[3] && !segments[4] && req.method === 'PUT') {
+        if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas administradores podem editar setores');
+        const r = await updateSetor(segments[3], await readJson(req));
+        return r ? sendJson(req, res, 200, { data: r }) : sendError(req, res, 404, 'NOT_FOUND', 'Setor nao encontrado');
+      }
+  if (segments[2] === 'setores' && segments[3] && !segments[4] && req.method === 'DELETE') {
+    if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas administradores podem excluir setores');
+    await deleteSetor(segments[3]);
+    return sendJson(req, res, 200, { data: { deleted: true } });
+  }
+
+      if (segments[2] === 'setores' && segments[3] && segments[4] === 'periodos' && req.method === 'GET') {
+        return sendJson(req, res, 200, { data: await listPeriodos(segments[3]) });
+      }
+      if (segments[2] === 'periodos' && !segments[3] && req.method === 'POST') {
+        if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas administradores podem criar períodos');
+        const p = await readJson(req);
+        const err = validateRequired(p, ['setor_id', 'periodo', 'data_inicio', 'data_fim']);
+        if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+        return sendJson(req, res, 201, { data: await createPeriodo(p) });
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'fechar' && req.method === 'PUT') {
+        if (!canValidate) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas validadores podem fechar períodos');
+        const r = await closePeriodo(segments[3]);
+        return r ? sendJson(req, res, 200, { data: r }) : sendError(req, res, 404, 'NOT_FOUND', 'Periodo nao encontrado');
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'submit' && req.method === 'PUT') {
+        const r = await submitPeriodo(segments[3], user.id);
+        if (!r) return sendError(req, res, 409, 'CONFLICT', 'Período não pode ser submetido no status atual');
+        const permList = await listPcPermissoes();
+        const notifyIds = permList.filter(pm => pm.papel === 'admin' || pm.papel === 'validador').map(pm => pm.user_id).filter(id => id !== user.id);
+        if (notifyIds.length) notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null, title: 'Período enviado p/ validação', message: `${user.name} enviou o período "${r.periodo}" para validação`, type: 'info', link: '/prestacao-contas', userIds: notifyIds }).catch(() => {});
+        return sendJson(req, res, 200, { data: r });
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'validar' && req.method === 'PUT') {
+        if (!canValidate) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas validadores podem validar períodos');
+        const r = await validarPeriodo(segments[3], user.id);
+        if (!r) return sendError(req, res, 409, 'CONFLICT', 'Período não pode ser validado no status atual');
+        if (r.responsavel_user_id && r.responsavel_user_id !== user.id) notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null, title: 'Período validado!', message: `${user.name} validou o período "${r.periodo}"`, type: 'success', link: '/prestacao-contas', userIds: [r.responsavel_user_id] }).catch(() => {});
+        return sendJson(req, res, 200, { data: r });
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'inconsistencia' && req.method === 'PUT') {
+        if (!canValidate) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas validadores podem marcar inconsistência');
+        const body = await readJson(req);
+        const errV = validateRequired(body, ['texto']);
+        if (errV) return sendError(req, res, 400, 'VALIDATION_ERROR', errV);
+        const r = await inconsistenciaPeriodo(segments[3], { user_id: user.id, texto: body.texto });
+        if (!r || r.status !== 'inconsistencia') return sendError(req, res, 409, 'CONFLICT', 'Período não pode ser marcado no status atual');
+        if (r.responsavel_user_id && r.responsavel_user_id !== user.id) notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null, title: '⚠ Inconsistência no período', message: `${user.name} encontrou inconsistência em "${r.periodo}": ${body.texto}`, type: 'warning', link: '/prestacao-contas', userIds: [r.responsavel_user_id] }).catch(() => {});
+        return sendJson(req, res, 200, { data: r });
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'corrigir' && req.method === 'PUT') {
+        const body = await readJson(req);
+        const r = await corrigirPeriodo(segments[3], user.id, body.texto);
+        if (!r) return sendError(req, res, 409, 'CONFLICT', 'Período não pode ser resubmetido no status atual');
+        const permList = await listPcPermissoes();
+        const notifyIds = permList.filter(pm => pm.papel === 'admin' || pm.papel === 'validador').map(pm => pm.user_id).filter(id => id !== user.id);
+        if (notifyIds.length) notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null, title: 'Período corrigido e resubmetido', message: `${user.name} corrigiu e resubmeteu "${r.periodo}" para validação`, type: 'info', link: '/prestacao-contas', userIds: notifyIds }).catch(() => {});
+        return sendJson(req, res, 200, { data: r });
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'comentarios') {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listComentariosPeriodo(segments[3]) });
+        if (req.method === 'POST') {
+          const p = await readJson(req);
+          const errV = validateRequired(p, ['texto']);
+          if (errV) return sendError(req, res, 400, 'VALIDATION_ERROR', errV);
+          return sendJson(req, res, 201, { data: await createComentarioPeriodo({ periodo_id: segments[3], autor_id: user.id, texto: p.texto }) });
+        }
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'fatura' && req.method === 'GET') {
+        const r = await getFatura(segments[3]);
+        return r ? sendJson(req, res, 200, { data: r }) : sendError(req, res, 404, 'NOT_FOUND', 'Periodo nao encontrado');
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'lancamentos' && req.method === 'GET') {
+        return sendJson(req, res, 200, { data: await listLancamentos(segments[3]) });
+      }
+      if (segments[2] === 'lancamentos' && !segments[3] && req.method === 'POST') {
+        const p = await readJson(req);
+        const err = validateRequired(p, ['periodo_id', 'data', 'descricao', 'valor']);
+        if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+        const lancamento = await createLancamento({ ...p, created_by: user.id });
+        const permList = await listPcPermissoes();
+        const notifyIds = permList.filter(pm => pm.papel === 'admin' || pm.papel === 'validador').map(pm => pm.user_id).filter(id => id !== user.id);
+        if (notifyIds.length > 0) {
+          notifyUsers({
+            actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null,
+            title: 'Novo lançamento', message: `${user.name} adicionou: ${p.descricao}`,
+            type: 'info', link: '/prestacao-contas', userIds: notifyIds,
+          }).catch(() => {});
+        }
+        return sendJson(req, res, 201, { data: lancamento });
+      }
+      if (segments[2] === 'lancamentos' && segments[3] && !segments[4]) {
+        if (req.method === 'GET') {
+          const r = await getLancamento(segments[3]);
+          return r ? sendJson(req, res, 200, { data: r }) : sendError(req, res, 404, 'NOT_FOUND', 'Lancamento nao encontrado');
+        }
+        if (req.method === 'PUT') {
+          const body = await readJson(req);
+          const r = await updateLancamento(segments[3], body);
+          if (!r) return sendError(req, res, 404, 'NOT_FOUND', 'Lancamento nao encontrado');
+          const permList = await listPcPermissoes();
+          const notifyIds = permList.filter(pm => pm.papel === 'admin' || pm.papel === 'validador').map(pm => pm.user_id).filter(id => id !== user.id);
+          if (notifyIds.length > 0) {
+            notifyUsers({
+              actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null,
+              title: 'Lançamento atualizado', message: `${user.name} atualizou: ${body.descricao || r.descricao}`,
+              type: 'info', link: '/prestacao-contas', userIds: notifyIds,
+            }).catch(() => {});
+          }
+          return sendJson(req, res, 200, { data: r });
+        }
+        if (req.method === 'DELETE') {
+          if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas administradores podem excluir lançamentos');
+          await deleteLancamento(segments[3]);
+          return sendEmpty(req, res);
+        }
+      }
+      if (segments[2] === 'lancamentos' && segments[3] && segments[4] === 'status' && req.method === 'PUT') {
+        if (!canValidate) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas validadores podem alterar status');
+        const body = await readJson(req);
+        const err = validateRequired(body, ['status']);
+        if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+        const r = await updateLancamentoStatus(segments[3], { status: body.status, validado_por: user.id, obs: body.obs });
+        return r ? sendJson(req, res, 200, { data: r }) : sendError(req, res, 404, 'NOT_FOUND', 'Lancamento nao encontrado');
+      }
+      if (segments[2] === 'lancamentos' && segments[3] && segments[4] === 'comentarios') {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listComentarios(segments[3]) });
+        if (req.method === 'POST') {
+          const p = await readJson(req);
+          const err = validateRequired(p, ['texto']);
+          if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+          return sendJson(req, res, 201, { data: await createComentario({ lancamento_id: segments[3], autor_id: user.id, texto: p.texto }) });
+        }
+      }
+      if (segments[2] === 'lancamentos' && segments[3] && segments[4] === 'anexos') {
+        if (req.method === 'GET') return sendJson(req, res, 200, { data: await listAnexos(segments[3]) });
+        if (req.method === 'POST') {
+          const p = await readJson(req);
+          const err = validateRequired(p, ['data', 'file_name']);
+          if (err) return sendError(req, res, 400, 'VALIDATION_ERROR', err);
+          const r = await saveAnexo({ lancamento_id: segments[3], uploaded_by: user.id, file_name: p.file_name, file_type: p.file_type, data: p.data });
+          return sendJson(req, res, 201, { data: r });
+        }
+      }
+      if (segments[2] === 'anexos' && segments[3] && !segments[4]) {
+        if (req.method === 'GET') {
+          const r = await streamAnexo(segments[3]);
+          return r ? sendBinary(req, res, 200, r.buffer, r.mime_type) : sendError(req, res, 404, 'NOT_FOUND', 'Anexo nao encontrado');
+        }
+        if (req.method === 'DELETE') { await deleteAnexo(segments[3]); return sendEmpty(req, res); }
+      }
+    }
+
+
+
+    // ── Projects ─────────────────────────────────────────────────
+    if (segments[1] === 'projects' && !segments[2]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listProjects() });
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await createProject(body, user) });
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && !segments[3]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'PUT' || req.method === 'PATCH') {
+        const body = await readJson(req);
+        const updated = await updateProject(segments[2], body);
+        return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Projeto não encontrado');
+      }
+      if (req.method === 'DELETE') { await deleteProject(segments[2]); return sendEmpty(req, res); }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'steps' && !segments[4]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listSteps(segments[2]) });
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await createStep({ ...body, project_id: segments[2] }, user) });
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'steps' && segments[4] && !segments[5]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'PUT' || req.method === 'PATCH') {
+        const body = await readJson(req);
+        const updated = await updateStep(segments[4], body, user);
+        return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Etapa não encontrada');
+      }
+      if (req.method === 'DELETE') { await deleteStep(segments[4]); return sendEmpty(req, res); }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'steps' && segments[4] && segments[5] === 'assignees' && !segments[6]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await addStepAssignee({ ...body, step_id: segments[4] }, user) });
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'steps' && segments[4] && segments[5] === 'assignees' && segments[6]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'DELETE') { await removeStepAssignee(segments[6]); return sendEmpty(req, res); }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'steps' && segments[4] && segments[5] === 'history') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listStepHistory(segments[4]) });
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await addStepHistory(segments[4], body, getRealIP(req)) });
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'comments' && !segments[4]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listComments(segments[2]) });
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await createComment(segments[2], body, user) });
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'comments' && segments[4]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'PUT' || req.method === 'PATCH') {
+        const body = await readJson(req);
+        const updated = await updateComment(segments[2], segments[4], body);
+        return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Comentário não encontrado');
+      }
+      if (req.method === 'DELETE') { await deleteComment(segments[2], segments[4]); return sendEmpty(req, res); }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'attachments' && segments[4] && segments[5] === 'download') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') {
+        const att = await getAttachmentForDownload(segments[4]);
+        if (!att) return sendError(req, res, 404, 'NOT_FOUND', 'Anexo não encontrado');
+        const buf = Buffer.from(att.data_base64, 'base64');
+        res.writeHead(200, { ...responseHeaders(req, att.mime_type || 'application/octet-stream'), 'Content-Disposition': `attachment; filename="${att.filename}"`, 'Content-Length': buf.length });
+        return res.end(buf);
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'attachments' && segments[4] && !segments[5]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'DELETE') { await deleteAttachment(segments[2], segments[4]); return sendEmpty(req, res); }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'attachments' && !segments[4]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') return sendJson(req, res, 200, { data: await listAttachments(segments[2]) });
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await createAttachment(segments[2], body, user) });
+      }
+    }
+
+    if (segments[1] === 'project-requests' && !segments[2]) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'GET') {
+        const status = url.searchParams.get('status');
+        return sendJson(req, res, 200, { data: await listRequests(status || undefined) });
+      }
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, { data: await createRequest(body) });
+      }
+    }
+
+
+    // ── J-RH (Jornal do RH) ─────────────────────────────────
+    // Static uploads: /uploads/jrh/<filename>
+    if (segments[0] === 'uploads' && segments[1] === 'jrh' && segments[2] && req.method === 'GET') {
+      const filename = segments[2].replace(/[^a-zA-Z0-9._-]/g, '');
+      const filepath = join(UPLOADS_JRH_DIR, filename);
+      try {
+        const stat = statSync(filepath);
+        const ext = extname(filename).toLowerCase();
+        const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime' };
+        const mime = mimeMap[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': mime, 'Content-Length': stat.size, 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': req.headers.origin || '*' });
+        createReadStream(filepath).pipe(res);
+        return;
+      } catch {
+        return sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
+      }
+    }
+
+
+    if (segments[0] === 'api' && segments[1] === 'jrh') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      // Upload de arquivo (imagem/vídeo)
+      if (segments[2] === 'upload' && req.method === 'POST') {
+        const { filename, mime, data } = await readJson(req);
+        if (!filename || !mime || !data) return sendError(req, res, 400, 'VALIDATION_ERROR', 'filename, mime e data obrigatórios');
+        if (!ALLOWED_UPLOAD_MIME.has(mime)) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Tipo de arquivo não permitido');
+        const fileExt = extname(String(filename)).toLowerCase() || '.bin';
+        const safeName = randomUUID() + fileExt;
+        const buffer = Buffer.from(String(data), 'base64');
+        if (buffer.length > 30 * 1024 * 1024) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Arquivo muito grande (máx 30MB)');
+        writeFileSync(join(UPLOADS_JRH_DIR, safeName), buffer);
+        return sendJson(req, res, 200, { data: { url: '/uploads/jrh/' + safeName } });
+      }
+
+
+      if (segments[2] === 'me' && segments[3] === 'is-hr' && req.method === 'GET') {
+        return sendJson(req, res, 200, { data: { is_hr: await checkIsHR(user.id) } });
+      }
+
+      if (segments[2] === 'birthdays' && req.method === 'GET') {
+        return sendJson(req, res, 200, { data: await getMonthBirthdays() });
+      }
+
+      if (!segments[2] && req.method === 'GET') {
+        await autoPublishTodayBirthdays().catch(() => {});
+        return sendJson(req, res, 200, { data: await listJRHPosts() });
+      }
+
+      if (!segments[2] && req.method === 'POST') {
+        const payload = await readJson(req);
+        const post = await createJRHPost(user.id, payload);
+        return sendJson(req, res, 201, { data: post });
+      }
+
+      if (segments[2] === 'posts' && segments[3]) {
+        const postId = segments[3];
+        if (segments[4] === 'view' && req.method === 'POST') {
+          await recordJRHPostView(postId, user.id);
+          return sendEmpty(req, res);
+        }
+        if (segments[4] === 'views' && req.method === 'GET') {
+          return sendJson(req, res, 200, { data: await listJRHPostViews(postId, user.id) });
+        }
+        if (segments[4] === 'reactions' && req.method === 'POST') {
+          const { reaction } = await readJson(req);
+          return sendJson(req, res, 200, { data: await toggleJRHReaction(postId, user.id, reaction) });
+        }
+        if (segments[4] === 'comments' && req.method === 'POST') {
+          const { content } = await readJson(req);
+          return sendJson(req, res, 201, { data: await createJRHComment(postId, user.id, content) });
+        }
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'stories') {
+      const user = await requireUser(req, res); if (!user) return;
+      if (!segments[2] && req.method === 'GET') return sendJson(req, res, 200, { data: await listStories(user.id) });
+      if (!segments[2] && req.method === 'POST') { const p = await readJson(req); return sendJson(req, res, 201, { data: await createStory(user.id, p) }); }
+      if (segments[2] && segments[3] === 'view' && req.method === 'POST') { await recordStoryView(segments[2], user.id); return sendEmpty(req, res); }
+      if (segments[2] && segments[3] === 'viewers' && req.method === 'GET') return sendJson(req, res, 200, { data: await listStoryViewers(segments[2]) });
+    }
+        return sendError(req, res, 404, 'NOT_FOUND', 'Rota não encontrada');
+  } catch (error) {
+    if (error?.statusCode) {
+      return sendError(req, res, error.statusCode, error.code || 'REQUEST_ERROR', error.message);
+    }
+    if (error?.code === '23505') {
+      return sendError(req, res, 409, 'CONFLICT', 'Registro duplicado', { constraint: error.constraint });
+    }
+    if (error instanceof SyntaxError) {
+      return sendError(req, res, 400, 'VALIDATION_ERROR', 'JSON inválido');
+    }
+    console.error(error);
+    return sendError(req, res, 500, 'DATABASE_ERROR', 'Erro inesperado na API');
+  }
+}
+
+const httpServer = createServer(route);
+
+// WebSocket signaling for WebRTC voice calls
+const wss = new WebSocketServer({ server: httpServer });
+const callSessions = new Map(); // userId -> Set<WebSocket>
+
+wss.on('connection', async (ws, req) => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+
+  // Authenticate at connection time via session cookie
+  const cookies = parseCookies(req);
+  const user = cookies.session ? await getUserByToken(cookies.session) : null;
+  if (!user) {
+    ws.send(JSON.stringify({ type: 'call:auth_error' }));
+    ws.close(1008, 'Unauthorized');
+    return;
+  }
+
+  const wsUserId = user.id;
+  if (!callSessions.has(wsUserId)) callSessions.set(wsUserId, new Set());
+  callSessions.get(wsUserId).add(ws);
+  ws.send(JSON.stringify({ type: 'call:auth_ok' }));
+
+  ws.on('message', async (data) => {
+    try {
+      let msg;
+      try { msg = JSON.parse(String(data)); } catch { return; }
+      if (msg.type === 'ping') { ws.send(JSON.stringify({ type: 'pong' })); return; }
+
+      const { to, ...rest } = msg;
+      if (!to) return;
+      const targets = callSessions.get(to);
+      if (targets) {
+        const payload = JSON.stringify({ ...rest, from: wsUserId });
+        for (const s of targets) { if (s.readyState === 1) s.send(payload); }
+      }
+    } catch (err) {
+      console.error('[WS] message handler error:', err.message);
+    }
+  });
+
+  ws.on('close', () => {
+    const sessions = callSessions.get(wsUserId);
+    if (sessions) {
+      sessions.delete(ws);
+      if (!sessions.size) callSessions.delete(wsUserId);
+    }
+  });
+});
+
+// Heartbeat to detect dead connections
+const wsPingInterval = setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (ws.isAlive === false) { ws.terminate(); return; }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 25000);
+
+httpServer.listen(port, () => {
+  console.log(`Rede Nex API running at http://localhost:${port}/api`);
+});
+
+// Daily cleanup of expired sessions
+setInterval(() => {
+  pool.query("DELETE FROM user_sessions WHERE expires_at < now()").catch(() => {});
+}, 24 * 60 * 60 * 1000);

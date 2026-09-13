@@ -1,0 +1,728 @@
+import { query, pool } from './db.js';
+import { notifyAdmins, notifyUsers } from './notifications.repository.js';
+import { hashPassword } from './auth.repository.js';
+
+const ALLOWED_POST_TYPES = new Set(['message', 'announcement', 'alert', 'update', 'event', 'poll']);
+const ALLOWED_REACTIONS = new Set(['like', 'love', 'celebrate', 'insightful']);
+
+function cleanText(value, maxLength) {
+  const text = String(value ?? '').replace(/\u0000/g, '').trim();
+  return text.length > maxLength ? text.slice(0, maxLength) : text;
+}
+
+const userSelect = `
+  select
+    u.id,
+    u.name,
+    u.email,
+    u.photo_url,
+    u.cover_url,
+    u.bio,
+    u.department_id,
+    u.position,
+    u.phone,
+    u.status,
+    u.role_id,
+    u.admission_date,
+    u.last_seen_at,
+    u.must_change_password,
+    u.last_login_at,
+    u.bitrix_id,
+    u.bitrix_department,
+    u.bitrix_active,
+    u.bitrix_last_sync_at,
+    u.source,
+    u.created_at,
+    u.updated_at,
+    case
+      when d.id is null then null
+      else json_build_object('id', d.id, 'name', d.name, 'description', d.description, 'created_at', d.created_at)
+    end as departments,
+    case
+      when r.id is null then null
+      else json_build_object('id', r.id, 'name', r.name, 'description', r.description, 'created_at', r.created_at)
+    end as roles
+    ,
+    case
+      when u.last_seen_at >= now() - interval '2 minutes' then true
+      else false
+    end as online,
+    case
+      when u.last_seen_at is null then null
+      else extract(epoch from (now() - u.last_seen_at))::int
+    end as seconds_since_seen
+  from users u
+  left join departments d on d.id = u.department_id
+  left join roles r on r.id = u.role_id
+`;
+
+const postSelect = `
+  select
+    p.id,
+    p.author_id,
+    p.title,
+    p.content,
+    p.type,
+    p.image_url,
+    p.video_url,
+    p.pinned,
+    p.visibility,
+    p.community_id,
+    p.created_at,
+    p.updated_at,
+    case
+      when u.id is null then null
+      else json_build_object(
+        'id', u.id,
+        'name', u.name,
+        'email', u.email,
+        'photo_url', u.photo_url,
+        'position', u.position,
+        'status', u.status,
+        'created_at', u.created_at,
+        'updated_at', u.updated_at,
+        'departments', case
+          when d.id is null then null
+          else json_build_object('id', d.id, 'name', d.name, 'created_at', d.created_at)
+        end
+      )
+    end as users,
+    coalesce(
+      (
+        select json_agg(json_build_object('id', pr.id, 'user_id', pr.user_id, 'reaction', pr.reaction, 'created_at', pr.created_at))
+        from post_reactions pr
+        where pr.post_id = p.id
+      ),
+      '[]'::json
+    ) as likes,
+    coalesce(
+      (
+        select json_agg(json_build_object(
+          'id', c.id,
+          'content', c.content,
+          'created_at', c.created_at,
+          'users', case
+            when cu.id is null then null
+            else json_build_object('id', cu.id, 'name', cu.name, 'photo_url', cu.photo_url)
+          end,
+          'reactions', coalesce(
+            (
+              select json_agg(json_build_object('id', cr.id, 'user_id', cr.user_id, 'reaction', cr.reaction))
+              from comment_reactions cr
+              where cr.comment_id = c.id
+            ),
+            '[]'::json
+          )
+        ) order by c.created_at)
+        from comments c
+        left join users cu on cu.id = c.author_id
+        where c.post_id = p.id
+      ),
+      '[]'::json
+    ) as comments,
+    coalesce(
+      (
+        select json_agg(json_build_object('user_id', pv.user_id, 'option_index', pv.option_index))
+        from poll_votes pv
+        where pv.post_id = p.id
+      ),
+      '[]'::json
+    ) as poll_votes
+  from posts p
+  left join users u on u.id = p.author_id
+  left join departments d on d.id = u.department_id
+`;
+
+const trainingSelect = `
+  select
+    t.id,
+    t.title,
+    t.description,
+    t.category_id,
+    t.thumbnail_url,
+    t.video_url,
+    t.pdf_url,
+    t.duration_minutes,
+    t.level,
+    t.status,
+    t.created_by,
+    t.created_at,
+    t.updated_at,
+    case
+      when c.id is null then null
+      else json_build_object('id', c.id, 'name', c.name, 'color', c.color, 'type', c.type, 'created_at', c.created_at)
+    end as categories,
+    case
+      when u.id is null then null
+      else json_build_object('id', u.id, 'name', u.name, 'photo_url', u.photo_url)
+    end as users
+  from trainings t
+  left join categories c on c.id = t.category_id
+  left join users u on u.id = t.created_by
+`;
+
+export async function getDashboardData() {
+  const [usersCount, trainingsCount, articlesCount, postsCount, recentPosts] = await Promise.all([
+    query('select count(*)::int as count from users'),
+    query("select count(*)::int as count from trainings where status = 'published'"),
+    query("select count(*)::int as count from wiki_articles where status = 'published'"),
+    query('select count(*)::int as count from posts'),
+    query(`${postSelect} where p.type != 'jrh' order by p.created_at desc limit 5`),
+  ]);
+
+  return {
+    stats: {
+      users: usersCount.rows[0]?.count ?? 0,
+      trainings: trainingsCount.rows[0]?.count ?? 0,
+      articles: articlesCount.rows[0]?.count ?? 0,
+      posts: postsCount.rows[0]?.count ?? 0,
+    },
+    recentPosts: recentPosts.rows,
+  };
+}
+
+export async function listUsers({ search = '', limit = 500 } = {}) {
+  const cap = Math.min(Number(limit) || 500, 1000);
+  if (search) {
+    const { rows } = await query(
+      `${userSelect} where (u.name ilike $1 or u.email ilike $1) order by u.name limit $2`,
+      [`%${search}%`, cap]
+    );
+    return rows;
+  }
+  const { rows } = await query(`${userSelect} order by u.name limit $1`, [cap]);
+  return rows;
+}
+
+export async function listDepartments() {
+  const { rows } = await query('select id, name, description, created_at from departments order by name');
+  return rows;
+}
+
+export async function listDepartmentsWithStats() {
+  const { rows } = await query(`
+    select d.id, d.name, d.description, d.created_at, d.parent_id, d.manager_id,
+      count(u.id)::int as user_count
+    from departments d
+    left join users u on u.department_id = d.id
+    group by d.id
+    order by d.name
+  `);
+  return rows;
+}
+
+export async function createDepartment(name, description) {
+  const cleanName = String(name || '').trim().slice(0, 100);
+  if (!cleanName) throw Object.assign(new Error('Nome obrigatório'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  const { rows } = await query(
+    'insert into departments (name, description) values ($1, $2) returning *',
+    [cleanName, description ? String(description).trim().slice(0, 500) : null]
+  );
+  return rows[0];
+}
+
+export async function updateDepartment(id, name, description, managerId, parentId) {
+  const fields = [];
+  const values = [];
+  let i = 1;
+  if (name !== undefined) { fields.push(`name = ${i++}`); values.push(String(name || '').trim().slice(0, 100)); }
+  if (description !== undefined) { fields.push(`description = ${i++}`); values.push(description ? String(description).trim().slice(0, 500) : null); }
+  if (managerId !== undefined) { fields.push(`manager_id = ${i++}`); values.push(managerId || null); }
+  if (parentId !== undefined) { fields.push(`parent_id = ${i++}`); values.push(parentId || null); }
+  if (!fields.length) throw Object.assign(new Error('Nenhum campo para atualizar'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  values.push(id);
+  const { rows } = await query(
+    `update departments set ${fields.join(', ')} where id = $${i} returning *`,
+    values
+  );
+  return rows[0] || null;
+}
+
+export async function deleteDepartment(id) {
+  await query('update users set department_id = null where department_id = $1', [id]);
+  const { rowCount } = await query('delete from departments where id = $1', [id]);
+  return rowCount > 0;
+}
+
+export async function listTrainingCategories() {
+  const { rows } = await query("select * from categories where type = 'training' order by name");
+  return rows;
+}
+
+export async function listTrainings() {
+  const { rows } = await query(`${trainingSelect} where t.status = 'published' order by t.created_at desc`);
+  return rows;
+}
+
+export async function getTrainingData() {
+  const [trainings, categories] = await Promise.all([listTrainings(), listTrainingCategories()]);
+  return { trainings, categories };
+}
+export async function listAllTrainings() {
+  const { rows } = await query(`${trainingSelect} order by t.created_at desc`);
+  return rows;
+}
+
+export async function createTraining(input, actorId) {
+  const title = String(input.title || '').trim().slice(0, 200);
+  if (!title) throw Object.assign(new Error('Título obrigatório'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  const { rows } = await query(
+    `INSERT INTO trainings (title, description, category_id, video_url, pdf_url, duration_minutes, level, status, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    [
+      title,
+      input.description ? String(input.description).trim().slice(0, 2000) : null,
+      input.category_id || null,
+      input.video_url ? String(input.video_url).trim().slice(0, 2000) : null,
+      input.pdf_url ? String(input.pdf_url).trim().slice(0, 2000) : null,
+      parseInt(input.duration_minutes) || 30,
+      ['beginner', 'intermediate', 'advanced'].includes(input.level) ? input.level : 'beginner',
+      ['draft', 'published', 'archived'].includes(input.status) ? input.status : 'published',
+      actorId || null,
+    ]
+  );
+  const { rows: full } = await query(`${trainingSelect} where t.id = $1`, [rows[0].id]);
+  return full[0] || null;
+}
+
+export async function updateTraining(id, input) {
+  const fields = [];
+  const values = [];
+  let i = 1;
+  if (input.title !== undefined) { fields.push(`title = ${i++}`); values.push(String(input.title || '').trim().slice(0, 200)); }
+  if (input.description !== undefined) { fields.push(`description = ${i++}`); values.push(input.description ? String(input.description).trim().slice(0, 2000) : null); }
+  if (input.category_id !== undefined) { fields.push(`category_id = ${i++}`); values.push(input.category_id || null); }
+  if (input.video_url !== undefined) { fields.push(`video_url = ${i++}`); values.push(input.video_url ? String(input.video_url).trim().slice(0, 2000) : null); }
+  if (input.pdf_url !== undefined) { fields.push(`pdf_url = ${i++}`); values.push(input.pdf_url ? String(input.pdf_url).trim().slice(0, 2000) : null); }
+  if (input.duration_minutes !== undefined) { fields.push(`duration_minutes = ${i++}`); values.push(parseInt(input.duration_minutes) || 30); }
+  if (input.level !== undefined && ['beginner', 'intermediate', 'advanced'].includes(input.level)) { fields.push(`level = ${i++}`); values.push(input.level); }
+  if (input.status !== undefined && ['draft', 'published', 'archived'].includes(input.status)) { fields.push(`status = ${i++}`); values.push(input.status); }
+  if (!fields.length) throw Object.assign(new Error('Nenhum campo para atualizar'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  values.push(id);
+  await query(`UPDATE trainings SET ${fields.join(', ')}, updated_at = now() WHERE id = ${i}`, values);
+  const { rows } = await query(`${trainingSelect} where t.id = $1`, [id]);
+  return rows[0] || null;
+}
+
+export async function deleteTraining(id) {
+  const { rowCount } = await query('DELETE FROM trainings WHERE id = $1', [id]);
+  return rowCount > 0;
+}
+
+export async function listFeedPosts() {
+  const { rows } = await query(`${postSelect} where p.type != 'jrh' order by p.pinned desc, p.created_at desc limit 200`);
+  return rows;
+}
+
+export async function voteOnPoll(postId, userId, optionIndex) {
+  await query(
+    `INSERT INTO poll_votes (post_id, user_id, option_index)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (post_id, user_id) DO UPDATE SET option_index = EXCLUDED.option_index`,
+    [postId, userId, optionIndex]
+  );
+  const { rows } = await query(`${postSelect} where p.id = $1`, [postId]);
+  return rows[0] || null;
+}
+
+export async function createFeedPost(input, actorId = null) {
+  const authorId = input.author_id ?? actorId ?? null;
+  const content = cleanText(input.content, 5000);
+  const title = cleanText(input.title, 160) || null;
+  const type = ALLOWED_POST_TYPES.has(input.type) ? input.type : 'message';
+  if (!content) throw Object.assign(new Error('Conteudo obrigatorio'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+
+  const imageUrl = input.image_url ? String(input.image_url) : null;
+  const videoUrl = input.video_url ? String(input.video_url) : null;
+
+  const { rows } = await query(
+    `
+      insert into posts (author_id, title, content, type, pinned, image_url, video_url)
+      values ($1, $2, $3, $4, false, $5, $6)
+      returning id
+    `,
+    [authorId, title, content, type, imageUrl, videoUrl]
+  );
+  const post = await query(`${postSelect} where p.id = $1 limit 1`, [rows[0].id]);
+  const created = post.rows[0];
+  const author = created?.users?.name || 'Rede Nex';
+  const authorPhoto = created?.users?.photo_url ?? null;
+  const isAdmin = created?.users?.email
+    ? await query(
+        `
+          select 1
+          from users u
+          join roles r on r.id = u.role_id
+          where u.id = $1 and r.name = 'Administrador'
+          limit 1
+        `,
+        [authorId]
+      )
+    : { rows: [] };
+
+  if (isAdmin.rows[0]) {
+    await notifyUsers({
+      actorId: authorId,
+      actorName: author,
+      actorPhotoUrl: authorPhoto,
+      type: 'feed',
+      title: 'Nova publicacao administrativa',
+      message: `${author} publicou uma atualizacao no Feed`,
+      link: '/feed',
+    });
+  } else {
+    await notifyAdmins({
+      actorId: authorId,
+      actorName: author,
+      actorPhotoUrl: authorPhoto,
+      type: 'feed',
+      title: 'Nova publicacao no Feed',
+      message: `${author} publicou no Feed`,
+      link: '/feed',
+    });
+  }
+
+  return created;
+}
+
+export async function createPostComment(postId, actorId, content) {
+  const cleanContent = cleanText(content, 2000);
+  if (!cleanContent) throw Object.assign(new Error('Comentario obrigatorio'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+
+  const { rows } = await query(
+    `
+      insert into comments (post_id, author_id, content)
+      values ($1, $2, $3)
+      returning id
+    `,
+    [postId, actorId, cleanContent]
+  );
+
+  const post = await query('select author_id from posts where id = $1 limit 1', [postId]);
+  const ownerId = post.rows[0]?.author_id;
+  if (ownerId && ownerId !== actorId) {
+    const actor = await query('select name, photo_url from users where id = $1 limit 1', [actorId]);
+    await notifyUsers({
+      actorId,
+      actorName: actor.rows[0]?.name || null,
+      actorPhotoUrl: actor.rows[0]?.photo_url || null,
+      userIds: [ownerId],
+      type: 'feed',
+      title: 'Novo comentario no Feed',
+      message: `${actor.rows[0]?.name || 'Alguem'} comentou sua publicacao`,
+      link: '/feed',
+    });
+  }
+
+  const refreshed = await query(`${postSelect} where p.id = $1 limit 1`, [postId]);
+  return refreshed.rows[0] ?? null;
+}
+
+export async function togglePostReaction(postId, actorId, reaction = 'like') {
+  const nextReaction = ALLOWED_REACTIONS.has(reaction) ? reaction : 'like';
+  const { rows } = await query(
+    `
+      with removed as (
+        delete from post_reactions
+        where post_id = $1 and user_id = $2 and reaction = $3
+        returning id
+      ),
+      upserted as (
+        insert into post_reactions (post_id, user_id, reaction)
+        select $1, $2, $3
+        where not exists (select 1 from removed)
+        on conflict (post_id, user_id) do update set reaction = excluded.reaction
+        returning id
+      )
+      select exists(select 1 from upserted) as active
+    `,
+    [postId, actorId, nextReaction]
+  );
+
+  const post = await query('select author_id from posts where id = $1 limit 1', [postId]);
+  const ownerId = post.rows[0]?.author_id;
+  if (rows[0]?.active && ownerId && ownerId !== actorId) {
+    const actor = await query('select name, photo_url from users where id = $1 limit 1', [actorId]);
+    await notifyUsers({
+      actorId,
+      actorName: actor.rows[0]?.name || null,
+      actorPhotoUrl: actor.rows[0]?.photo_url || null,
+      userIds: [ownerId],
+      type: 'feed',
+      title: 'Nova curtida no Feed',
+      message: `${actor.rows[0]?.name || 'Alguem'} reagiu a sua publicacao`,
+      link: '/feed',
+    });
+  }
+
+  const refreshed = await query(`${postSelect} where p.id = $1 limit 1`, [postId]);
+  return { active: rows[0]?.active ?? false, post: refreshed.rows[0] ?? null };
+}
+
+export async function toggleCommentReaction(commentId, actorId, reaction = 'like') {
+  const nextReaction = ALLOWED_REACTIONS.has(reaction) ? reaction : 'like';
+
+  const { rows } = await query(
+    `
+      with removed as (
+        delete from comment_reactions
+        where comment_id = $1 and user_id = $2 and reaction = $3
+        returning id
+      ),
+      upserted as (
+        insert into comment_reactions (comment_id, user_id, reaction)
+        select $1, $2, $3
+        where not exists (select 1 from removed)
+        on conflict (comment_id, user_id) do update set reaction = excluded.reaction
+        returning id
+      )
+      select exists(select 1 from upserted) as active
+    `,
+    [commentId, actorId, nextReaction]
+  );
+
+  const commentRow = await query('select post_id from comments where id = $1 limit 1', [commentId]);
+  const postId = commentRow.rows[0]?.post_id;
+  if (!postId) return null;
+
+  const refreshed = await query(`${postSelect} where p.id = $1 limit 1`, [postId]);
+  return { active: rows[0]?.active ?? false, post: refreshed.rows[0] ?? null };
+}
+
+export async function updateFeedPost(postId, actorId, content) {
+  const cleanContent = cleanText(content, 5000);
+  if (!cleanContent) throw Object.assign(new Error('Conteudo obrigatorio'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  const { rows } = await query(
+    `UPDATE posts SET content = $1 WHERE id = $2 AND author_id = $3 RETURNING id`,
+    [cleanContent, postId, actorId]
+  );
+  if (!rows[0]) throw Object.assign(new Error('Nao encontrado ou sem permissao'), { statusCode: 403, code: 'FORBIDDEN' });
+  const post = await query(`${postSelect} where p.id = $1 limit 1`, [postId]);
+  return post.rows[0] ?? null;
+}
+
+export async function deleteFeedPost(postId, actorId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`DELETE FROM comment_reactions WHERE comment_id IN (SELECT id FROM comments WHERE post_id = $1)`, [postId]);
+    await client.query(`DELETE FROM comments WHERE post_id = $1`, [postId]);
+    await client.query(`DELETE FROM post_reactions WHERE post_id = $1`, [postId]);
+    const { rows } = await client.query(`DELETE FROM posts WHERE id = $1 AND author_id = $2 RETURNING id`, [postId, actorId]);
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      throw Object.assign(new Error('Nao encontrado ou sem permissao'), { statusCode: 403, code: 'FORBIDDEN' });
+    }
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updatePostComment(commentId, actorId, content) {
+  const cleanContent = cleanText(content, 2000);
+  if (!cleanContent) throw Object.assign(new Error('Comentario obrigatorio'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  const { rows } = await query(
+    `UPDATE comments SET content = $1 WHERE id = $2 AND author_id = $3 RETURNING id, post_id`,
+    [cleanContent, commentId, actorId]
+  );
+  if (!rows[0]) throw Object.assign(new Error('Nao encontrado ou sem permissao'), { statusCode: 403, code: 'FORBIDDEN' });
+  const post = await query(`${postSelect} where p.id = $1 limit 1`, [rows[0].post_id]);
+  return post.rows[0] ?? null;
+}
+
+export async function deletePostComment(commentId, actorId) {
+  await query(`DELETE FROM comment_reactions WHERE comment_id = $1`, [commentId]);
+  const { rows } = await query(
+    `DELETE FROM comments WHERE id = $1 AND author_id = $2 RETURNING id`,
+    [commentId, actorId]
+  );
+  if (!rows[0]) throw Object.assign(new Error('Nao encontrado ou sem permissao'), { statusCode: 403, code: 'FORBIDDEN' });
+  return true;
+}
+
+export async function listRoles() {
+  const { rows } = await query('select id, name, description, created_at from roles order by name');
+  return rows;
+}
+
+export async function createUser(input) {
+  const name = cleanText(input.name, 200);
+  const email = cleanText(input.email, 200).toLowerCase();
+  const password = String(input.password || '');
+  if (!name || !email || !password) throw Object.assign(new Error('name, email e password sao obrigatorios'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  if (password.length < 8) throw Object.assign(new Error('Senha deve ter pelo menos 8 caracteres'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+
+  const passwordHash = await hashPassword(password);
+  const { rows } = await query(
+    `insert into users (name, email, password_hash, position, department_id, role_id, phone, admission_date, birth_date, status, must_change_password)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', true)
+     returning id`,
+    [
+      name,
+      email,
+      passwordHash,
+      input.position ? cleanText(input.position, 200) : null,
+      input.department_id || null,
+      input.role_id || null,
+      input.phone ? cleanText(input.phone, 30) : null,
+      input.admission_date || null,
+      input.birth_date || null,
+    ]
+  );
+  const created = await query(`${userSelect} where u.id = $1 limit 1`, [rows[0].id]);
+  return created.rows[0];
+}
+
+export async function updateUser(id, input) {
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  if (input.name !== undefined) { fields.push(`name = $${i++}`); values.push(cleanText(input.name, 200)); }
+  if (input.email !== undefined) { fields.push(`email = $${i++}`); values.push(cleanText(input.email, 200).toLowerCase()); }
+  if (input.position !== undefined) { fields.push(`position = $${i++}`); values.push(input.position ? cleanText(input.position, 200) : null); }
+  if (input.department_id !== undefined) { fields.push(`department_id = $${i++}`); values.push(input.department_id || null); }
+  if (input.role_id !== undefined) { fields.push(`role_id = $${i++}`); values.push(input.role_id || null); }
+  if (input.phone !== undefined) { fields.push(`phone = $${i++}`); values.push(input.phone ? cleanText(input.phone, 30) : null); }
+  if (input.admission_date !== undefined) { fields.push(`admission_date = $${i++}`); values.push(input.admission_date || null); }
+  if (input.birth_date !== undefined) { fields.push(`birth_date = $${i++}`); values.push(input.birth_date || null); }
+  if (input.status !== undefined && ['active', 'inactive'].includes(input.status)) { fields.push(`status = $${i++}`); values.push(input.status); }
+  if (input.password !== undefined && String(input.password).length >= 8) {
+    fields.push(`password_hash = $${i++}`);
+    values.push(await hashPassword(String(input.password)));
+    fields.push(`must_change_password = false`);
+  }
+
+  if (!fields.length) throw Object.assign(new Error('Nenhum campo para atualizar'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+
+  fields.push(`updated_at = now()`);
+  values.push(id);
+  await query(`update users set ${fields.join(', ')} where id = $${i}`, values);
+
+  const updated = await query(`${userSelect} where u.id = $1 limit 1`, [id]);
+  return updated.rows[0] || null;
+}
+
+export async function deactivateUser(id) {
+  const { rowCount } = await query(`update users set status = 'inactive', updated_at = now() where id = $1`, [id]);
+  return rowCount > 0;
+}
+const PERIOD_CFG = {
+  week:    { curr: '7 days',   prev: '14 days',   series: "interval '1 day'",   truncate: 'day',   format: "'DD/MM'" },
+  month:   { curr: '30 days',  prev: '60 days',   series: "interval '1 day'",   truncate: 'day',   format: "'DD/MM'" },
+  quarter: { curr: '90 days',  prev: '180 days',  series: "interval '1 week'",  truncate: 'week',  format: "'DD/MM'" },
+  year:    { curr: '365 days', prev: '730 days',  series: "interval '1 month'", truncate: 'month', format: "'MM/YY'" },
+};
+
+export async function getAnalyticsData(period = 'week') {
+  const cfg = PERIOD_CFG[period] ?? PERIOD_CFG.week;
+
+  const activityQuery = `
+    select to_char(date_trunc('${cfg.truncate}', d)::date, ${cfg.format}) as day,
+           coalesce(p.cnt, 0)::int as posts
+    from generate_series(
+      date_trunc('${cfg.truncate}', now() - interval '${cfg.curr}'),
+      date_trunc('${cfg.truncate}', now()),
+      ${cfg.series}
+    ) d
+    left join (
+      select date_trunc('${cfg.truncate}', created_at) as dt, count(*)::int as cnt
+      from posts where created_at >= now() - interval '${cfg.curr}' group by 1
+    ) p on p.dt = date_trunc('${cfg.truncate}', d)
+    order by d
+  `;
+
+  const [
+    usersCount, trainingsCount, articlesCount, postsCount,
+    usersNew, usersPrev,
+    postsNew, postsPrev,
+    articlesNew, articlesPrev,
+    activeUsers,
+    postsByPeriod,
+    calendarEvents, calendarThisMonth,
+    driveFiles, driveFolders, driveSize,
+    forms, formResponses,
+    signDocs, signPending, signSigned, signRejected,
+    whiteboards,
+    postTypes,
+  ] = await Promise.all([
+    query('select count(*)::int as count from users'),
+    query("select count(*)::int as count from trainings where status = 'published'"),
+    query("select count(*)::int as count from wiki_articles where status = 'published'"),
+    query('select count(*)::int as count from posts'),
+    query(`select count(*)::int as count from users where created_at >= now() - interval '${cfg.curr}'`),
+    query(`select count(*)::int as count from users where created_at >= now() - interval '${cfg.prev}' and created_at < now() - interval '${cfg.curr}'`),
+    query(`select count(*)::int as count from posts where created_at >= now() - interval '${cfg.curr}'`),
+    query(`select count(*)::int as count from posts where created_at >= now() - interval '${cfg.prev}' and created_at < now() - interval '${cfg.curr}'`),
+    query(`select count(*)::int as count from wiki_articles where status='published' and updated_at >= now() - interval '${cfg.curr}'`),
+    query(`select count(*)::int as count from wiki_articles where status='published' and updated_at >= now() - interval '${cfg.prev}' and updated_at < now() - interval '${cfg.curr}'`),
+    query(`select count(*)::int as count from users where last_seen_at >= now() - interval '${cfg.curr}'`),
+    query(activityQuery),
+    query('select count(*)::int as count from calendar_events'),
+    query("select count(*)::int as count from calendar_events where date_trunc('month', start_at) = date_trunc('month', now())"),
+    query('select count(*)::int as count from drive_files'),
+    query('select count(*)::int as count from drive_folders'),
+    query('select coalesce(sum(file_size),0)::bigint as total from drive_files'),
+    query('select count(*)::int as count from forms'),
+    query('select count(*)::int as count from form_responses'),
+    query('select count(*)::int as count from sign_documents'),
+    query("select count(*)::int as count from sign_requests where status = 'pending'"),
+    query("select count(*)::int as count from sign_requests where status = 'signed'"),
+    query("select count(*)::int as count from sign_requests where status = 'rejected'"),
+    query('select count(*)::int as count from whiteboards'),
+    query(`select type, count(*)::int as count from posts where created_at >= now() - interval '${cfg.curr}' group by type order by count desc`),
+  ]);
+
+  const trend = (curr, prev) => {
+    const c = curr.rows[0]?.count ?? 0;
+    const p = prev.rows[0]?.count ?? 0;
+    return { current: c, previous: p, delta: c - p, pct: p > 0 ? Math.round(((c - p) / p) * 100) : (c > 0 ? 100 : 0) };
+  };
+
+  return {
+    period,
+    stats: {
+      users: usersCount.rows[0]?.count ?? 0,
+      trainings: trainingsCount.rows[0]?.count ?? 0,
+      articles: articlesCount.rows[0]?.count ?? 0,
+      posts: postsCount.rows[0]?.count ?? 0,
+    },
+    trends: {
+      users: trend(usersNew, usersPrev),
+      posts: trend(postsNew, postsPrev),
+      articles: trend(articlesNew, articlesPrev),
+      active_users: activeUsers.rows[0]?.count ?? 0,
+    },
+    activity_by_day: postsByPeriod.rows,
+    post_types: postTypes.rows,
+    modules: {
+      calendar: {
+        total_events: calendarEvents.rows[0]?.count ?? 0,
+        events_this_month: calendarThisMonth.rows[0]?.count ?? 0,
+      },
+      drive: {
+        files: driveFiles.rows[0]?.count ?? 0,
+        folders: driveFolders.rows[0]?.count ?? 0,
+        total_size: Number(driveSize.rows[0]?.total ?? 0),
+      },
+      forms: {
+        total: forms.rows[0]?.count ?? 0,
+        responses: formResponses.rows[0]?.count ?? 0,
+      },
+      sign: {
+        documents: signDocs.rows[0]?.count ?? 0,
+        pending: signPending.rows[0]?.count ?? 0,
+        signed: signSigned.rows[0]?.count ?? 0,
+        rejected: signRejected.rows[0]?.count ?? 0,
+      },
+      whiteboard: {
+        total: whiteboards.rows[0]?.count ?? 0,
+      },
+    },
+  };
+}

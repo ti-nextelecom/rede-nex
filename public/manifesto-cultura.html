@@ -1,0 +1,1310 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Manifesto da Cultura | NEX Telecom</title>
+<style>
+  :root {
+    --navy:#063a76;
+    --navy-950:#031d3c;
+    --navy-900:#052a57;
+    --navy-800:#073f7f;
+    --blue:#0877d5;
+    --blue-soft:#eaf4ff;
+    --orange:#ff4f18;
+    --orange-2:#ff7a1a;
+    --orange-soft:#fff2eb;
+    --ink:#152033;
+    --muted:#637089;
+    --line:#dfe6ef;
+    --surface:#ffffff;
+    --bg:#f4f7fb;
+    --green:#16845b;
+    --green-soft:#eaf8f2;
+    --red:#b54848;
+    --red-soft:#fff0f0;
+    --amber:#a66a00;
+    --amber-soft:#fff7df;
+    --purple:#6657b8;
+    --purple-soft:#f1efff;
+    --shadow:0 18px 50px rgba(17,42,76,.10);
+    --shadow-sm:0 8px 24px rgba(17,42,76,.08);
+    --radius:22px;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:92px; }
+  body { margin:0; zoom:0.74; font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); line-height:1.68; }
+  a { color:inherit; }
+  img { max-width:100%; }
+  .reading-progress { position:fixed; top:0; left:0; width:100%; height:3px; z-index:100; background:rgba(255,255,255,.25); }
+  .reading-progress span { display:block; width:0; height:100%; background:linear-gradient(90deg,var(--orange),var(--orange-2)); }
+  .topbar { position:sticky; top:0; z-index:90; backdrop-filter:blur(16px); background:rgba(255,255,255,.92); border-bottom:1px solid rgba(8,43,80,.09); }
+  .topbar-inner { max-width:1380px; height:72px; margin:auto; display:flex; align-items:center; justify-content:space-between; padding:0 28px; gap:24px; }
+  .brand { display:flex; align-items:center; gap:14px; text-decoration:none; min-width:0; }
+  .brand img { width:150px; height:auto; display:block; }
+  .brand-copy { border-left:1px solid var(--line); padding-left:14px; min-width:0; }
+  .brand-copy strong { display:block; color:var(--navy-900); font-size:.9rem; letter-spacing:.02em; white-space:nowrap; }
+  .brand-copy small { color:var(--muted); font-size:.72rem; }
+  .topnav { display:flex; align-items:center; gap:6px; }
+  .topnav a { text-decoration:none; font-size:.86rem; font-weight:700; color:#42516a; padding:10px 12px; border-radius:10px; }
+  .topnav a:hover { background:var(--blue-soft); color:var(--navy-800); }
+  .hero { position:relative; overflow:hidden; color:white; background:
+      radial-gradient(circle at 83% 12%, rgba(7,119,213,.55), transparent 28%),
+      radial-gradient(circle at 15% 85%, rgba(255,79,24,.22), transparent 30%),
+      linear-gradient(135deg,var(--navy-950) 0%,var(--navy-900) 55%,#06498d 100%); }
+  .hero:before { content:""; position:absolute; width:580px; height:580px; right:-170px; top:-240px; border:1px solid rgba(255,255,255,.10); border-radius:50%; box-shadow:0 0 0 70px rgba(255,255,255,.025),0 0 0 150px rgba(255,255,255,.02); }
+  .hero:after { content:""; position:absolute; left:-90px; bottom:-170px; width:420px; height:420px; background:linear-gradient(145deg,var(--orange),transparent 65%); transform:rotate(22deg); opacity:.24; border-radius:80px; }
+  .hero-inner { position:relative; z-index:2; max-width:1220px; margin:auto; padding:78px 32px 72px; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr); gap:70px; align-items:center; }
+  .hero-inner > div:first-child { text-align:center; }
+  .hero-logo { display:inline-flex; background:white; padding:14px 18px; border-radius:16px; box-shadow:0 14px 40px rgba(0,0,0,.16); margin-bottom:28px; }
+  .hero-logo img { width:210px; display:block; }
+  .eyebrow { display:inline-flex; align-items:center; gap:8px; text-transform:uppercase; letter-spacing:.14em; font-size:.72rem; font-weight:800; color:var(--orange-2); }
+  .hero h1 { margin:10px 0 16px; font-size:clamp(2.7rem,5.7vw,5.2rem); line-height:.98; letter-spacing:-.055em; max-width:820px; }
+  .hero h1 span { color:#ff7a1a; }
+  .hero p { max-width:760px; margin:0; color:rgba(255,255,255,.79); font-size:1.08rem; }
+  .hero-meta { display:grid; gap:12px; align-self:end; }
+  .meta-card { padding:18px 20px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.08); border-radius:16px; backdrop-filter:blur(8px); }
+  .meta-card span { display:block; font-size:.72rem; text-transform:uppercase; letter-spacing:.11em; color:rgba(255,255,255,.58); font-weight:800; }
+  .meta-card strong { display:block; margin-top:3px; font-size:1rem; }
+  .status-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .status-pill { font-size:.72rem; font-weight:800; padding:6px 9px; border-radius:999px; background:rgba(255,255,255,.11); border:1px solid rgba(255,255,255,.13); }
+  .status-pill.pending { color:#ffd3c4; border-color:rgba(255,122,26,.35); }
+  .page-shell { max-width:1380px; margin:0 auto; padding:42px 28px 90px; display:grid; grid-template-columns:200px minmax(0,1fr); gap:34px; align-items:start; }
+  .sidebar { position:sticky; top:94px; max-height:calc(100vh - 112px); overflow:auto; padding:18px; background:rgba(255,255,255,.88); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow-sm); }
+  .sidebar-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.14em; font-weight:900; color:#8a96a8; padding:4px 10px 9px; }
+  .sidebar nav { display:grid; gap:3px; }
+  .sidebar a { text-decoration:none; color:#526178; font-size:.86rem; font-weight:650; padding:9px 10px; border-radius:10px; transition:.18s ease; }
+  .sidebar a:hover,.sidebar a.active { background:var(--blue-soft); color:var(--navy-800); transform:translateX(2px); }
+  .sidebar .divider { height:1px; background:var(--line); margin:12px 0; }
+  .sidebar-note { background:linear-gradient(135deg,#f6f9fd,#edf4fb); border-radius:12px; padding:13px; color:#5e6b7e; font-size:.76rem; margin-top:14px; }
+  .content { min-width:0; }
+  .content-anchor { scroll-margin-top:94px; }
+  .content-card,.value-section { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:34px; margin-bottom:28px; }
+  .section-head { display:flex; gap:16px; align-items:flex-start; margin-bottom:22px; }
+  .section-kicker { flex:0 0 48px; width:48px; height:48px; border-radius:15px; display:grid; place-items:center; color:white; font-weight:900; background:linear-gradient(145deg,var(--navy-800),var(--blue)); box-shadow:0 8px 18px rgba(7,63,127,.18); }
+  .section-head h2 { margin:2px 0 4px; font-size:1.75rem; line-height:1.15; color:var(--navy-950); letter-spacing:-.025em; }
+  .section-head p { margin:0; color:var(--muted); font-size:.92rem; }
+  .content-card p:first-child { margin-top:0; }
+  .content-card p:last-child { margin-bottom:0; }
+  .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin:0 0 28px; }
+  .overview-card { position:relative; min-height:230px; overflow:hidden; border-radius:20px; padding:28px; text-decoration:none; color:white; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; justify-content:space-between; }
+  .overview-card:after { content:""; position:absolute; width:180px; height:180px; border-radius:50%; right:-80px; top:-75px; border:35px solid rgba(255,255,255,.08); }
+  .overview-card.mission { background:linear-gradient(145deg,#063a76,#0877d5); }
+  .overview-card.vision { background:linear-gradient(145deg,#0b315d,#03519b); }
+  .overview-card.purpose { background:linear-gradient(145deg,#d94a17,#ff781c); }
+  .overview-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.13em; font-weight:900; opacity:.72; }
+  .overview-card h3 { margin:10px 0 10px; font-size:1.55rem; }
+  .overview-card p { margin:0; color:rgba(255,255,255,.83); font-size:.92rem; }
+  .overview-link { margin-top:20px; font-size:.78rem; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+  .definition-label { margin-top:24px; margin-bottom:8px; font-size:.75rem; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); }
+  .definition-box { border-radius:16px; padding:20px 22px; margin:0 0 22px; font-size:1.05rem; }
+  .old-definition { background:#f5f6f8; border:1px dashed #c9d0da; color:#687385; }
+  .current-definition { background:linear-gradient(135deg,var(--blue-soft),#f7fbff); border:1px solid #cde5fb; color:var(--navy-900); font-size:1.12rem; font-weight:750; box-shadow:inset 4px 0 0 var(--blue); }
+  .why-label { color:var(--navy-800); }
+  blockquote { margin:16px 0 0; padding:20px 22px; border-radius:16px; border-left:4px solid var(--orange); background:var(--orange-soft); color:#794529; }
+  .values-intro { margin-top:8px; }
+  .value-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:22px; }
+  .value-card { position:relative; display:grid; grid-template-columns:auto 1fr; column-gap:16px; row-gap:4px; padding:22px; background:white; border:1px solid var(--line); border-radius:18px; text-decoration:none; transition:.2s ease; overflow:hidden; }
+  .value-card:before { content:""; position:absolute; width:5px; top:0; bottom:0; left:0; background:linear-gradient(var(--orange),var(--orange-2)); opacity:.85; }
+  .value-card:hover { transform:translateY(-3px); border-color:#c8d8e9; box-shadow:var(--shadow-sm); }
+  .value-number { grid-row:1 / span 3; width:46px; height:46px; display:grid; place-items:center; border-radius:14px; background:var(--navy-950); color:white; font-weight:900; font-size:.82rem; }
+  .value-name { color:var(--navy-950); font-weight:900; font-size:1.05rem; }
+  .value-desc { color:var(--muted); font-size:.82rem; line-height:1.45; }
+  .value-link { font-size:.76rem; font-weight:850; color:var(--blue); margin-top:7px; }
+  .value-section { padding:0; overflow:hidden; }
+  .value-header { display:flex; align-items:center; gap:18px; padding:30px 34px; color:white; background:linear-gradient(125deg,var(--navy-950),var(--navy-800)); position:relative; }
+  .value-header:after { content:""; position:absolute; right:-40px; top:-70px; width:240px; height:240px; border-radius:50%; background:radial-gradient(circle,rgba(8,119,213,.5),transparent 67%); }
+  .value-header .eyebrow { color:#ff9b62; }
+  .value-header h2 { position:relative; z-index:1; margin:4px 0 0; font-size:2rem; letter-spacing:-.035em; }
+  .value-index { position:relative; z-index:1; width:58px; height:58px; flex:0 0 58px; display:grid; place-items:center; border-radius:17px; font-weight:950; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.08); }
+  .section-preamble { padding:26px 34px 8px; color:#35445a; }
+  .section-preamble p { margin-top:0; }
+  .manifest-detail { margin:14px 24px; border:1px solid var(--line); border-radius:16px; background:#fff; overflow:hidden; }
+  .manifest-detail:last-child { margin-bottom:28px; }
+  .manifest-detail summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:18px; padding:18px 20px; font-weight:850; color:#26384f; user-select:none; }
+  .manifest-detail summary::-webkit-details-marker { display:none; }
+  .manifest-detail summary:hover { background:#f8fafc; }
+  .manifest-detail .chevron { width:10px; height:10px; border-right:2px solid #7c8798; border-bottom:2px solid #7c8798; transform:rotate(45deg); transition:.2s ease; margin-right:4px; }
+  .manifest-detail[open] .chevron { transform:rotate(225deg); margin-top:6px; }
+  .detail-body { padding:0 20px 20px; border-top:1px solid #edf1f5; color:#38485e; }
+  .detail-body p { margin:16px 0; }
+  .detail-body ul,.detail-body ol { padding-left:1.35rem; }
+  .detail-body li { margin:.55rem 0; padding-left:.25rem; }
+  .manifest-detail.positive { border-left:4px solid var(--green); }
+  .manifest-detail.positive summary { background:linear-gradient(90deg,var(--green-soft),#fff 70%); }
+  .manifest-detail.negative { border-left:4px solid var(--red); }
+  .manifest-detail.negative summary { background:linear-gradient(90deg,var(--red-soft),#fff 70%); }
+  .manifest-detail.warning { border-left:4px solid var(--amber); }
+  .manifest-detail.warning summary { background:linear-gradient(90deg,var(--amber-soft),#fff 70%); }
+  .manifest-detail.protocol { border-left:4px solid var(--purple); }
+  .manifest-detail.protocol summary { background:linear-gradient(90deg,var(--purple-soft),#fff 70%); }
+  .manifest-detail.action { border-left:4px solid var(--blue); }
+  .manifest-detail.action summary { background:linear-gradient(90deg,var(--blue-soft),#fff 70%); }
+  .manifest-detail.why { border-left:4px solid var(--orange); }
+  .manifest-detail.why summary { background:linear-gradient(90deg,var(--orange-soft),#fff 70%); }
+  .manifest-detail.deepdive { border-left:4px solid #64748b; }
+  .content h3 { color:var(--navy-900); }
+  .content strong { color:#24354d; }
+  .content ol,.content ul { margin-top:.6rem; }
+  .content li::marker { color:var(--orange); font-weight:800; }
+  .footer { padding:48px 28px; background:var(--navy-950); color:rgba(255,255,255,.72); text-align:center; }
+  .footer strong { color:white; }
+  .footer .tagline { margin-top:7px; color:#ff8a49; text-transform:uppercase; letter-spacing:.08em; font-size:.78rem; font-weight:850; }
+  .back-top { position:fixed; right:24px; bottom:24px; width:44px; height:44px; border:0; border-radius:14px; background:var(--navy-900); color:white; box-shadow:0 10px 28px rgba(3,29,60,.28); cursor:pointer; opacity:0; transform:translateY(8px); pointer-events:none; transition:.2s ease; font-size:1.05rem; }
+  .back-top.show { opacity:1; transform:none; pointer-events:auto; }
+  @media (max-width:600px) {
+    .page-shell { grid-template-columns:1fr; }
+    .sidebar { position:relative; top:0; max-height:none; }
+    .sidebar nav { display:flex; flex-wrap:wrap; }
+    .hero-inner { grid-template-columns:1fr; gap:32px; }
+    .hero-meta { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  @media (max-width:760px) {
+    .topbar-inner { padding:0 16px; }
+    .brand img { width:125px; }
+    .brand-copy,.topnav { display:none; }
+    .hero-inner { padding:52px 20px 46px; }
+    .hero h1 { font-size:clamp(2.45rem,12vw,4rem); }
+    .hero-meta { grid-template-columns:1fr; }
+    .page-shell { padding:24px 14px 70px; gap:22px; }
+    .content-card { padding:23px 20px; border-radius:18px; }
+    .overview-grid,.value-grid { grid-template-columns:1fr; }
+    .overview-card { min-height:190px; }
+    .value-header { padding:26px 22px; }
+    .section-preamble { padding:22px 20px 4px; }
+    .manifest-detail { margin:12px 14px; }
+    .value-section { border-radius:18px; }
+  }
+  @media print {
+    .topbar,.sidebar,.reading-progress,.back-top { display:none !important; }
+    body { background:white; }
+    .hero { color:#111; background:white; border-bottom:2px solid #ddd; }
+    .hero:before,.hero:after { display:none; }
+    .hero-inner { display:block; padding:25px 0; }
+    .hero-logo { box-shadow:none; border:1px solid #ddd; }
+    .hero p,.meta-card span,.meta-card strong { color:#333; }
+    .meta-card { border-color:#ddd; background:#fafafa; }
+    .page-shell { display:block; padding:20px 0; }
+    .content-card,.value-section { box-shadow:none; break-inside:avoid; }
+    .manifest-detail { break-inside:avoid; }
+    .manifest-detail:not([open]) > .detail-body { display:block; }
+    .manifest-detail:not([open]) > summary .chevron { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="reading-progress" aria-hidden="true"><span id="progressBar"></span></div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="#inicio" class="brand">
+      <img src="data:image/png;base64,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" alt="NEX Telecom">
+      <span class="brand-copy"><strong>Manifesto da Cultura</strong><small>Missão, Visão, Valores e Propósito</small></span>
+    </a>
+    <nav class="topnav" aria-label="Navegação principal">
+      <a href="#apresentacao">Apresentação</a><a href="#missao">Missão</a><a href="#visao">Visão</a><a href="#valores">Valores</a>
+    <a href="https://drive.google.com/file/d/1m3Di9MjccUC7tFbzEkEv-237lVFROwCS/view?usp=drive_link" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#ff7a00;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;margin-left:12px;white-space:nowrap;border:none;cursor:pointer;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Acessar PDF</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="inicio">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABAAAAAD8CAMAAADe3CbAAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAFxUExURXY7RwI2dAI2dAI3dQI3dAI2dQE2dgM0cQE4dgE4dgI4dgI4dgI4dgI4dgI4dgI4dgI4dQI4dgI3dgE3dgI4dgI4dgI4dQI4dgI3dgI4dgI3dQI4dgI4dgI4dgI4dgE3dQI3dQE3dgE4dAI4dgI4dgI4dgI4dQI4dgM3dgI4dgE4dgI4dgI4dgI4dgI4dgI4dgI4dgE3dQI4dgI4dgI3dQE4dgI2df9IGv9JG/9KGv9KG/9KGv9KG/9KG/9JGv9KGv9KG/9KG/9KG/9KG/9JGv9HGf9KG/9KG/9KGwI4dv9KGwI3cAI4dv9JGv9JGv1JGv9KG/9KG/9KG/9KGwI4dv1JGwI4dv9KGwI3df9KG/9JGv9JGv9KGv9JGv9KG/9IGv9KG/9KG/9KG/9JG/9KG/tHGf9HGgI4dgE4dQI3dQM2dQI4dgI4dgE4df5GGv9JG/9JGgI3dv9HGf9KGv9IGf9KG/9JGwI3dQI4dv9KG////xi1KA4AAAB4dFJOUwAMFDIlIyEQR6Xs+vTx8Ovo0lNng5ScmZCNc9zK/NiiY0VEoqiusPjAxrq+4NHP9vJo4+o11RwjY4N1kpaIQ+H389OhXBTkpsD33SP1mjxIy8Tss9ZQtqwr2TM3bitMHZCM31W8IDhuW0tI/vusGHxRahm4C4BqPD0y3IwAAAABYktHRHo41YVqAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH6QkCBDEKewcMYAAAPeJJREFUeNrtfflDGsm+b1e3nUKWUVnMsLjAKCGKZJI3B2xFVhUujBten0v0xEzGnHPPeS/Xm5x7H/z37wc0UbqAb23dDfqFOKu9VNX3U5/6rorCLEjVNG1C0ycmdF3XX7xQX6iqqqoYY4wQRgIFY4yU0Rf0/fMszzLqi1l1Tbrbw8Tj8Xg8Hq/X6/X6fD6fz+3+yf3jj3tqamp6+B+319Nuz/hHV20QwqquufyBYGj25c/hYCQS8WsYIecA0vCPFbd79EWKwA3k7vvj84zBnIID0ba1EnWN5KQhrGr+lzFv7+vMzS8saqqtrxRfhIvGt1qwqiVc/sX7z6L/7rKB7xIJRAKBSCQQIUgwEowEg5HgdwkHw8FwOBwOh0PhUDj0QGZDs7Ozs7MLswuzvyxM/jI5Obk0Obm0tLS0tLS8tLy0vJzsyoDtBGGs6oCP6ggYQXi4SHhONfyqbbVM6iNIkxKRpQFImfLbCQFLFHMY4dB+3RVMRtvOkki/cUe6fyEVnfYNk59+er0U8WsvsN3ra2FyYXJhcsD3l5fBgEtTxe7/L22YM9/iiFEArPuTviEvlfLraBQAIMi6RHVXeKbtPIn0UVzkilGtyVTYZRsE4InFpBv6pEsJkc/p8toxaSvaCGk/UhOR15C3WvXbxWwmvbIBAGuR1Ku2EyXYRx0SKdorpYP2zB/SglTIOhUS95xqzJZJexUZHQqAXaE08LU8SZs2kV8kMwA1Hlxzpvr3ZwARN/WlvLN2bEyqnxaqvJPCllnEplnLjAoFQBMRGnRORybseMpZGgZAjb04Ho62HSt9AWCKYWNasHxdIi1Ej1TRhKC762mbZm0uiEdC/7Frme6M9MYWEkADAGFq8h+cabdHDwD88+0RQAC8mGJ4zLRfEPq8tG3aovFR2P71yBo1tEVtIAEhGgBAdBtUJOZxsv73tQFoKyzP7bEWAdSgm+Wd04IYgMtt37yFVOfrf2LSx/BmvknL4xykAQD2J71tZ0tfL4Cf6dxiKQLgINPoepJiWCZembNv3qadHw3kSrG9mie2aPExIOSTAwBaeL7dHlEAUHCE6YDrnbSMwakRH9MrR12CLIC2gvuSOqb6327PzUesdSiFaQAADE540fHb/yAAUPTwFBsHmEAW7f8/se2dgnxo2tqcnRP3q8NTAuIpHn4TsvQoGaZYSSEoAOhB52//gwFNDzGdcT3WRKriyDTTC/sEGdBRyGZ4TzmaAmgprpfzLcctxDcaUxIUALRJ7yjof/vtgPfRF5g4ttcKBMBBJn7S9oQF6Y0/OmfvzM0F0Njqf7vtTVnIcCQAgD/pGQn9nxt0pEETy0wo9kr++ZTRQtFuzwoCJ9X+CZ5xbk6QviLg9SLYkQAAWtuLr9sjIm8HjrLGtsw9k6ps/Wfb/9tJUUrDeAARa79xKgVAIRHomI5YdcihCXudBTwUikRHRf+HGDWRlmKaSq9cBGDe/1dF2Za0mAPmLj3hUADwiwmQmApahAA07qQQIG/ZCbuDGAagKIkMmxFnQSJ/Q6wDHNOQqC3O54TJm3XoAUAUOr4Lq45jAICtLZIeHf2fG+bWRFrUaQjAvP/PCLMs+50R3u12Zk6QOP+IO2yJHeAtBZzPvhgn/R/OABSUYHsf3yyWtf8zDrCoFABFUZccYuJNOvIAIFABfC8tQAD0loJRDmUAi/NzowQAwyEW+X1OQgAUYYyvmBLnV3LMGc/ncp7+qymRb+idtQABaOZzQR8JciiOASgK8jPyNxlzhwKM+8tP4gLMtVXHTF/KeQDws1jzyKsl+QgQEAcAE6mR2v+H2wAURVFwgI3x+kLYMfrvFedVRj87J8bLt+g0/U+IDoAVlbs1CADeURwBBgIA+sXbHi15CxldzFj55ifRCMCs/x6BHiUnkby5NadVBpkVrgFzK7LfcZECAJb08TEAwmwAiqIoOOgIDsCu/z+L03992Unz53NYNJC2JuElky/kPrR/ShAAxNdGTf9hDEBRcOgVIwKoIvWf0fj26qW4qFnEGoQoSaLOCggOSimSkpL7kosU+8qgWNIXy55R0/85qKNVZTzcCEQATHNUe7T/LwkMmeNOcxFNAUKOigGSMzqelNSgRxrH5fLEOB0AwAxAUXRG37dbVDQXXmQc3ldJgfEyOOQ0kE87KRooIEsFUjLf0k+xsyz3fxA9OXr6PwcPtdIY65u4xXAAzHz+XxVZQNPvuDQPgVXO+WMA5KmAsDBuTgaQnLAe/RzBABRFW2XkAMEXNu7/npRf4FKZWHbeFM77HQMAfnlFcDyxhLTHdtEAgNafI4+g/rdpgq0TKVYE4OYAiFX/52ZEqgeOuJ03hZ5lp1AAPCux/40nJY0DiAGAxegoAgAFA1CQK2YTB+DQf6F1c+gbplliBQg4JQhI7vAkNQcAQN++jOrLUdT/Oap0K+RnTPSc5uMAzPrfjgp1k6thZ7p5kg5xBUo+BHuWJSGAa54GhfqsKFdsFAGAigEoCvJnbEAAdv1PCy0rhfwOJXnTDqEAQclxsD5JNefjFADQt6bMSJoAKRmAouAAow6k2RGAXf+nxRaUoHDzRFOpWCqTyqRisdj9n1jqdUyOrDoDANCs7OXqfimF62hpfgBAwfYTYACKglnLnb1jrvDGbFxxh4QuFwoL4OqiS4u74q64Kx7//qf7Q7y4XJozjgAW+MGnwxKigpFGwQD6BSTok6xu3PlManV1JXn36crqSiq5ei+pXomlYqm7TSWWeR3LxDKxTCaTyWTWMmtra2trazN3Ep2Zic5EZ6Lz0floNBqNzs/Pp7ufe/lfb2nPyCpruBNrhTdm/fctiNULDXz8iSYUxcoQfYekA1gRJJmWUSeQhgH080UwGUB9mYVgwO9yaSRJaJqmxTXN1f385vrNFY+74nFXPBFP3GO/Wfwuv8vfTxa7fxb9/kV/wB/wB/z0rhWdsSI/W5VXtMjqWvYuiz0wqvAYwIDj+/bJiQKwIk0yLaFauPYX+P1jfRiAn14r0ksBVxYpSFHufig//vL4X4vbCe4viTi2DsaeYe22m37u0CJr/w3PiliTMYKHi63oT1L/lYAlaVLRgHAEoDoCkIswIeqMeV8yoI/oRqGz1sSdonXKcei/6LAR+AHX7XqaBEAJvrHEbDWzKHh80USUmwFQA8C7kDa6y2RikhEBKBtzogBrgcW5NcHV8hC8F3AYP039RyGLDNcZ0V3D9KjlDOBdMDvKc60lGWM+p2iMjijA3H9vXvQurIHPt2vaEyUAeMEiAPDEBKO7TmG86HNvSi+gO6SO9mQzI8B0hGLTZdZ/t+g9AoNd3J4nagFUFNWyRClPKuE4AKBiAJ7kqJuJkJZhjIpNR8D6z1xg3Sv8lOgCn3mWn6gFkKFW2ptYOBB5uRJliB8UmxZgOQNIj76ZCDEXfwMiAMf+7xFeJw9e6/7dU7UAKsoEZRzQVFDHCGNd12bpcyyFbqEqhRcgIwAA3iyPwSJBccYAnTlQ8hqH/reDoq1wFPzuqVoAFQVRtkuYDuN7ZzROTNKygLmkwEO0SsEA1gQAQNo1FjPuYnT7zk0vAlQuzaz/4u0rOniHSmlPlgDQBgI+aviBXbTbySuBzSetBoDV8VgkyO+VxQEQR3nFX4RHiyPw4dYbeLr6T5kP27sGNNoZ9/wsbKwxxXF2pg8AhClCgCLjMuWLzPGcAWn6L8G+6oKDj648YQCgsgqt9g5VgtYQMCfM1EMFAOQKU5iCAaS1cZlyFJCCADyFt1YnhO/BGMxOo64nrP90qQDusBlAaKPLPKKqvSGKKhfRPgBAwQDS6tjMOY54mRGgr6LiIHt7yZgEcAV3RfJG8FMGAKq0LcIOgBZp590tyOKCYvwMgAoAxuegiEOsCBDt56tXw+x1ZV5LqByrgW2dq9pT1n+qFptEPUIRWgQQ1RaJggHMCwCAcTooYuZmkPNkBNDZ9d8TleCER0kBpOZpAADNwS2jES1ptGc/QRYfiwFgYpym/cUkq8ISs7r0EHtl6ahfggbCeWnoxZPWf/SWZv+O6WRCScsBxHRFoXBgvuMHgHfjxRT1JCsCrJkQAOkv2evupgMSjuD6GjQe4fWTtgAqikIVDZ8kn4N12haUPiFRXxQ2gDR5l1EpUiHTYxYsoiVZY3bW/D2zN8GRUJaOSDCuojB0S3IH8RMHAKoW8qv9AHeZEgHcIg5eFDGMU30YAAUAvEuM18Qj1p5h7fb8YzjVOJorCa4AfCdxaECCJ6kpTx0AqBgA6rud0AK/gIMfBQCkFxVeBvBu3Lgiiqc8IjiAxlFVVnAF4PtpBWc9pxfRMwDQAIC47STD3fwVJT28DIAGANz+sZt7f4pVcWd+4HdihV3/fbNSXCuRaWgIQEhVngGAQpb7a6OLcjF5+ckXxcp7F+AHgLdjt1kgP2tycDsT0HSsIFXzr3Lo/6QUAg5Pb4m5njwBUCjs4G3P8qDFRNlky5Pk9avRMADyEUCnAIA34fGbfLTIjADp1GQ4EAytcLTd8q5I0X8cgla5nIrgJ6//iAoAlgaNO219cTevB5YfAFSKrkhvJsdw+pl7hgkQz2pcyjuBWwF6Vpwb2oEUpCCEEHIWAAzUAZV2MfEC8DIFAAS4GUA7NY45Y2rELgQQXiPyfk7B+wJrBFJu3TCMDUYxNjaM7sfYMHpl09g08kZ+M79pGIaxtbW1tWUUsg4CgIUhi4kyHZSzWcAS3Pfo7mMD+IXmxBoeSwQI2tQedc0vZXdDYAugb5bNApjLF0udUplTSuXy/TVKpVKp1Oknlep2TiYA0OyBntnB18oG39EuAp5nn4QzAJ8ABtB2J4P+uDah66quvtBf6I9kQp+4E6370Sb6dA5LaFpCi2txLa4l4loikUgkyB3D/HcNwwg9w8Q1J0FqeNoO/Z+Xo/8Uzd4ybJFdOxu7HWulXCvIOwnQhMK0vbPD6FeIrt6UJ8VDAxd+5QYAys7I7mgmtbqaXFlJriSTK8mVZHJ1ZSWZSqYe9gO9+5vVx31BY6nXr1+/jqVisVSm2x369eu1WOz13T/EXmcymddrmcyjNqGPJDoTnYlGo3+Zn0/Pi0xg0UNu6/VfSgCwQpPnOMVYmKJQ71gu9YI8AHhJo6+h4YuJLi2Ayxm4AO9p5BXBAITJHPcVhAaw6gs+q0fALcv+vgi3ALIdAHbyJesBoFPZkQYANHugbygAKBOUQcE8oSChf4Ob8CN9ln57NEWs/tBOGrf4gpKKK+hgwzBjKCoqNDp2iCHNBkQDAN7hAIC0JF1IoJs5GByF4EcAT2C8AEBwGWvmjkGMDgBZAXgo4gOyK+9LRg+AYYv+d4pNWQAwKZYBUJcZ5ugcHvodvuQizwAgctL49H9BVgBuHByMNsNGPFGhbA8AdPYkDRmVCrghwXAoQRkSyGwPprA3jBkAeEQDAHvPMAZJyiqupr6EEhnWEs/Nqk363ynvyxk0lSaV0weLhnXN0y2INcaIsDCF7eqZAQxDAMsCgjK6LKfWIjgLmLHHAz4o2QUAnUM5ZlOd5gjgDsIWk58utmQupdkDAGhUAWBOfCsrFLcoICgqLf4WnpfsZvQ9NY9s0/9OWY4dkKo3KBAAFCVAF1viWWI6kQX5GcDyyDIA8buo35JwAHmFleDFzj1htmdQtzs2SiNnOwOYggKAQtkjYo7JLPyUAUCGGc1vQTjAVFxaUBv85Bll5E+5lp0A0DmWMXQ6jQ1gKiJFOdvt9hyLK4CmvQU57GuEAUDGYghIDweYkpeAD4/qZG1Noxq26n+nvG83ALgpbKc/0y0mD0NtpiAFzQgiog1gVAFAjiMdRSS7Anx+afqPFsGrIcn4EAV7CUCnU8/ZzgDgQ4cW6BbTNP3eQHPOID/5xOgCgJxUuiW5+i+xAAe8zT2rBTBnMwHodFoGshcA3tF4TzFlSOC/084LesvNACaeGUCPM1CqGeClvAp8GFzd2hNkJQAluwFARlKQPABQdMo6oSla/xBNTzLyrE8kRxUAJJUmwCsSH1qiAQC5wGEMGUYUylU79ouxYysATAWorj2Rokt7W6YsERbgZQBcFa1tlVlJeymWGRixKq+gyguwM8vNaobYd4D+d4rrtgJAmg4AkPaa1rstDQDC4wUA0hiAzAFZlgYAFC2qWbvSZRtOAIBONTdCAKAgF13R2Vd0dS4CU7zYMroMQJIu6TKDgeT14YbvNFHWOKQTR+h/Z1e0HZAOABZpkZmyUvAUlYd2cerJMgBJAIAiMh/6XVyS/lP0eH3LSACaRWcAQOdIGyUAUNAiXY5JlKZEmP/pMgBJRwDayu6UIssLCM89WWFNRDIcov+dkpG1DwDmF+nBOUKVGjgX0yQxgPECgAV9BPW/HZOTB6CDZ5G5I6VjCECn0zqwkQEwxFCqEbpKwRRFAmmSDsmOc231GQAejOea5Kf2SCEuKCA/fGKr4xyp5kTCKFUwLEvpDqSHqSoFv4JnBtKkr40ZAEzqI6j/7fYbGbaLCfApcy0xqkHAj/OChQLApGQGQF122geOF/O/4wQA9HwEeDCaVtQE+rcF4dUAKAyXrAQA5TtOEqHxgFRHgChbGpW+QJUYNBVUJQAAUWMsLYXnbJe635qaYP+2LLoeEAJXoPMwWgDQfstRANARaQekYgBRtjYeSFuiKjqbBuYcuSgAgBg6h377388AcKf/ry2qCehJCn70CfCDRxndkLjuLP3vFA/EgSiVDSDK2seHkmpHYQFBVAAwbgwACd7/56x6dNEI4IdvLAm2/evEYQSg0zk9s4cBzLACAIrTJZm8Bp014jQAkCUygFEFAME2AH/MY+HDrwh9eBccethOsNlDp+l/p7yujhYAKMhFVSt8DtQzMJHm1RgtM6IAkBQaD+Z/PWflw3tWRFoCVfgqYAtEMsqOA4DO+YU9AJBgvg+iczK9WgGscI0mDkAfKwaQnBC6/89Z+/QekVkBFF6ANZZApKbzCECn0zGatgAAx7xRBgV7l4YvcW36mQGMHP8XjwAqfBJD9BQAGSUnAkBJVMdwdcEaBqAoKEJVeN77clh1AETDAMhmc9fIMoDmKOt/u+1JiUMABDcDuulLkhQcSQA6nZqgeECq1hhrGh9XowoI+mloC2waAJgkms2ZGMC7ZCjg0iY0LRGPux5KwgWTuMsVf/z5/n3wufuSRROWVuOKeebao40AGM5iV17QXtyZBKDT6WyLAQCq7sAzfJOGQ1QV59xDwgHQhA0MwJsM6BghpCBFWn2r7tvdf/v+EaP/r+dsIjGxhLCh0sDuoLkA7cgVDGOrV2pGbdOobeaFi5E/hgcDiIkHVK1jAIqCZqlCAtNDSoULAIAY7b7lQnL13mJxrdml/+12TFh5AAo7YJp6CSPcK+gemiXAPoXJQUg8IKJiAGu8tme8RIUAQ0KPJygyjYlmc0R5BHCH1HHSfuqKTWZA9PDYD9Zcol5Ehyd1zWJnz8lOFW4HFPEqmAYAMhO8uKfS1QofvER0mjgAogfIRQUAvtBY7f68+79vOhUKJtMchcTXRPUJQS6wecnjcvYkogK49MCRCEswDtEAgC4Aq6kQYKCpSKdhAMQLxWkAwJPEY6X+KM6l/+63KlIUBbk4sogyohBAhS/j1AtnTwuGFx8SEQ9oNQAoE3SVggc5vCliwPoBAI0NIBofM/1/zcP+5wP3DYo1DgQQxQGQBj/MRBzO496Dc49aBYsBIKVbO1Xt9sDyl1luBkBzBPAsj9UBANEaQHvQ8IeBFmkckQRRQQiA4Y1N05rDZ+ZyF4oAW1lrASAjxAbmogoJ9PTvhK3yAwAFGE0tjtf+z6X/Mw8dNFwIMLMo5mBF0eVtweFIrtbAhwD+vGBkPQBQ1fJrtz39UjgQ/guvMYEGAJy+cdAJl/57evZtpKVsRwDkB28Hb1wOnxx49GGDmwKgMM0RQExPWhSYplkh7kCfFYKpGADRC0BRBjc6RiZAPv7vWfPjXj6xynEKCAgZWTX8BhyB4HBvrgpPQOSuD0gFADFBOoAiVHVCp/uEA9AUBOnDAGgA4Hn/76f/ioIStiMA0uC1wZxuBzw7BXcKuuJ9FSoGIGoTxHSVgsmViKhiClJkBkBhjpgZHxugi8f+74n5ScsgvsKOAPNCOoagCJhYRh1+nMv+FRwMUBtJAKBNC3i9qHLSiBg/A0DP+t/Vf0S2KnIgQFoIAuhL0CfwON0O+OHaMjtgkAYABNYifEmXFhDqLemO/VQth8glhvwUDGB+XMKA+fh/qp/fjhMBBIwuRSdKt9/Zc4QL4GbE51nrAGBVIG7qC3TLJRV5FBCgRuiaDmbIDIDiItMTY6L/KSn6z4sAQQEcQA37wO+hOxwBtksW2QGpAECkIVpbplsuvuXAj3O8Hk7TLTB+BpDW0LP+pwZF0qP4ipf50tMCEADBOz25gw730xTASUG7BcsAICX0HRO0bXnSqyG/pmKEtcUl2j72qTgvA5hyjYP+uzg89kP0n5MDuEUgALzq1JrT4wEPoMXIS1Wu4xNNR/ik0D0Q0Zfj8MynkkuTS6k09TrLkBkABY+Y9j95/V8dmknHhQBhfgTQJ6H3f7Xk7LgOlINXBtjmYgAUM7Yi+B39XOGoVEKuPkFjSHQHxkH/X/Ho//AaPnwcQEC6Nbz4dHrR4RTgAh4PmONhABQTlhT9jrIb0otkAO7IGJz/ufQfZAThiQhyh7h3ZRQGHw6TDrcDqsauBXZAFPHaCAA4ELUVAGjiAHzhkdf/Vfn6ryCNAwF+4kcAuB3Q53A7oNIEJwUV99kRgIIBeJbFezveTlkDAOSmRjS9Ab2hJ67/YFM8R26gm7tiFwpAWd1cxuEFHtQDcDBAnTkYAL312QkASA1O2wcAiKYoumf1Ces/TSkIrtxA3y+8CIDB7mXvgsPzu7JbYFfgOjMFeAufrDeTMmAu5LMCAMjpBJgmEDo60pFA1E7XxxEgNOdlxFMjyDfJGxMIz/GOOt0OqMHjAVntgOgt3KPukQEAih7yWsEAyE68wBv4JaZH2Q2QWJ2zSv8VvpZr3iVOBBgjOyBaBwcDfGQdtQh8A/YuSHlLfdmC3lR/IQOAnyKjeJRrgvGwcnr9V5SJGR4E4CzbmQVbdnxBh5cIbu6BO4YfMN4jALfCvZmV85Z6Uj4CzJMBgKowhiflYusHgQg/eq/U+5/F7v888b/tFZVhTjk6Drxa4tyYF8HhHa+dHt55AHYF1hmLhAfgRwBpdnC+/YkHAPRlqqvMudeSC8GA/4Es+v3+xYefvhJ4IJHuj0ggEohEIpHuX+//gSDBH99gJBgJ+ql0MrHKMXKeZaY6UDoHB/BwUnM0CT7ZLTg7xxOpBvQQUGYMBqBgAB5pjjAtJRsA3pEBgKomqoOEqj04n/6zHsl5OABv+3MNjD5ppxt2cuB4wPoFEwIE4KdgnzQAQK6MZI1J+7lff1QBIM6j/95Z5gP5BAcCzCW5ci8pGlEnHZ4UhLfBxYHy6sgCgKL4Z+SeAqb6AICWHE0A0K3Z/70hDjLOExHUXuFSTAymlF6H2wGVLDge8I9PLHENi/BweKnBsIF5yQwA9dkr3owkADSByxZxna58PPrPd++5FS4OAM/ycLodEMGLA/15IxcA3DIBAL1Ny9SYmX7T7EqNJABMWLH/u0Ocxjgu6+5KggcBQuA7hxweDKCA84JLBgMFgLtM5AKAgoJuiRrTN5UFhzwjCADLTWhmDs+xKcyrGlwIMJeMcyAA3AuRXnT6IQBMASqf5QKA3PQpFJYYFLzQby1bmJIsEgB0+fr/Lsy/NXLlBrZXeBAA3izQ6XZApQDuE/LxTOJhSXpGPJK4GfevNmNJIKJ4PIOoBtf5X4T+KwpKcFQIaQ8vQTTADrgCtgNGHF4cKLsJLg70iXrAKOpiSi+kqE7K0kVvRAgHGi0GwHX+T4ezYiaVCwFSHAiQAOeZrjk9HvAKTAHq1J2CKKpiTcmuiYN0WU65mQEF/dTQ6DkCJnXJ+386qAo6GSNtlWN8Uxztw8FBXnMvXzgbABC8PiC1HZCGAcgviqWtyFGYBV2WrdqxAMDH/yPiTOPIxZPrEWNHAHgsYtrv8MoAagOKAIf7lK9CYQObkg8ASE5QsHtgN0gUGLlDwIIud/+PiHSNoTgPArxmRgC0CLYDppxe6wFuB6w2pQHAOwvKYvI1ru47v4PtvNiaoiRWAgBXhGM6khU8qTwIMMOMABic6uV0O6CCN6EA0PpEFxFMURfznRWJEzLccp5htSa5nFV2yLDgFS7/X/qtLhzWeRCAvXBPAuziijq8PiDSwCkBlRzd1MDTcKYsyZxCi8IrBWdcQ1FnfqwYgMZjeX/3VnyKLFe/gHaUdeEheNubWYf3fkXr4H7BBhV/owAAi1IncUBwUPBUBA8jkfite4wYABehSQdUGZFx8ZU3NiAA3BLi8zu8ONAZOCmo9ZnmVeJwAHi3aM27qhGxtcIBkV5I9D3tBACNo0dnOx2QcxrmOwWw7j3ID7buOL1fMCp0pNgBKbrFWtVMCalBkUa5vwQggIgjvjEBAD77XwDJ2gnjPLwkymiA1uEVXyJOTwkwwAiwTfEqcbjV/Z1l7TH1sLhKwT5YtxmkRrwjBABZOef/KYlEmCsvYC7NiABxsEVpyun9gq/gSUE5+DRqcABIW3dM0mdFmeW94AqTOOgZAwDg4v/TUmcYccYmsBVkhbe+WnJ6n5ATMAXYgr8KRT68dQxAQROTgjyAq/AQDzQ6CNAXADSek7bbJRfh+WIup9k4wAQ4uPSV0xvA35xCAaB0AUYAClSet3CAkKBaXTGaujI4MCq+gJAq4fzvls7wuHoGtaeZqnchP9i8O+/0EsGfwUXCD1U4KFMcAax8Xa5ctu9RZHQZ5UhbG2kG4Oj9v8vseKq/ppkQQIXbAZNjZAfEEhiAtVmT/EHBnhitXYeqXaiNEiZGNnDt/9NxS1Y/T78ANg6AKMxca5FIJBiMBCPBv/3t7du3bxcXF//+97//3e/3+//jP/7xj3/8I/GPRCKRiMcTiUQikfgt8Vvit99+0+5lQtMmtImJiQld1/UXXclmVRVjjJFZ6F8lB7YDdqCuQIqg0bTF4ZJ+zu3Yk2SgdDgwCgEBYVW4/8+qydV5OIA7zGCoQwEJ/p1//vOf//znP+nWo8fz668//TQ1NT2dTqfTmQX6DRUdgAFgD7j4KRJw/2J13YRFrrQAdwgznRnjI5AdTAIAnlTquXnNOg8PDwIAnbpyLMp8+i8irgZpeTACXAABAL5tWJ4wgfwcNqN51txFpEai3pEDAC6rqWctYeHpV+exBPpeMtA6Cake/Ajwf5IMZUgw3ApwjUUDgIW7xI9djTE+b2qZI8MbTcymnc0CzEyYS/8zCUtndYILARjKeKvhN85jAEyBtWgfnBXYggXANWkAwAbPR4glM8g3E0Cc3CM55WAI8PQCANKW2a8299piZEdcPYNYuhWJrzPDjQC/LzDFHX3+A0wBYOGAExRHADtiJVEg5qNW/xD/k6qBlINZQLBn8fA4LzypuPXMjsfO4gtSnwJQREYPSC4GkGGyqOH9FhgA9mFs1+EAoChaaI3mSO5bCwnZ0JAaWHasLaAHANQwuz55V22ohcEXE8gQkKJLKTjNgQBTbCW20TZY/1swNaAoxDtjV7ZEPBQFTp/nXSysCctnw/7QmnsEAABz+Ll8SVtq4SAtyXEs/5neEOhfcxYDSDJlH6ObazAAnAKhEX54jNpWORG5FmIA97w7k3yrCU1nRYlwMurAPOHHJexesBsA0rM2oTrSJpkDLrz0ZwAFhx0F5YxRtQieD9QqICA3Aj/0mo2lU5EWWR64G3umMsvBOBZ/mtX94eSM19kMIDLjY2G4vmgyYF8ZDD2YSru9Xu+bN56utD3Ap15gOOMhGY3gmSmAJ8RkAUQf4JGABnCM1PDMTGZtLZPJZDKxWCwWS8VSqVQqlVpdXV1NJVdWVpP3ErI1VwKpruBSasZNJP6ZZCjikraWdX9w+ZEkkwvJ/3v/TS4kkwv3P/p8lgXJ/c0ep+0g1R8JzU4uLy0tLS13P6bfW072yPLybNiv2xn8jrVAJBgMB8NdCYVD4VAoFAq9DL2cDYVmQ7Ozs7OzswuzC78sLCwsTE5OTi5NLi3NBtmeGkXSzgHwDBvvwkYZ2h+gkQM3kPf7/X6X3+VyuVyueDweTyQSWkJ7HN+s67quZ+1OlUBY80dCyyuptWja5/NNTaXT0djKUigccMleyWp3BPQH0tT1ZlNv6jyS/fEza75Df8GkwVHVF98/evdDvmI3Wl3FimLvjA64+4OIeYwwxhhjtSvMSfvqpGN4nI8tSA1dVMAEAN4kEPX5t+juv6D7f3SEIAXpWtzvD0QikUAgEPC7NB07YPXejVLfrxWag8C/jKQ8lSVDzv7UyOWYVM8k25LdqcIzAXKjN73P8ixy8cMpdsA0W+AlPinDYwCe9f9ZnqXXluOQNK8w2+PfwA8AhvoMAM/yLL0ScIQdMMNmrcbwFsFHZ89z/SzPYtYhJ9gBPYyFtS7AQcDlg+zzXD/Ls5itAFrUfgBYZvOmZ+EWwOrN81Q/y7OQECBoux0wzRYCgP4K1v/K52cLwLM8C1FU2+2AjI3Iv1BYAJ8PAM/yLH02Ur/NFICxBSH6T7D+1wrP0/wsz9JPkxZspQC/s9XVRDmwB6Bz8sz/n+VZ+opuqyuQNZ/mGH4AeI4BfJZnGSCRN/bpP2NNHYrW4MXPz/r/LDDJ3V4ahpGv1Y6P6/XjWj5vbGzcFnbG/hCQsi8EYJFNOzG4JVhpu0l36UKt3iNHR/VGpVKpVCr1Yr14VDwqNhqNRqP4Q3Z3d3fLxXKxXN4tl8vl4mCjQ84wNg0jb5ik+28ffHs/3W8OsCJ3Nu7+d8Mw7i8mZCEX8sfHx5vHx8e1B5/j4+Pj42q9Wq/Wa3XT+D2U43WWBaoglNMKJxsbG4aRz1drx8fH9Xq9flw/vpNarVbL5w3DMNjsPQjlCpvHxVKHcLAslev52xzz4BWO71/9/mlrx7VarVarVat5BnAxiuVBUmdRKM22Ci8LbPZ5BI4BbDWuKK99C64y3Fd2B6/C2zLf5S8Bc/y+bv49IQCwzjc85Q3Kmd55f2sYtcOW6KoPj+5R2Bz6VsXj/R2mzWp9UMWKeo6apNSHxLwyVQYI2RUCwFh9/QpsASzuY2tXeKfT6ezeDt4TSnyXP1HZ1okTAGCXDgB2jBblDWq0CoBy63VgOMkBCw8YCAAgMH8kG0O4b4MJpfR5ezwAQbYQAPUUbgFsKjYAgFwGAGhziuQBQMM6BrBzW6e+ASUDUDWDYr4PjSb1IN4OHLA65frMDTN+H7GdqQO2uAKTjOUX4YWAGwXFBgAYYgPgZQCXANgkHQHQiDGAHYNhoKgYADrbpLz8udFEQgfshM4Ldjls+A/Z9lSctEH/p9ksgOjmELzfbNPf4ZIfAMqaVAbwCTDHhK7JJScAAAUD2MmzAKVBs/0XjhgQ5gqJpEwVKgqwUxt6TmGbZaRZHw/oCTHGAIK7AZbyDDbh9V2nM4BtNhuAIwCguAHXfyacpGAATWoDQ5dkF6gs18OMylQUYPgBrMJYDg6HLT8ErDHGAMJ7gbUOGK5/yQ8ArTOpDGAdsGSa5pVSFgMAfDaA4qVc/YfbANSLPcZ5KG9nBQ4YDQXYqQ7dOxqss6yvWu0BYEwC2gHHALaoz2uKoiiXZX4GMDj2kNsICAEAMwPYdQQDuJR8nyq0EGjhnP0taLLLhrqVKSjA7fAEuApzQdi4tRVC00HGMkDb4B368EKxhwGUB3t3C/K9ACQG4AwAuAWGz9RZdRO4jPaH3KA0cK81sDjKVAGjCYQV/cE8y8i/Gp32+bzeR99ff/f97vN6f/39/tOV+7/e/Svf777v/4Pvd9/vvl8HylT0dTLCmAOQA2cBFw0mMBTBAM4GMwALvAA3ZvNWcYQAYKfKOgtV2KT3j6cpFevHtXw+b9SO60f9nqJ0gIQxADgFgKAixywjzR+JRIKmTzgSjIT/9uDzX99//lf4b2HCbwQjwUhwwDey6NIYmYpqgFfGXlOxCQDKN1JtAH9FTAygMkIAwO6KgdkAtI+lfgF/+Y3C+x1FUZSdXOF2I18vs4R6UBlNzoEUAEHWfoNnlpH0/g3cUgAT9EaBDWM2BDCAwdBT4Lw8pMAhgQEcOgIAQIozKNxlt1ivN7ofkoAAIEt2JJUa+fX3Pe1NCkadiBVV6PZyO9xqCsxX1yDHoiJWxljQzR6YPhuMZwwBAND6KpUBnNjJAC6tAICNYt/92di4vb0t3BZubx/8tSuXhdvLAqT8s/qJqJTF2i3BeLNT2CBCANDdgArDAeActFTxOsRruTveua/rYP1vsFYByBkbxvajJL28kTfypD2p0c3qMmr5fD6fz98n321cqvRxALuGsbFhbNz96PkYxoZhGMalYVwal8YZ4M3kMYAGcSDy+TwhvdHoGUfD2IZMC5kAFKvGbaFfQg4y/c2gCSBFkpXql31stzuFGgGyW8BWMxDKBKIAN99AoZbjzABQDuyE3mUvA4QQxndNGLv9FzFWVUwyDeRvtJtms9lsZrPZ+0aNCCE05NZEBlBUfzR/fNgIEj1qCokwAvX7RtbaAKoFVVXVbLbZbGYffJrN7ANRMVZVUHVW0j1KxxvvBSXmZ0mh5OX8gO7xOVLCwClsPAFHAJDvTv0ECltqjTMDgPcCLu01BQ8E4eBeNjBiMZYQGcChWOT+YGYADTEcjLSej5s9mzHVhmzacQnxrsXN98Im9OqcFDMy0HWb2zC/dqvAPmAms87w2W/WOk+dAaAC2AXY2hd9cxIDMNguRWQADbGARWAAR/KOAHd9F9Agbk4xPgRjl5ETNjRZwjmybAxhF+jS/N5bomwAnU5lqBUAH8DM3+UxZgBfwZ1AWuJbAe6TGADbTYiBQIdiH/jGUgZQHXSyp36xDbOCHovb/5WcmQCUN4bum9hs/SxqzAO226PNpaEn1uyeOWDhiR0B8DY4d+OwKfzuAhkAEQDOxT4ugQHU5TGAU5Gdl3I1QkyXuMtnt0tMgX1Nc3Iy5KnIDKB+TEkB0H7DPChPjAFcgbOAWwfiD0KfS8IYwO0oMwBiYFtVZOFlQrxb473AkTETgAYkEgdd9Kpg6QiyzxRIA1a77HnJ8qfBI6humQhAfv1pMQDVADuba6r424u0AZBOc4ejwgCKshkA4QRQFQfoeN90+RaIyiPFbAaAZJsSKVPt/WaJhgKgzybzV/H9LdH8PbYAsA+OASxqEgah0JJrA2iIfVyrGYA4Dd3JE2IkBB4kDabsyu6vlnpNTYAFsE9kADuFxuOLtQZSAPPuVzLIpfHH9QiAcvDiTYaEMUAEABDKAOryGYA8I6BIBvD+mDF8EDgwVXPgNnS9mI7zddYBq+VMha0PB8AQujFdZDeH1p8UA/gE1v+GlCEokGwAAo2AggHgpi7pCCDdBkAyAQhs7poz51aB2YvpIA55sD4MQDFRgAHl69A2YfNB+08IAChiADsXUp6AUCag5FwGgL6OrBeAkItRE7eo1QKHxwj1uAJLkHAT4oBdq+bcvgEUwMznWllFuSQu//EEAAy3AG6pUp6AaAN4ZgBd2RTHAAgVH8tbAgHAMLsAKaoIHvcaAQADRgKAzaaiaD2x/a31fg+CTsx2C9yHAYwnAGC4BbDclPQERWEMgOgYEswAZNkAEHE974kb9FxVGNCSJGt6/H1Eg0492L0HMB4RI6dURUG9NUkP+x0ozPXdWk1FQU+IAXytQfW/dClpAIi5AAIZQE3scxNyAcQwACJ6bX0V9vSEUj3FA3Fjc2NSpTOai3/uefvGcPsB0QZw3USKctNjBdjtQwEI5v5PqkIMTu0Iav/iMFFPwPrfkHMAEMoAbuUzAJIX4FSMDaBCPtKKoi4EG2D5QNw0fjaZAL7QPJ3WsxMdDS8/sN6PASh4u2ch9AksIjkulL4MYBwBgJS+xVNvQtC2zcwAiEbAXDabzX7Jfml+aX5pfm1+bd40b26aNzc3Nzc3udxZjs4S/qFuZRzA5kUul7shyIcPHz58/fr1K7yvJoFhVAriLAymrcTI0lwc9zSlOxzeJYSYwXb9BSmKkjM5AkiEAplAq9tRED0ZBpCFWwANWcmQJAYgFADKe9Xa6enxt2/f/vyzfnR0eFQ5rFTOzxt/FHd3d1utFt3N0BfzvlMVAwBEd8xu4/z8/Pz8vFKpVCqHlcPDw8PDo6Ojo6N6vV7/s360AZ4XQsTl7pW4aTQtpU9U4NJromx9HvYbO31tAGavApkCZK9NrCWrKIqiHjwRAEDvwSW0GjlpJhCRDICpJBhdeNONpQxgqJx+gF6f4AUUOKsmAChd0F27xwoIICdEo0mXAZi8CrvrBKC8MNu5MJnNjCcAIHgWcOlEWjUE/LlISDoWaEcbDgBUg5a1lgEMkz+/Mm6xnU6ncy7Ox2DaTXfp6gygk55IgJOhv3HbnwEo+FPPUqibx8nsuLzjCU+FASB4DGBeHgFQ9ltyjwCCGYA8G0CF5eFr0HBbEgAc3gibVrXOGWRYeNyXrji8SQvZBnB32+a3oRQg1xuCWr7rI/BEGADKwbOA9+XpP8kG0FlnNHRbwAC+OIsB1KG2dkxI+dgVFmeIvvR6R0+/Uq7GBiUJHMgAFNzDKDrfboZaLY5y3aprT4QB4C3wAYDOoGsjA2ABgJJTbABMAHD6Afj0pKTvQ3G5hs3eWdyjZBdXR7SnwM9EG8DOXaGk7OkQCtAsmgjA3TLvwwByY6b/BxQWQJnPsV8ZJRuAQrIBIPsAAGwDOCPgfUuYFwBle/n0HuWG2WPTHx4KgvcHMQAFH/RaAR5TAHXbFOly/z84lQGgbochc21rfC8qvquhne1+stlstltF+qZ5c3Zzlju7udJyhbOrq5sreBmw4qXUIEgSA9hG1gEAJd1wGAOoQe14JItv5UIYA/hqglVKA+P7Cm1FALIX4LvpQe2lAI+tCtneEJjW92XexzgmnQGol5+219c/GdvGtrFubBvGOrkNxJZhbBlbW1tbWx8/fvx4fX19fX29uZnfzOfz+fze3t5edW+vuletVqvVWq12enp6enx6fHx85wmv178dHdW//QnW/85WVuZb432TKaLUGS0vQE3IQBSYAOAb0AaActeE04+4SMBmLwOg7B+FDw4pYZnMAPZwX+PSIwqATLt87Qd0HNgDAIWjcqlT6pRLpVKpU+p0SsNaKVsjjfeq1NcmMIDWNrYOACjPGx+cxQDAnfSaBAZQ3BbHAMwAQMfiTso9j8bIAH6ERuLqAAqAered1klWsZcBoM+HHQdK2cjKfW3SzmetEZDXCyAm3YiNAZxCGcDNFu+rDzaN9A79R7ojc6/jvvRp6G98HswAzE6h47MHymYayB/6rdpkBMQfnQgA1SvJaZAX5wQGwGgDYHGll9fpvAB/SmMAMLp3xw07pU6pVOpcQxlAdlNc1iVBdnq1sfqB7gI9KbzF4fWniXD/8cF2hXpOPa1PP67Zy+N2fxAA22wASGs4kAB8kt0RibDzCa0H0Nm8vv74cWvroRnl0ri83NjYuNy4PLk8oTOFE2wAp/JsANXL/f3C/gABw3OTlPexKc6A1fv0lRsuABjeHqwPA/jXwyHtCQw7/v5Mpio0DwiAbQxAQeslxwGA0ZRdB+GiIo4BEBvsNs9uzm7Omt1mo2oWP+w2ilUV0yGcPC8AqUm9kUUYq1jFWMUkQeCBwv9N8iEIQ3e1t+JokS4OAPeULG4w5gJ8fHRgNcihforSaxEtnjxkDp/sAoDsqdMQoLIvW/+RSAZAAoCKgpCCug5UEXNkqQ1AXBImsfbbn6JmF30x2RjpiFVvmYXK0F8fagNQFJRrkR0BWi8BqD3U7j4M4EKRL/sOA4CWoUp/58KRXAZwKPZxrfUCCBx/UuvuhjgGYCotVaC69sF5b/AZWz2Ax7ZHU5LxXVLblokAPPRZ2MYAFKQaZUcBgNDGNBRay5gLkJMPACQvwOlIMIATQuRHRdj8miON8zTYZaoJ+G2o72lYHEB3RRCtAM0/ek0tj8bBRgZgDlC2VYoHKrIAAMrmSECBcQCCOwN9kOUFKJC8AAJbsRwQAKBYEAUw5sCa4geKZ8e9LXrzwx+MyAC21EcnvV4KUDpQzaaBHgLQjwFYAgAUEfoWyHXWglcmbNtlgTaAlmAAMNsAyqIAoCMVAIjXXxd1dXRmWrgUFUdN3A2wAgA2AMKOenyjKNnDwdFUdjIAU200W2MAr6yohFxomLam1ie2G2vnBLf5qdjHJcQBCDIC1uUCQO6UFAgg7Ihhygfu5Cm2j5Meql75PPzFyTaAnoOHqc3Xgar8j4noPh4FtE1Uh/eWAIDJcGmflLYtqYSeE2cDuCAtiT8Fe2rMj3sk0QYg7sHPrklGHnHMyOxlgPsBTNVKKsPjm8gMoPfoYJqv+k22F6ryPTfrwwCsAQDzAcU2/d87swQASAyA1QZwboENQJYXgGwDEAhdpIUlrti72QjQqYIpwFXvoO5BugM3yDaAnufqPdAf9NobG71Bh7YyAEVBDokH3D2x5n0Lp8KOpsRQyqrY2SF4AQ6FBBhochmAgk8IBdMOxVUEIFDXE3C5sjK9EQjGAMxGm3rvr2324pTNDIDULteOGGBDtaYXknbYEcUALqxgAGYbQFHIQBHPLwIBQNn/g+TnEWYE+GBmMEVgtZKrXlJe/AxhABUIAyBRk56Yw94hsJkBKKjmBAA4urLobUk2gG1GGwApn7Im9nkJNoA/JNoAxIEwuiIVgRbXHjR7Yt649kAnjKzR+5uHgMNDHwbwL9N7q4MptYkA9GMABasAwBynYEcIwLpq0dte1cUxgF35DIDgBdgVAwBHkhlAllQEsiGuMPBVhS2SEf9PrwextQ6ZfyIDINwQDYyvNRMA5V/bNgMAurQ/GOC0adXLimMAxE20JLg7MIEBlEeCAZhr5YsN9kbZbYKi/efQy6vmx6pAFh+UASjorEoX62I7A1Cyth8CGp8ta4Z8ZY4EbDHmIJP2IAtsAKIAQG4koKJckDhGY1tYtNcV4QRWMoYEBGa3TbStBavQAGUAAxtgNAjZbshuBkDslmOtC9BQLXvZQm3UGUBnJAKBFKVplIgJX4JOAUglMtfaoB5hKGeYnQeNrzAlITGATUSyfvTfUEntl9VPdgMATddOOQSgad275gjZgIx1iDXSnnBY2N8v/JCDQo8c3P08ODiAvPWHb+Zb7Bf2C4X9wv7+fuH2tnBbuC0Ubntv836HAb061/v7n7/L+/fvL96/vzDL1cXVxRVgI98mHobL9e0CFoIBOWJRoz/W+2b2qQfHhOcBWoA+QxmAoq73Z7qEe9nPABTUtDUYoHVi4aueEV6V7f7oilhVsdjqlXKrVb6XUrl0L5DodVIcQKfcKpdb5XKpXN4tFouVYqPYuJdKo9KV2nsGW0ins7vb2P3jj2Kjcd44b1TOz88r55Xzyl234Mpht2Fw5fDwqA5Yn4V+O+GRsf25kDu70W7O7j7azdmNltNyZ4UrrfsFjE32gMxc69vEDiRnBx9J5u5D2O4DZwD9xpYQOewUBqCgAxuDAUp7WWQhAzBvAkVGG8AF58npAHDwIdgAQFK/HcoAuEy/kBoKaEC2+R/1+rdv374dHx+fdkvIf6t/q9fr9eN6/c+j+p9HdchB4cYgL9tS3dg/ezynzYvtGvFpKtAMRTgDUPB2HwJAbIzwr3UHAICddsDWhZVvekNA50+MDICTN0Ei17KM96gUmBgAXAB2Ey5iCVkUSDP6pbLsHhvGwYWWy+Vy7wuFA6N62GeLg2ag4AvimQmRn4v84ltYgTOAW8VSBLio2EYADGQhAVCuzKHAu4w2AKIrnYYBAM7RN9+cyQBANf7ROvs9CgiEwQNcbqXG4Z/H1Wq1Xi/2fYzyNph97sMZgLJDpCaNQp9Rsp8BKIp9xYHqWUtflJALUPorG2jmHMwAhp7RiV4AmoeXbFuCrX/1osp1eIV3oUAFOAPoQw77+FgcwQDI+dtWSLmArH1Ps+n4vnSb5QwAYAO4YbQBNIYpkMZH+YqgMUMnzNnmGmxZqPsN9oT2kkGRgUoM/P5vDPerNfq8Uh8GYDUAoEt7ggH2VGtf8yovygag8DZWOJDJAG4lGzBAY4aazMQSahhSfzNYF26RJiSBzAA+IrjPoF+QhUMYALGju3wpatYSABID2D0RGAlIIft2MgDOh4f2+cuxbtBgYog+fGJqcleqXlKFI1AxAKVpqodS6Vfw6l/OYAB9IE62/I/F+o9yVXFxAJwDtg/xdUvyAigFKxgAR/8puA0MNS+MXerr7xpnlAc+GgagqAcVIAFwDANQ0CfrgwEaqtVvOWIM4IMsL8DVoSUMQEEXdckAoCiouU05Fa29S9poRDoGoNz0bDTFvvGJ2CEMQFEK15a7AC+Q1Sh3tSksDiDnYAYw7AjA3RkSOmYIa8clyQCgILV5eQ1nAUXjM3ULuj42gP4n6oLxcev6euu6++Njf5ePYxhAn7JnMsWwnACQGEDRwQzgqzQGwGkDgMdOoC9GSzIAKIqCsjkD1PB4t3rZzDJMODF9sj8DUNRms9nM3v1pfunvb+xjA1i3Xv+RemFtQOBm1vp3zF07xgZQkBkJKNkLUDqg2p/pLfX0cTAIqf/PaAy8UbHx8aTAWHuOSJmGVzhCClIGN4pUtx3DABSsrV83imUrZLdRk98KmDTcn09OTi4v9x98LxjrETe3DcMwanff+0/VqNaMqlGt1oxqtVarPpbN47u/2avWLgD7kHpgGIZhXFevq9Xju+/9p3pcu5NqNV/N5/P5/GbeyHc7kg9rLZfdNriETkFxNrd/YhhGtdEwRyCWysVGo9GoNa5re/nrj93rM+0NCCN8VjDylZ7NutQqNo6Ny1wWY+bSkzuF7W3jsivG5aWxbRjbGyKCWNDVxqVhGMZ2t5P8/Y/3dgCAgjBCCCGERX7vrvlIMMYY2fOGqooU5dGX8UGQqqrq98G6Hzh8N35dUdCj/4IxQhhjFauqClqK3aFSVRWrGOHuF2F0360bP76LgpS7vwfPdF/p3qbn++OXqPeW7kgpCsJqNptVs9lstpnNNrNq9z4KQuiuk7rKcv0HI4ZVFWebzeb79+8LhULhLKtixod+PGD44XQijJAqppAtUjFCCrq7vKLcPen/B/ONUHudUsJ6AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI1LTA5LTAyVDA0OjQ5OjA5KzAwOjAwBxtegQAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNS0wOS0wMlQwNDo0OTowOSswMDowMHZG5j0AAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjUtMDktMDJUMDQ6NDk6MDkrMDA6MDAhU8fiAAAAAElFTkSuQmCC" alt="NEX Telecom"></div>
+      <span class="eyebrow">Documento institucional</span>
+      <h1>Manifesto <span>da Cultura</span></h1>
+      <p>Missão, Visão, Valores e Propósito da NEX Telecom reunidos em uma referência prática para o dia a dia de gestores e colaboradores.</p>
+    </div>
+    <div class="hero-meta">
+      <div class="meta-card"><span>Versão</span><strong>1.3</strong></div>
+      <div class="meta-card"><span>Última atualização</span><strong>07/08/2026</strong></div>
+      <div class="meta-card" style="grid-column:1/-1"><span>Status</span><div class="status-row"><span class="status-pill">Missão aprovada</span><span class="status-pill">Visão aprovada</span><span class="status-pill">Valores aprovados</span><span class="status-pill pending">Propósito pendente</span></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="page-shell">
+  <aside class="sidebar" aria-label="Índice do manifesto">
+    <div class="sidebar-title">Neste manifesto</div>
+    <nav id="sideNav">
+      <a href="#apresentacao">Apresentação</a>
+      <a href="#missao">Missão</a>
+      <a href="#visao">Visão</a>
+      <a href="#proposito">Propósito</a>
+      <a href="#valores">Valores</a>
+      <div class="divider"></div>
+      <a href="#valor-dedicacao">Dedicação</a><a href="#valor-etica">Ética</a><a href="#valor-inovacao">Inovação</a><a href="#valor-respeito">Respeito</a><a href="#valor-solidez">Solidez</a><a href="#valor-compromisso">Compromisso</a><a href="#valor-ambicao">Ambição</a><a href="#valor-humildade">Humildade</a>
+    </nav>
+    <div class="sidebar-note">Use o índice para navegar. Nos valores, clique em cada bloco para abrir ou fechar o conteúdo detalhado.</div>
+  </aside>
+
+  <main class="content" id="conteudo">
+    <section id="apresentacao" class="content-card content-anchor">
+      <div class="section-head"><div class="section-kicker">01</div><div><h2>Apresentação</h2><p>O que este documento representa para a NEX Telecom.</p></div></div>
+      <p>Este documento consolida a Missão, a Visão e os Valores da NEX TELECOM LTDA, homologados pelo comitê de direção em 07/08/2026, com o objetivo de alinhar o discurso institucional à prática de gestão e à cultura consolidada internamente. As definições anteriores não refletiam a direção estratégica atual da empresa nem funcionavam como referência prática para gestores e colaboradores. Este manifesto sana essa lacuna, apresentando conteúdo aplicável ao dia a dia da operação.
+O documento está estruturado em três blocos: Missão, Visão e Valores. Cada bloco apresenta a definição vigente e homologada. No caso dos Valores, além da lista, inclui-se o detalhamento de cada um: o que é, o que não é, como identificar sua ausência e como agir quando ela ocorre.</p>
+
+    </section>
+
+    <div class="overview-grid" aria-label="Resumo institucional">
+      <a class="overview-card mission" href="#missao"><div><span class="overview-label">Missão</span><h3>O que fazemos e como entregamos</h3><p>Conectar pessoas e empresas a soluções completas de telecomunicações, com processo que funciona, atendimento que resolve e resultado que se supera a cada entrega.</p></div><span class="overview-link">Ver missão →</span></a>
+      <a class="overview-card vision" href="#visao"><div><span class="overview-label">Visão</span><h3>Onde queremos chegar</h3><p>Alcançar 100 mil assinantes simultâneos, sendo referência em qualidade e confiabilidade.</p></div><span class="overview-link">Ver visão →</span></a>
+      <a class="overview-card purpose" href="#proposito"><div><span class="overview-label">Propósito</span><h3>Por que existimos</h3><p>Conteúdo definitivo ainda em processo de homologação pelo comitê.</p></div><span class="overview-link">Ver status →</span></a>
+    </div>
+
+    <section id="missao" class="content-card content-anchor">
+      <div class="section-head"><div class="section-kicker">02</div><div><h2>Missão</h2><p>A definição homologada e a evolução em relação à formulação anterior.</p></div></div>
+      <p class="definition-label old-label"><strong>Definição antiga (alterada):</strong></p>
+<p class="definition-box old-definition">"Prestar serviços de internet destinados a atender as necessidades
+dos clientes em toda região onde estamos localizados, com qualidade
+e confiabilidade."</p>
+<p class="definition-label current-label"><strong>Missão homologada:</strong></p>
+<p class="definition-box current-definition">"Conectar pessoas e empresas a soluções completas de telecomunicações, com processo que funciona, atendimento que resolve e
+resultado que se supera a cada entrega."</p>
+<p class="definition-label why-label"><strong>Por que essa é a Missão da NEX:</strong></p>
+<p>A definição anterior limitava a empresa a "serviços de internet", quando a operação da NEX TELECOM já engloba um portfólio mais amplo de soluções em telecomunicações. A redação anterior era declarativa e não estabelecia um padrão de conduta interno, descrevia o que a empresa faz, mas não sinalizava como quer fazer. A Missão atual reposiciona a empresa como fornecedora de soluções completas de telecomunicações e incorpora três pilares operacionais que direcionam a atuação diária: processo que funciona, atendimento que resolve e resultado que se supera a cada entrega.</p>
+
+    </section>
+
+    <section id="visao" class="content-card content-anchor">
+      <div class="section-head"><div class="section-kicker">03</div><div><h2>Visão</h2><p>O objetivo concreto que orienta a direção da empresa.</p></div></div>
+      <p class="definition-label old-label"><strong>Definição antiga (alterada):</strong></p>
+<p class="definition-box old-definition">"Ser a empresa de telecom líder em tecnologia, reconhecida nacionalmente por inovação e solidez. Destacando-se pela velocidade dos
+nossos pacotes, tecnologia avançada e atendimento."</p>
+<p class="definition-label current-label"><strong>Visão homologada:</strong></p>
+<p class="definition-box current-definition">"Alcançar 100 mil assinantes simultâneos, sendo referência em
+qualidade e confiabilidade."</p>
+<p class="definition-label why-label"><strong>Por que essa é a Visão da NEX:</strong></p>
+<p>A definição anterior era subjetiva ("líder em tecnologia", "reconhecida nacionalmente") e não estabelecia um marco mensurável nem um horizonte de tempo, o que impedia que a empresa e sua liderança acompanhassem o progresso em direção a ela. A Visão atual define um objetivo concreto e verificável, 100 mil assinantes simultâneos, mantendo os atributos de qualidade e confiabilidade como diferenciais de posicionamento no mercado.</p>
+<hr/>
+
+    </section>
+
+    <section id="proposito" class="content-card content-anchor">
+      <div class="section-head"><div class="section-kicker" style="background:linear-gradient(145deg,var(--orange),var(--orange-2))">04</div><div><h2>Propósito</h2><p>Status atual da definição institucional.</p></div></div>
+      <blockquote>
+<p>(A definir)</p>
+<p>Observação: campo temporariamente sem conteúdo definitivo. O texto anterior foi removido nesta revisão para nova redação a ser homologada pelo comitê. Referência da versão anterior mantida no arquivo manifesto-cultura-v1.1.md.</p>
+</blockquote>
+<hr />
+
+    </section>
+
+    <section id="valores" class="content-card content-anchor">
+      <div class="section-head"><div class="section-kicker">05</div><div><h2>Valores</h2><p>Referências de comportamento que transformam cultura em prática.</p></div></div>
+      <div class="values-intro"><div class="section-preamble"></div>
+<details class="manifest-detail neutral">
+          <summary><span>5.1. Contexto histórico</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A NEX TELECOM LTDA possuía anteriormente seis valores formalizados, sem definição de conteúdo, apenas a nomenclatura:</p>
+<ol>
+<li>Dedicação</li>
+<li>Ética</li>
+<li>Inovação</li>
+<li>Respeito</li>
+<li>Solidez</li>
+<li>Compromisso</li>
+</ol>
+</div>
+        </details>
+<details class="manifest-detail neutral">
+          <summary><span>5.2. Valores homologados</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Os valores homologados pelo comitê de direção em 07/08/2026 ampliam a lista para oito, mantendo os quatro pilares centrais e incorporando Ambição, Humildade, Solidez e Compromisso com conteúdo prático definido: o que é, o que não é, como identificar a ausência e como agir sobre ela. Cada valor deixa de ser declaração abstrata e passa a servir como referência clara de conduta.</p>
+</div>
+        </details></div>
+      <div class="value-grid"><a class="value-card" href="#valor-dedicacao">
+      <span class="value-number">01</span>
+      <span class="value-name">Dedicação</span>
+      <span class="value-desc">A dedicação é o que transforma intenção em resultado.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-etica">
+      <span class="value-number">02</span>
+      <span class="value-name">Ética</span>
+      <span class="value-desc">Na NEX Telecom, ética significa agir com honestidade, transparência e integridade em todas as decisões, mesmo quando isso exige assumir erros, contrariar interesses pessoais ou tomar decisões difíceis.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-inovacao">
+      <span class="value-number">03</span>
+      <span class="value-name">Inovação</span>
+      <span class="value-desc">Na NEX Telecom, inovação é a diferença entre acompanhar e liderar o setor de telecomunicações.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-respeito">
+      <span class="value-number">04</span>
+      <span class="value-name">Respeito</span>
+      <span class="value-desc">Na NEX Telecom, respeito significa tratar todas as pessoas com dignidade, agir com justiça nas relações profissionais e enfrentar conflitos de forma transparente, preservando o foco na solução e no fortalecimento da equipe.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-solidez">
+      <span class="value-number">05</span>
+      <span class="value-name">Solidez</span>
+      <span class="value-desc">Na NEX Telecom, solidez significa construir resultados sustentáveis por meio de decisões responsáveis, processos consistentes e relacionamentos de confiança.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-compromisso">
+      <span class="value-number">06</span>
+      <span class="value-name">Compromisso</span>
+      <span class="value-desc">Na NEX Telecom, compromisso significa assumir responsabilidade pelos resultados das atividades sob sua responsabilidade, comunicando riscos, propondo soluções e garantindo que os acordos estabelecidos sejam cumpridos.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-ambicao">
+      <span class="value-number">07</span>
+      <span class="value-name">Ambição</span>
+      <span class="value-desc">Na NEX Telecom, ambição significa buscar crescimento contínuo por meio do desenvolvimento das próprias competências, contribuindo para o crescimento da equipe e da empresa, sem transformar colegas em adversários.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a><a class="value-card" href="#valor-humildade">
+      <span class="value-number">08</span>
+      <span class="value-name">Humildade</span>
+      <span class="value-desc">Na NEX Telecom, humildade significa reconhecer que sempre existe espaço para aprender, evoluir e melhorar.</span>
+      <span class="value-link">Explorar valor <span aria-hidden="true">→</span></span>
+    </a></div>
+    </section>
+
+    <section id="valor-dedicacao" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">01</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Dedicação</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A dedicação é o que transforma intenção em resultado. Em uma empresa de telecomunicações, onde pequenas falhas impactam diretamente clientes, equipes e a continuidade da operação, dedicação significa assumir responsabilidade pelo resultado, agir com iniciativa e manter constância mesmo diante das dificuldades. Mais do que esforço, é o comportamento que sustenta a qualidade das entregas, fortalece a confiança entre as equipes e torna possível o crescimento consistente da empresa.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Entregar o melhor do que você tem para o que assumiu fazer, não pela metade, não no limite, não só quando alguém está olhando</li>
+<li>Tratar o trabalho da empresa como se fosse seu: agir sem precisar ser cobrado, buscar entender o porquê do que faz, não apenas o como</li>
+<li>Persistir quando fica difícil, e pedir ajuda quando precisa, em vez de deixar a entrega travar</li>
+<li>Assumir o resultado como seu, não apenas a tarefa</li>
+<li>Ir além quando a situação exige, com consciência e propósito, não por pressão ou aparência</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Trabalhar mais horas para parecer comprometido, dedicação não se mede por presença, se mede por entrega</li>
+<li>Fazer o que foi pedido e nada mais, dedicação é postura ativa, não execução passiva</li>
+<li>Esgotar-se para provar valor, isso é workaholismo, não dedicação</li>
+<li>Estar fisicamente presente enquanto a cabeça está em outro lugar</li>
+<li>Aceitar tudo sem questionar, pessoa dedicada propõe, melhora e sinaliza quando algo não está certo</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de dedicação</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A falta de dedicação raramente aparece como ausência total, ela aparece
+como inércia. A pessoa está ali, mas não está de fato. Alguns sinais:</p>
+<ul>
+<li>Faz exatamente o que foi pedido, nunca além</li>
+<li>Não questiona, não propõe, não busca melhorar nada</li>
+<li>O padrão cai quando a pressão diminui ou o gestor não está presente</li>
+<li>Aguarda instrução para tudo, nunca toma iniciativa</li>
+<li>Quando algo dá errado, a primeira resposta é explicar por que não era sua
+responsabilidade</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer quando o colaborador não está dedicado</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Antes de agir, entender. A ausência de dedicação tem causas, e a resposta
+muda conforme a origem:</p>
+<ul>
+<li><p>Pessoa no lugar errado → não se identifica com o que faz, executa por obrigação. Resposta: conversa sobre função e fit.</p>
+</li>
+<li><p>Sem clareza do que se espera → não sabe o impacto do próprio trabalho.
+Resposta: alinhar expectativas e propósito.</p>
+</li>
+<li><p>Desmotivada por algo que aconteceu → desconectou da empresa em algum
+momento. Resposta: abrir espaço antes de concluir qualquer coisa.</p>
+</li>
+<li><p>Postura crônica → independente do contexto, não entrega além do mínimo.
+Resposta: intervenção direta e conversa sobre continuidade.</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo prático</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Nomear o comportamento, não o caráter. &quot;Suas entregas têm chegado
+sem iniciativa própria&quot;, não &quot;você não tem comprometimento&quot;</li>
+<li>Entender a causa antes de concluir</li>
+<li>Alinhar expectativa com clareza e prazo real</li>
+<li>Acompanhar, não como vigilância, mas como gestão ativa</li>
+<li>Se nada mudar: conversa honesta sobre fit. A empresa não sustenta inércia
+, porque inércia tem custo no time, no resultado e na cultura</li>
+</ol>
+<p>O que não fazer: ignorar esperando que melhore sozinho. Punir sem conversa.
+Confundir momento difícil com postura crônica, um precisa de suporte, o
+outro precisa de intervenção.</p>
+</div>
+        </details>
+    </section><section id="valor-etica" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">02</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Ética</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, ética significa agir com honestidade, transparência e integridade em todas as decisões, mesmo quando isso exige assumir erros, contrariar interesses pessoais ou tomar decisões difíceis. Numa empresa de telecomunicações que depende diariamente da confiança de clientes, colaboradores, parceiros e órgãos reguladores, a ausência de ética não é falha isolada, é risco sistêmico. Cada decisão ética construída no dia-a-dia sustenta a reputação que a empresa levou anos para construir e não conseguirá reconstruir em meses.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Agir com integridade mesmo quando ninguém está olhando, e da mesma forma quando todos estão</li>
+<li>Assumir o erro no momento em que ele é identificado, não depois, não quando for conveniente</li>
+<li>Ser transparente com resultados, mesmo quando eles são ruins</li>
+<li>Questionar um resultado incorreto quando é sua responsabilidade fazê-lo, mesmo que gere desconforto, silêncio diante de erro evidente não é gentileza, é omissão</li>
+<li>Apontar o erro com foco no fato, não na pessoa: &quot;esse dado está errado&quot; é diferente de &quot;você é incompetente&quot;</li>
+<li>Receber um apontamento profissional sem transformá-lo em ataque pessoal , ouvir crítica ao resultado sem confundi-la com crítica ao caráter</li>
+<li>Tratar clientes, colegas e parceiros com o mesmo respeito independente de hierarquia</li>
+<li>Criar um ambiente onde assumir erro tem menos custo do que escondê-lo</li>
+<li>Separar o interesse pessoal do interesse da empresa, e ser honesto quando os dois entram em conflito. Quando você faz hora extra, a pergunta ética é: a empresa precisa de mim agora ou eu preciso do dinheiro agora? Se for a segunda, o caminho honesto é outro.</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Apenas cumprir a lei, ética vai além do que é legal ou &quot;não proibido&quot;</li>
+<li>Dizer &quot;vou revisar depois&quot; quando o erro já está claro para todos na sala</li>
+<li>Agir corretamente apenas quando há risco de ser pego ou avaliado</li>
+<li>Usar o sentimento de perseguição para desviar da responsabilidade pelo erro</li>
+<li>Confundir &quot;meu resultado foi questionado&quot; com &quot;estou sendo atacado&quot;, perseguição questiona a pessoa; accountability questiona o resultado</li>
+<li>Silenciar diante de um indicador errado por medo de gerar desconforto, esse silêncio cria uma cultura onde erros acumulam até causar dano real</li>
+<li>Conformidade passiva, ética exige coragem de se posicionar mesmo quando é incômodo</li>
+<li>Discurso: empresa ética é julgada pelo que faz nos momentos difíceis, não pelo que declara nos fáceis</li>
+<li>Guardar situações, erros e eventualidades do outro para usar como munição em confrontos quando convém, problema que não foi tratado no momento virou instrumento de poder; isso é manipulação, não memória</li>
+<li>Usar benefícios ou recursos da empresa, como hora extra, como estratégia de ganho pessoal quando não há necessidade real da operação. Hora extra existe para suprir uma demanda específica da empresa num momento específico, não para complementar renda. Usar esse recurso fora desse contexto é um conflito de interesse: o colaborador prioriza o próprio ganho acima da honestidade com a empresa. Se normaliza, vira cultura, e o custo invisível escala.</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail deepdive">
+          <summary><span>Sobre conflito de interesse, hora extra como exemplo prático</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>O problema: Colaboradores que fazem hora extra como estratégia de arrecadação pessoal, não porque a operação precisa naquele momento. É uma afirmação implicitamente falsa: &quot;a empresa precisa de mim agora&quot;, quando não
+precisa.
+Por que é falta de ética: Usa um recurso da empresa (verba de hora extra)
+fora do contexto para o qual foi criado. Distorce métricas de produtividade.
+Cria um precedente cultural onde outros fazem o mesmo. Torna impossível
+distinguir necessidade real de estratégia pessoal.</p>
+</div>
+        </details>
+<details class="manifest-detail deepdive">
+          <summary><span>Sobre os tipos de erro e seus limites</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Erro inconsciente (não sabia): A pessoa agiu de boa-fé com as informações
+que tinha. Não é falha de caráter, é falha de informação ou alinhamento. A
+resposta correta é orientar e treinar, não punir. Como identificar: a reação ao
+apontamento é surpresa ou curiosidade, não defensividade. A correção é
+aceita rapidamente.
+Erro escondido (sabia e não falou): A pessoa tinha consciência do erro e escolheu não revelar. Aqui existem dois problemas: o erro e a escolha de escondê-
+lo. A segunda é mais grave que a primeira. A permissão acaba imediatamente
+, não pelo erro, mas pela desonestidade.
+O momento decisivo: O erro inconsciente é perdoável. O que a pessoa faz depois que descobre é o que revela o caráter. Se descobriu e assumiu → aprendizado. Se descobriu e escondeu → virou erro consciente escondido.
+A régua prática: Primeira vez → orienta. Segunda vez → conversa direta. Terceira vez → avalia se é erro de ambiente, de capacidade ou de postura. Erro
+escondido → intervenção imediata, independente de ser a primeira vez.</p>
+<ul>
+<li>Desonestidade → encerramento da relação.</li>
+</ul>
+<p><strong>Definição de desonestidade que leva a encerramento</strong></p>
+<p>Desonestidade que leva a encerramento é conduta com viés deliberado de enganar a empresa ou se beneficiar em detrimento dela, comprovada por fato objetivo e não por interpretação. Se manifesta em situações como:</p>
+<ul>
+<li>falsificar ou manipular números que orientam decisão;</li>
+<li>omitir intencionalmente erro técnico ou operacional conhecido pra esconder responsabilidade;</li>
+<li>quebrar acordo por má-fé (aceitar sabendo que não vai cumprir);</li>
+<li>enganar colegas, gestores ou clientes pra obter vantagem pessoal;</li>
+<li>passar por cima da verdade pra se defender de uma situação real (mentir sobre um fato que efetivamente aconteceu quando confrontado).</li>
+</ul>
+<p>Não se confunde com erro sem consciência, negligência, falta de processo, desconhecimento ou falha de julgamento. Essas situações são humanas e se resolvem com orientação, treino ou revisão de processo, não com encerramento.</p>
+<p>Antes de aplicar a régua de encerramento, o gestor precisa ter CERTEZA dos 3 critérios: <strong>ato consciente</strong> (a pessoa sabia o que estava fazendo), <strong>com malícia</strong> (viés deliberado de enganar ou se beneficiar em detrimento da empresa), e <strong>com impacto real</strong> (afetou decisão, resultado, dinheiro ou credibilidade). Se qualquer um dos três não estiver comprovado por fato, não é desonestidade, é outra coisa que se resolve de outra forma.</p>
+</div>
+        </details>
+<details class="manifest-detail deepdive">
+          <summary><span>Sobre fusão entre identidade e resultado</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Quando alguém interpreta o questionamento de um indicador como crítica
+pessoal ou ofensa, não está cometendo um erro de dado, está cometendo um
+erro de percepção: fusão entre identidade e resultado.
+A pessoa não consegue separar o que entregou de quem ela é. Quando o número é questionado, ela não ouve &quot;esse dado está errado&quot;, ouve &quot;você não
+presta&quot;. Esse modo defensivo torna qualquer feedback impossível.
+Na maioria dos casos, não é má-fé, é inconsciente. Vem de autoestima atrelada ao desempenho, de histórico de punição por erro ou de nunca ter aprendido que feedback profissional é sobre o trabalho, não sobre a pessoa.
+A resposta ética de quem aponta: separar os níveis explicitamente em voz alta
+, &quot;meu questionamento é sobre o número, não sobre você.&quot; Se a defensividade persistir mesmo assim, o problema saiu do campo do indicador e entrou no
+campo da postura, e aí é uma conversa diferente.
+Quando isso acontece com frequência em uma equipe, não é problema individual: é sinal de que a empresa criou, em algum momento, um ambiente onde
+errar custava caro. As pessoas aprenderam a se defender porque precisavam.
+A cura não é individual, é cultural.</p>
+</div>
+        </details>
+    </section><section id="valor-inovacao" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">03</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Inovação</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, inovação é a diferença entre acompanhar e liderar o setor de telecomunicações. Num mercado onde o que hoje é diferencial em 6 meses vira commodity, quem não evolui perde relevância. Inovar não é reinventar o que já funciona eficientemente, é resolver problemas reais da operação de forma mais ágil e garantir que a solução chegue a quem precisa aplicá-la.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li><p>Buscar constantemente formas melhores de fazer o que já é feito, não porque alguém mandou, mas porque a estagnação tem custo real</p>
+</li>
+<li><p>Investir no próprio conhecimento: quem não avança em capital intelectual torna o trabalho obsoleto sem perceber</p>
+</li>
+<li><p>Planejar antes de executar: identificar problemas e dificuldades prováveis antes de começar, responsabilidade com o que se propõe é parte do valor</p>
+</li>
+<li><p>Contornar as dificuldades, não apenas identificá-las, quem aponta o problema sem buscar solução está criticando, não inovando</p>
+</li>
+<li><p>Propor com fatos e dados: crítica sem evidência não é contribuição, é ruído</p>
+</li>
+<li><p>Respeitar o tempo: inovar com atraso é entregar o que o mercado já espera como padrão, deixou de ser diferencial</p>
+</li>
+<li><p>Entender que inovação não é exclusividade da liderança: qualquer pessoa que encontra uma forma melhor de fazer sua parte está inovando</p>
+</li>
+<li><p>Compartilhar melhorias e boas práticas com as equipes que atuam no processo, contribuindo para que o conhecimento gerado beneficie quem precisa aplicá-lo, e não fique restrito a quem o desenvolveu.</p>
+</li>
+<li><p>Ouvir com atenção quando alguém traz uma proposta de melhoria, ferramenta ou solução, mesmo que a ideia pareça invadir seu espaço de conhecimento. Colaboração começa com abertura para receber. Sem isso, nenhuma boa ideia sobrevive à primeira reação.</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li><p>Só grandes ideias disruptivas, a maioria das inovações que mudam resultados são pequenas melhorias acumuladas</p>
+</li>
+<li><p>Inovar por inovar, sem planejamento, mudança sem método é risco sem propósito e compromete a credibilidade de quem propõe</p>
+</li>
+<li><p>Criticar sem propor solução: identificar o problema é o começo, não o mérito. O valor está em resolver</p>
+</li>
+<li><p>Inventar o que já existe, inovação começa por conhecer o que já foi feito antes de propor o novo</p>
+</li>
+<li><p>Esperar que a inovação venha de cima, quem executa tem visibilidade que quem coordena não tem</p>
+</li>
+<li><p>Confundir tecnologia com inovação, ferramenta nova que ninguém usa não é inovação, é custo</p>
+</li>
+<li><p>Resistir a mudança porque &quot;sempre foi assim&quot;, esse argumento não é experiência, é acomodação</p>
+</li>
+<li><p>Demorar demais: quando a inovação chega fora do tempo, ela não lidera mais, apenas acompanha</p>
+</li>
+<li><p>Só receber a solução, nunca ajudar a construir. Inovação é feita junto, não delegada.</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de inovação</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A estagnação raramente se anuncia, ela aparece como conformismo
+gradual. Alguns sinais:</p>
+<ul>
+<li>&quot;Sempre foi assim e funciona&quot; como resposta a qualquer sugestão de melhoria</li>
+<li>Processos com gargalos conhecidos que ninguém questiona há meses</li>
+<li>Colaborador que executa igual há anos, sem evolução perceptível na
+qualidade ou na velocidade</li>
+<li>Erros que se repetem sem reflexão estruturada sobre a causa</li>
+<li>Ausência de perguntas, quem não questiona não está buscando melhorar</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer quando o colaborador está estagnado</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Antes de concluir, entender a causa:</p>
+<ul>
+<li>Sem espaço para propor → o ambiente punindo ou ignorando sugestões cria
+quem não sugere mais. Resposta: abrir canais reais e mostrar que ideias
+são recebidas.</li>
+<li>Sem referência do que pode melhorar → não sabe que existe um nível melhor. Resposta: expor a benchmarks, treinamentos, referências externas.</li>
+<li>Medo de errar na mudança → prefere o conhecido ao risco do novo. Resposta: criar ambiente onde testar tem permissão e erro estruturado não é punido.</li>
+<li>Comodismo crônico → o suficiente está bom o bastante. Resposta: tornar o
+crescimento parte da avaliação, quem não evolui, regride em relevância.</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Nomear o padrão: &quot;esse processo tem o mesmo gargalo há X meses, o
+que você acha que trava?&quot;</li>
+<li>Abrir espaço antes de cobrar: a pessoa tem oportunidade real de propor?</li>
+<li>Conectar inovação a resultado: mostrar o custo da estagnação, não apenas
+o benefício do avanço</li>
+<li>Acompanhar: melhoria contínua exige repetição estruturada, não evento
+único</li>
+<li>Se nada mudar: avaliar fit, quem fica estagnado não fica neutro,
+compromete o resultado de quem está ao lado</li>
+</ol>
+</div>
+        </details>
+    </section><section id="valor-respeito" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">04</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Respeito</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, respeito significa tratar todas as pessoas com dignidade, agir com justiça nas relações profissionais e enfrentar conflitos de forma transparente, preservando o foco na solução e no fortalecimento da equipe. Num negócio que depende de equipes trabalhando junto sob pressão diária, o desrespeito não é apenas mal comportamento, é ruído operacional que destrói produtividade, aumenta rotatividade e trava colaboração. Ambiente respeitoso não é benefício para o colaborador, é infraestrutura para o resultado.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Reconhecer que cada pessoa tem valor, e agir de acordo com isso, independente de cargo, resultado ou momento</li>
+<li>Dizer a verdade sobre o trabalho e a entrega, com clareza e sem crueldade , aplauso falso não é gentileza, é abandono</li>
+<li>Ouvir com intenção de entender, não de responder</li>
+<li>Honrar o combinado: quando não puder cumprir, comunicar antes, não depois, não nunca</li>
+<li>Cobrar o melhor de quem está com você, quem não cobra não respeita, protege o medíocre às custas de quem entrega</li>
+<li>Tratar erros abertamente, com o time: erro velado vira assunto proibido; erro tratado em coletivo vira aprendizado coletivo, o foco não é no erro, é na correção</li>
+<li>Dar retorno: deixar alguém esperando sem resposta não é neutralidade, é descaso</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Tratar bem quando o gestor está na sala e diferente quando não está, respeito não depende de plateia, se mede no comportamento dos bastidores</li>
+<li>Evitar conflito para &quot;não criar problema&quot;, respeito não é ausência de tensão, é a capacidade de tratar o conflito sem atacar quem está do outro lado</li>
+<li>Usar ironia, sarcasmo ou silêncio punitivo como resposta, são formas de desrespeito disfarçadas de autocontrole</li>
+<li>Confundir cobrança com desrespeito, exigir o melhor de alguém é uma das formas mais honestas de respeitá-la; o que destrói é a humilhação, não a exigência</li>
+<li>Discordar atacando a pessoa, discordância e questionamento são bem- vindos; o que não pode é usar o desacordo como pretexto para ir ao pessoal</li>
+<li>Velar o erro, tratar problema como assunto secreto não protege ninguém, cria cultura onde o silêncio vale mais do que a verdade</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de respeito</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A falta de respeito raramente aparece como hostilidade direta, ela aparece
+como padrão de comportamento que corrói o ambiente gradualmente. Alguns
+sinais:</p>
+<ul>
+<li><p>Tom que muda conforme o cargo de quem está na sala</p>
+</li>
+<li><p>Pessoas que param de trazer problemas porque &quot;não adianta&quot;, aprenderam que a resposta será ignorada ou virada contra elas</p>
+</li>
+<li><p>Erros que viram assunto proibido em vez de aprendizado coletivo</p>
+</li>
+<li><p>Conflitos que nunca são nomeados e acumulam até explodir</p>
+</li>
+<li><p>Ironia e sarcasmo frequentes, quando o humor é sempre às custas de
+alguém, não é cultura, é toxicidade normalizada</p>
+</li>
+<li><p>Combinados quebrados repetidamente sem comunicação prévia</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer quando o respeito está ausente</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Antes de agir, identificar a causa, a resposta muda conforme a origem:</p>
+<ul>
+<li>Episódio isolado (pressão, estresse, momento ruim) → a pessoa agiu com
+desrespeito uma vez, não é padrão. Resposta: nomear o comportamento
+logo, com clareza e sem drama. &quot;O que você disse para o colega hoje não
+foi OK. Não pode se repetir.&quot;</li>
+<li>Conflito de relação não tratado → duas pessoas específicas, relação que deteriorou sem que ninguém interviesse. Resposta: reunir as partes, ouvir os
+dois lados, nomear o padrão, alinhar o que muda. Se necessário, mediação
+com um terceiro.</li>
+<li>Postura crônica, age assim com todo mundo → não é contexto, é comportamento. Resposta: conversa direta, individual. &quot;Observei um padrão que
+não é compatível com o que esperamos aqui. Vou te dizer o que vi, quero
+ouvir sua versão, e vamos alinhar o que precisa mudar e em quanto tempo.&quot;</li>
+<li>Liderança que modela ou tolera o desrespeito → quando o gestor age assim
+ou faz vista grossa, o time aprende que é norma. A mudança começa de
+cima, sempre.</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo prático</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Nomear o comportamento, não o caráter. &quot;Você usou um tom inadequado
+com o colega na reunião&quot;, não &quot;você não respeita ninguém&quot;</li>
+<li>Separar intenção de impacto: a pessoa pode não ter querido desrespeitar, o impacto aconteceu do mesmo jeito e precisa ser nomeado</li>
+<li>Ouvir a versão de quem errou antes de concluir</li>
+<li>Alinhar o que muda: comportamento esperado, prazo e consequência se
+não mudar</li>
+<li>Acompanhar, não como vigilância, como gestão ativa</li>
+<li>Se o padrão persistir: conversa honesta sobre continuidade. A empresa não
+sustenta comportamento que desgasta o time</li>
+</ol>
+<p>O que não fazer: ignorar porque &quot;é assim mesmo com ele&quot;. Reagir com desrespeito de volta. Diluir em grupo esperando que a pessoa entenda que é para ela
+, isso é covardia gerencial. Criar programa de cultura de respeito enquanto
+quem humilha fica intocável.</p>
+</div>
+        </details>
+    </section><section id="valor-solidez" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">05</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Solidez</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, solidez significa construir resultados sustentáveis por meio de decisões responsáveis, processos consistentes e relacionamentos de confiança. Solidez é o que permite que a empresa cresça sem se perder no processo, mantenha padrão de entrega ao longo do tempo e sustente aquilo que constrói. É a diferença entre ter resultado num período e ter resultado de forma consistente. Solidez é o que faz a Nex ser confiável para clientes, colaboradores e parceiros, não pelo que promete, mas pelo que entrega no dia a dia.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Construir sobre fundamentos reais antes de crescer, base sólida não é limitação, é o que permite escalar sem colapsar</li>
+<li>Ser previsível nas entregas: quem trabalha com você sabe o que esperar, e isso é a forma mais concreta de confiança</li>
+<li>Construir processo que funciona independente de quem executa, empresa sólida não depende de herói; se para quando o melhor profissional sai, o problema é de fundamento, não de pessoa</li>
+<li>Marchar com consistência: entregar na crise e na bonança, no dia de pressão e no de folga, não mais quando está fácil, não menos quando está difícil</li>
+<li>Crescer sobre o que já está consolidado, expandir quando o que existe está funcionando; abandonar fundamento para perseguir o próximo brilhante não é agilidade, é exposição</li>
+<li>Dizer não com critério: solidez exige recusar o que não cabe na capacidade real, mesmo quando a oportunidade parece boa</li>
+<li>Sustentar o resultado ao longo do tempo, quem cresce rápido e não sustenta não foi sólido, foi sortudo por um período</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail deepdive">
+          <summary><span>Solidez como comportamento cultural</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Solidez não aparece no site da empresa. Aparece nas decisões que a empresa toma quando tem a opção de fazer diferente:</p>
+<ul>
+<li>Escolher entre formar interno e contratar serviço externo pela situação, não pela ideologia. Contratar serviço externo é válido pra dar vazão situacional em prazo apertado ou expertise pontual. Formar interno é válido pra ganhar autonomia contínua em competência estratégica.</li>
+<li>Manter decisões e cobranças orientadas pelo processo e pelo resultado, não pela relação pessoal. Nex é empresa, não família. Cada colaborador entrega o combinado independente de proximidade com liderança, tempo de casa ou vínculo de amizade.</li>
+<li>Usar sistema e disciplina como padrão de operação, mesmo sob pressão. Improviso não é solução, é medida temporária pra situação que o processo ainda não cobre. Quando improviso vira padrão, o problema não é a crise, é a ausência de processo que deveria ter sido construído.</li>
+<li>Ter recorrência líquida (MRR) crescente como base do resultado. Venda nova é o motor que alimenta a recorrência, não o indicador final. O que sustenta a operação é quanto de mensalidade recorrente entra e cresce mês a mês, líquida de cancelamento e inadimplência.</li>
+<li>Avaliar oportunidades de crescer comprando outras operações (aquisição de carteira de clientes, compra de outra empresa, expansão para novas regiões) pela capacidade real de integrar sem quebrar o que já funciona. A resposta 'não estamos prontos' é válida quando ancorada em análise objetiva (capacidade técnica, financeira, operacional), e é evasão quando usada como justificativa pra adiar decisão que o mercado exige.</li>
+</ul>
+<p>Solidez é o que você faz quando a pressão aperta e a opção mais fácil seria ceder.</p>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li><p>Rigidez ou resistência à mudança, solidez não é manter o que está errado; é ter fundamento para mudar sem se perder no processo</p>
+</li>
+<li><p>Lentidão disfarçada de cautela, solidez justifica escolha consciente sobre o que construir e quando, não justifica inércia</p>
+</li>
+<li><p>Estabilidade sem crescimento, estagnação não é solidez, é deterioração silenciosa com aparência de segurança</p>
+</li>
+<li><p>Dependência de uma pessoa, empresa sólida funciona quando o melhor profissional está ausente, em férias ou se foi embora</p>
+</li>
+<li><p>Crescimento acelerado sem processo, velocidade sem fundamento não é solidez, é risco descoberto disfarçado de performance</p>
+</li>
+<li><p>Heroísmo episódico, resolver tudo no limite não é sinal de força, é sinal de que não há processo. Empresa sólida não precisa de herói para funcionar</p>
+</li>
+<li><p>Exigir garantia total antes de iniciar. Solidez não é ausência de risco, é gestão consciente do risco. Quem só começa quando tem 100% de certeza nunca começa, e o mercado não paga por planejamento infinito.</p>
+</li>
+<li><p>Confundir análise em excesso com responsabilidade. Análise é meio, decisão é fim. Quando a análise não termina em decisão, ela deixa de ser solidez e vira barreira.</p>
+</li>
+<li><p>Usar solidez como desculpa para rejeitar iniciativa nova ou travar processo em andamento. Solidez é sobre COMO construir, não sobre EVITAR construir.</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de solidez</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A ausência de solidez raramente se anuncia, ela aparece quando a pressão
+chega. Alguns sinais:</p>
+<ul>
+<li>Resultado que depende de uma pessoa específica, se ela sair, a área para
+ou regride</li>
+<li>Processos que existem na cabeça de alguém, não documentados, conhecimento que vai embora com quem tem</li>
+<li>Entrega inconsistente, boa quando está em ritmo, ruim sob pressão ou
+com times diferentes</li>
+<li>Crescimento que não sustenta, cresce rápido mas não mantém o que conquistou</li>
+<li>Improviso      como    padrão   ,    decisões    tomadas     sem    método,    sem
+repetibilidade, sempre de zero</li>
+<li>A empresa funciona bem quando o dono ou o líder está presente, e piora
+quando está ausente</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer quando a solidez está ausente</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Antes de agir, identificar a causa, a resposta muda conforme a origem:</p>
+<ul>
+<li><p>Falta de processo documentado → o conhecimento está na cabeça das pessoas. Resposta: documentar o que existe, padronizar o que funciona, criar o
+que ainda não tem.</p>
+</li>
+<li><p>Dependência de pessoa → uma pessoa é ponto único de falha, o risco é sistêmico. Resposta: treinar substitutos, criar redundância de conhecimento,
+distribuir responsabilidade.</p>
+</li>
+<li><p>Entrega inconsistente → o processo quebra em algum ponto. Resposta: mapear onde o resultado varia, entender se é falha de processo ou de
+execução, não punir antes de diagnosticar.</p>
+</li>
+<li><p>Crescimento sem base → a empresa cresceu mais rápido do que o processo
+suporta. Resposta: reduzir velocidade de expansão até consolidar o que
+existe. Crescer em cima de caos gera mais caos.</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo prático</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Medir consistência antes de crescimento, o que você não consegue
+repetir, você não tem; você teve uma vez</li>
+<li>Mapear dependências de pessoas: quais áreas param se a pessoa X sair
+amanhã?</li>
+<li>Documentar o que funciona enquanto ainda funciona, não esperar a crise
+para descobrir que o conhecimento não estava registrado</li>
+<li>Construir processo que sobrevive a quem não está presente</li>
+<li>Dizer não ao que não cabe, solidez inclui a disciplina de recusar o que
+parece bom mas desequilibra o fundamento</li>
+</ol>
+<p>O que não fazer: crescer antes de consolidar. Confundir velocidade com solidez. Manter pessoa como ponto único de falha sem criar backup. Ignorar
+inconsistência de entrega &quot;porque no geral está bom&quot;.</p>
+</div>
+        </details>
+    </section><section id="valor-compromisso" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">06</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Compromisso</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, compromisso significa assumir responsabilidade pelos resultados das atividades sob sua responsabilidade, comunicando riscos, propondo soluções e garantindo que os acordos estabelecidos sejam cumpridos. Compromisso é o que transforma acordo em entrega e palavra em resultado. Empresa funciona quando cada pessoa entrega o que se comprometeu a entregar, no prazo que combinou, com o padrão que acordou. Sem isso, planejamento vira lista de intenção e time vira grupo de pessoas trabalhando em paralelo sem produzir junto.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Assumir resultado, não tarefa, quando você assume uma entrega, você assume o que ela produz, não o esforço que fez. &quot;Tentei muito&quot; não entrega o projeto</li>
+<li>Honrar a palavra: compromisso é o contrato mais sério que existe, mais do que qualquer papel assinado. Quem não honra a palavra não é desonesto com a empresa, é desonesto consigo mesmo</li>
+<li>Ter clareza antes de assumir, compromisso começa quando o que foi pedido está claro: o que é, até quando, com qual padrão. Sem clareza, não há compromisso real, há intenção mal definida</li>
+<li>Comunicar antes de falhar, não depois, quem vai perder o prazo e só fala depois transferiu o problema para quem confiou. A responsabilidade de avisar enquanto ainda há tempo é de quem assumiu</li>
+<li>Não largar no meio do caminho quando fica difícil, compromisso não tem cláusula de dificuldade; quem para quando fica difícil nunca tinha se comprometido de verdade</li>
+<li>Dizer não quando necessário, comprometer-se com o que não pode cumprir não é gentileza, é dívida. &quot;Não posso assumir isso agora&quot; é mais honesto do que &quot;sim&quot; que não vai virar entrega</li>
+<li>Meta com nome, número e prazo, compromisso vago não existe. O que não tem número e data é intenção, não compromisso</li>
+<li>Ler o contexto antes de responder, há situações que pedem esforço máximo e comprometimento além do confortável; há situações que pedem honestidade sobre o que é possível. A distinção não é sobre facilidade, é sobre prioridade real e capacidade real. Usar &quot;não consigo&quot; como resposta padrão não é honestidade, é morosidade</li>
+<li>Ser honesto sobre o tempo real da entrega, estimar com precisão o que a tarefa exige, sem inflar o prazo para criar margem de conforto. Pedir 3 dias para o que leva 4 horas não é planejamento, é ocupação de espaço com ineficiência. Compromisso real inclui entregar no tempo que de fato é necessário</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Esforço sem resultado, boa intenção não entrega projeto; a empresa não funciona com intenção, funciona com entrega</li>
+<li>Dizer sim para tudo para não decepcionar, cada sim novo compete com os anteriores; quem aceita tudo compromete tudo</li>
+<li>&quot;Vou tentar&quot;, é negociação disfarçada de compromisso. Compromisso é &quot;vou entregar até X&quot; ou é conversa franca sobre o que é possível</li>
+<li>Só falar do problema depois que o prazo estourou, o problema não era imprevisível; o que faltou foi comunicar enquanto ainda havia tempo</li>
+<li>Estar presente mas não entregar, participar do time não é o mesmo que ter se comprometido com o resultado do time</li>
+<li>Justificativa como encerramento, explicar o que aconteceu não entrega o que foi pedido. A conversa sobre o porquê é válida, mas não substitui o que vem depois</li>
+<li>Aceitar prazo impossível por medo de decepcionar na hora, sem avaliar o contexto: se é prioridade alta, o caminho é empenho máximo; se não é, o caminho é honestidade sobre a capacidade real. &quot;Não consigo agora&quot; dito na hora é mais honesto do que &quot;sim&quot; que não vai virar entrega</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de compromisso</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A ausência de compromisso raramente aparece como recusa aberta, ela
+aparece como desvio gradual. Alguns sinais:</p>
+<ul>
+<li>Sim fácil, resultado escasso, assume tudo, entrega pouco</li>
+<li>Prazos que nunca são cumpridos &quot;porque sempre aparece algo&quot;, o imprevisto nunca é realmente imprevisto para quem acompanha o próprio processo</li>
+<li>Justificativas no lugar de resultado, explica o que aconteceu, não o que
+vai acontecer agora</li>
+<li>&quot;Quase pronto&quot; como resposta permanente, sinal de que o prazo nunca
+foi levado a sério</li>
+<li>Comunicação do problema só depois do prazo estourar</li>
+<li>Cultura onde prazo é sugestão, quando o líder aceita atraso sem
+conversa, o time aprende que prazo é opcional</li>
+<li>Prazos sistematicamente maiores do que o trabalho real exige, sempre
+pede mais tempo do que o necessário e entrega no limite do que pediu,
+nunca antes</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer quando o colaborador não está comprometido</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Antes de concluir, entender a causa, a resposta muda conforme a origem:</p>
+<ul>
+<li>Diz sim por medo de decepcionar → aceita tudo porque não consegue recusar; o sim virou proteção, não compromisso. Resposta: conversa direta, &quot;quando você aceita o que não pode entregar, você prejudica quem confiou
+em você mais do que se tivesse dito não na hora.&quot;</li>
+<li>Assumiu sem clareza do que foi pedido → comprometeu com algo mal definido; o problema não é postura, é ausência de alinhamento. Resposta: reconstruir a expectativa com clareza, o que é, até quando, com qual padrão. Se quem delega não é claro, o problema está na origem, não no colaborador.</li>
+<li>Nunca foi cobrado de forma consistente → aprendeu, ao longo do tempo,
+que prazo é sugestão; o ambiente ensinou isso. Resposta: não punir o comportamento que o ambiente criou, introduzir cobrança gradualmente,
+com consistência e sem explosão. A mudança de expectativa precisa ser
+comunicada antes de ser cobrada.</li>
+<li>Infla prazos sistematicamente → usa margem de tempo como proteção;
+nunca foi cobrado pelo tempo estimado, só pela entrega final. Resposta: calibrar junto, &quot;quanto tempo você precisa de fato para isso?&quot; + acompanhar a estimativa, não só a entrega. Quem estima com precisão melhora
+com o tempo; quem estima com folga cronicamente precisa de conversa
+direta sobre o padrão.</li>
+<li>Postura crônica → independente do contexto, do ambiente e de quem cobra,
+não entrega. Resposta: conversa direta e individual, &quot;observei um padrão
+que já aconteceu X vezes. Preciso entender se é algo que posso ajudar a resolver ou se é uma questão de escolha. Qual é a sua leitura?&quot; Consequência
+real e próximo passo com prazo definido.</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Nomear o padrão com dado, não &quot;você não se compromete&quot;, mas &quot;nas últimas 4 semanas, 3 das suas entregas chegaram depois do prazo acordado&quot;</li>
+<li>Ouvir antes de concluir, o que a pessoa diz sobre o que aconteceu</li>
+<li>Distinguir: a causa é de capacidade (não consegue), de ambiente (nunca foi
+cobrado) ou de postura (não priorizou)?</li>
+<li>Alinhar o que muda: expectativa clara, prazo concreto, o que acontece se
+não mudar</li>
+<li>Acompanhar em pontos intermediários, não esperar o próximo prazo para
+descobrir que o problema continua</li>
+</ol>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Como cobrar prazo, o protocolo</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Cobrar prazo não é pressão, é respeito com quem confiou na entrega. A cobrança deve ser clara, consistente e sem margem para ambiguidade.
+Antes do prazo:</p>
+<ul>
+<li>Acompanhar o andamento em pontos intermediários, não esperar o dia D
+para saber como está</li>
+<li>Se perceber risco, nomear: &quot;está no prazo?&quot; é uma pergunta. &quot;Preciso saber
+se vai ter algum problema antes de acontecer&quot; é uma posição</li>
+<li>Criar ambiente onde comunicar dificuldade antes do prazo é esperado, não punir quem avisa cedo</li>
+</ul>
+<p>No prazo, se não entregou:</p>
+<ul>
+<li>Nomear imediatamente: &quot;o prazo era hoje. O que aconteceu?&quot;, sem
+esperar, sem deixar passar</li>
+<li>Ouvir o que aconteceu, mas não encerrar a conversa com a justificativa, a
+próxima pergunta é: &quot;quando entrega?&quot;</li>
+<li>Deixar claro o impacto: quem estava esperando essa entrega, o que travou
+por causa disso</li>
+<li>Alinhar o novo prazo com clareza, não &quot;o mais rápido possível&quot;, mas uma
+data</li>
+</ul>
+<p>Quando é padrão (acontece repetidamente):</p>
+<ul>
+<li>Conversa direta, individual: &quot;esse padrão de não cumprir prazos já aconteceu X vezes. Preciso entender se é algo que posso ajudar ou se é postura.&quot;</li>
+<li>Distinguir: não conseguiu (capacidade ou obstáculo) vs. não priorizou (postura)</li>
+<li>Tornar a consequência real e consistente, não cobrar é ensinar que prazo
+é opcional</li>
+</ul>
+<p>O que não fazer: aceitar &quot;quase pronto&quot; sem nova data. Celebrar esforço em
+vez de entrega. Dar segundo prazo sem conversa sobre o primeiro. Ignorar
+descumprimento para &quot;não criar conflito&quot;, silêncio aqui não é gentileza, é
+ensinamento errado.</p>
+</div>
+        </details>
+    </section><section id="valor-ambicao" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">07</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Ambição</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, ambição significa buscar crescimento contínuo por meio do desenvolvimento das próprias competências, contribuindo para o crescimento da equipe e da empresa, sem transformar colegas em adversários. Ambição é o combustível que faz pessoa e empresa evoluírem, mas o alvo importa mais que a intensidade. Ambição bem direcionada tem como alvo a versão anterior de si mesmo e o resultado que ainda não foi alcançado. Empresa cresce quando cada pessoa cresce junto, não uma às custas da outra.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Querer mais do que se tem hoje, e o &quot;mais&quot; vai além do salário: pode ser conhecimento, mudança de área, cargo, destaque de resultado. Dinheiro também é parte disso. A pessoa ambiciosa sabe o que quer e por que quer , sem destino claro, o que existe é expectativa, não ambição</li>
+<li>Querer ser melhor do que a versão de ontem, não do que o colega, o adversário certo é o próprio histórico. Comparar-se com quem está ao lado desvia o foco e distorce o critério de crescimento</li>
+<li>Estudar e aplicar: não fazer apenas o que o líder pediu quando pediu, buscar o que ainda não sabe e colocar em prática sem esperar ser mandado</li>
+<li>Ter sede de entregar mais resultado, não só cumprir, mas encontrar como superar o que já está sendo feito</li>
+<li>Antes de pedir o aumento, já executar a função que o justifica, antes de ter, ser. Competência vem antes da recompensa, nunca depois</li>
+<li>Saber onde quer chegar e como vai fazer para chegar lá, meta com nome, número e prazo. Sem critério de chegada, não há caminho, só movimento</li>
+<li>Fazer o melhor possível nas condições atuais para construir condições melhores, quem espera o momento perfeito para se dedicar geralmente não se dedicou nunca</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Crescer a qualquer custo, ambição que passa por cima de quem está ao lado não é crescimento, é oportunismo. O valor de crescer não cancela o custo de destruir quem estava no caminho</li>
+<li>Competir com o colega como critério de avanço, o ranking existe para medir autossuperação, não para eliminar quem está ao lado. Quando o parâmetro é o outro, a ambição já está desalinhada</li>
+<li>Meta do setor acima do resultado real da empresa, ambição individual que desconsidera o contexto da operação não é crescimento, é localismo. Resultado individual existe dentro de um resultado maior</li>
+<li>Ver apenas o próprio ciclo sem enxergar os fatores ao redor, quem só vê a própria área toma decisões que parecem certas localmente e são erradas para o todo</li>
+<li>Centralizar processos para se tornar indispensável por medo de se tornar desnecessário, isso não é ambição, é insegurança disfarçada de competência. Quem esconde o que sabe não está crescendo, está se protegendo</li>
+<li>Crescimento declarado sem movimento real, ambição que existe no discurso e não aparece na ação é expectativa. A diferença está no que a pessoa faz quando ninguém está pedindo</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail deepdive">
+          <summary><span>A ambição que destrói, quando o valor vira risco</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Ambição é talvez o valor mais importante e o mais perigoso quando mal direcionado. A mesma energia que move uma pessoa a crescer pode mover outra a
+sabotar, e a diferença entre os dois não está na intensidade, está no alvo.
+Ambição bem direcionada: o alvo é a versão anterior de si mesmo. A métrica
+de crescimento é o próprio histórico. Quando alguém do time cresce, a reação
+é aprender com o que funcionou, não eliminar quem cresceu.
+Ambição mal direcionada: o alvo é o colega. O crescimento pessoal deixa de
+ser critério e passa a ser a comparação com o outro. Nesse modo, a ambição
+não gera valor, consome: aparecem centralização de informação, competição por visibilidade, localismo de resultado, resistência a compartilhar o que
+funciona.
+Três formas específicas em que a ambição mal direcionada se manifesta:</p>
+<ol>
+<li>Centralização por indispensabilidade: a pessoa acumula conhecimento ou
+acesso que outros precisam, não para crescer, mas para não ser substituída. Parece comprometimento, é bloqueio. O resultado do time trava em
+função do filtro que ela criou para si mesma.</li>
+<li>Localismo de resultado: o setor performa bem, a empresa vai mal, e a pessoa considera isso uma vitória. Não há ambição real aí, há desconexão
+entre a parte e o todo.</li>
+<li>Competição com o par: quando o colega cresce, a reação não é aprender, é competir ou minar. O problema não está só no comportamento, está na
+leitura do jogo: numa empresa, o colega não é o adversário. O adversário é
+o resultado que ainda não foi alcançado.</li>
+</ol>
+<p>A ambição saudável constrói quem está ao redor. A mal direcionada corrói, e
+o custo raramente é de quem a exerce; é do time que absorve o impacto.</p>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de ambição</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A falta de ambição raramente aparece como preguiça declarada, ela
+aparece como conformismo com o suficiente. Alguns sinais:</p>
+<ul>
+<li><p>Faz o que foi pedido, nunca além, o básico como teto, não como piso</p>
+</li>
+<li><p>Não investe em desenvolvimento próprio: sem busca de conhecimento
+novo, sem feedback, sem iniciativa de crescimento</p>
+</li>
+<li><p>Não sabe onde quer chegar, sem destino definido, não há movimento com
+propósito</p>
+</li>
+<li><p>Aguarda o reconhecimento para então se preparar, a lógica invertida de
+quem espera ter para depois ser</p>
+</li>
+<li><p>Olha apenas para o próprio ciclo: executa a função sem entender o impacto
+no resultado maior</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ambição mal direcionada</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Aqui o sinal não é ausência de movimento, é movimento na direção errada.
+Alguns sinais:</p>
+<ul>
+<li>Resiste a compartilhar o que sabe, guarda conhecimento como vantagem
+competitiva interna; &quot;quem tem informação tem poder&quot;</li>
+<li>A reação ao crescimento do colega é defensiva, não motivadora, quando
+alguém é reconhecido, a pergunta interna não é &quot;o que ele fez?&quot; mas &quot;por
+que não fui eu?&quot;</li>
+<li>Otimiza o resultado do setor em detrimento do resultado maior, bate a
+meta da área sem enxergar o impacto no todo</li>
+<li>Usa o cargo ou acesso para filtrar o que chega ao time, controla fluxo de
+informação para manter relevância</li>
+<li>O reconhecimento coletivo não satisfaz; só o individual conta, crescer
+junto não é crescer</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Quando a ambição está ausente:
+Antes de concluir, entender a causa, a resposta muda conforme a origem:</p>
+<ul>
+<li>Não sabe o que quer → nunca parou para definir destino. Não é preguiça, é
+falta de direção. Resposta: conversa sobre o que a pessoa quer para si, cargo, conhecimento, reconhecimento, renda. Sem saber o que quer, não há
+o que perseguir.</li>
+<li>Sabe o que quer, mas não sabe como chegar → tem destino, não tem plano.
+Resposta: construir junto o caminho, o que precisa aprender, o que precisa entregar, em quanto tempo. Meta com critério de chegada.</li>
+<li>Medo de tentar e não conseguir → prefere não tentar a expor a limitação.
+Resposta: deixar claro que o modelo aqui nunca pune quem tenta e não
+chega, só ganha quem sobe, não perde quem ainda não chegou. O erro de
+quem tentou tem peso diferente de quem não tentou.</li>
+<li>Comodismo crônico → independente do suporte e da oportunidade, a escolha é pelo mínimo. Resposta: conversa direta. &quot;Você entrega o básico, mas
+não avança. Isso tem custo, para você e para o time. O que posso ajudar,
+e o que depende de você?&quot;</li>
+</ul>
+<p>Quando a ambição está mal direcionada:</p>
+<p>A abordagem aqui é diferente, não se trata de motivar, mas de redirecionar
+o critério:</p>
+<ul>
+<li>Centraliza para ser indispensável → o medo de ser substituído virou estratégia; não tem destino próprio claro. Resposta: conversa direta sobre o que a
+pessoa quer para si, e mostrar que quem compartilha e forma quem está
+ao lado sobe mais rápido do que quem bloqueia. &quot;O que você está
+protegendo é o que vai te travar.&quot;</li>
+<li>Compete com o colega → o critério de crescimento está no lugar errado.
+Resposta: redirecionar o olhar, &quot;o que você era há 6 meses? Onde quer
+estar em 6 meses?&quot; O colega some da equação quando o adversário correto
+aparece.</li>
+<li>Localismo de resultado → não enxerga (ou não quer enxergar) o todo. Resposta: mostrar o mapa maior, como o resultado do setor impacta o resultado da empresa, e por que crescer individualmente dentro de uma
+empresa que vai mal não é crescimento real.</li>
+<li>Competição tóxica crônica → já causou desgaste no time e o comportamento é padrão. Resposta: conversa direta e individual. &quot;O que você faz aqui
+drena quem está ao lado. Não é sustentável, para o time nem para você.
+O que você quer mudar?&quot;</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Nomear o padrão com dado, &quot;você está há X meses com a mesma entrega, sem evolução perceptível&quot; ou &quot;nas últimas semanas, o que você
+compartilhou com o time foi zero&quot;</li>
+<li>Ouvir antes de concluir, o que a pessoa diz sobre o que quer para si</li>
+<li>Distinguir: ausência de ambição (sem destino) ou ambição mal direcionada
+(destino errado)?</li>
+<li>Construir ou redirecionar: definir o destino correto + o caminho com
+critério de chegada</li>
+<li>Acompanhar, ambição não se instala nem se redireciona com uma conversa</li>
+</ol>
+<p>O que não fazer: aceitar o mínimo porque &quot;pelo menos entrega o básico&quot;. Cobrar crescimento sem criar espaço para ele acontecer. Deixar competição tóxica continuar porque &quot;ele performa bem&quot;, quem performa bem e corrói o
+time está cobrando um preço invisível que o resultado individual não paga.
+Confundir centralização com comprometimento.</p>
+</div>
+        </details>
+    </section><section id="valor-humildade" class="value-section content-anchor">
+      <div class="value-header">
+        <div class="value-index">08</div>
+        <div>
+          <span class="eyebrow">Valor NEX</span>
+          <h2>Humildade</h2>
+        </div>
+      </div>
+      <div class="section-preamble"></div>
+<details class="manifest-detail why" open>
+          <summary><span>Por que este valor é importante para a NEX Telecom</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Na NEX Telecom, humildade significa reconhecer que sempre existe espaço para aprender, evoluir e melhorar. É ter segurança para admitir limitações, valorizar as contribuições das outras pessoas e mudar de posição quando isso produz um resultado melhor para a equipe e para a empresa. Humildade não é ausência de posição nem falta de confiança. É a capacidade de defender uma ideia com dados e atualizar essa ideia quando dados melhores aparecem. Empresa que cresce é aquela em que as pessoas conseguem admitir erro cedo, aprender com o que não sabiam e mudar de rota sem tratar isso como perda pessoal.</p>
+</div>
+        </details>
+<details class="manifest-detail positive">
+          <summary><span>O que É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Dizer saber o que não sabe, e não agir como se soubesse. Quem admite o próprio limite aprende. Quem finge que sabe acumula certezas e para de crescer.</li>
+<li>Mudar de posição quando aparece um argumento melhor. Mudar de verdade, não apenas fingir que ouviu. Defender a posição errada para não parecer fraco prejudica o resultado.</li>
+<li>Dar crédito a quem merece, com nome, na hora, em público. Apropriar resultado alheio não aumenta competência: mostra que você precisa disso para parecer competente.</li>
+<li>Pedir ajuda antes de travar, não depois que o problema virou crise. Admitir que não sabe enquanto ainda dá tempo é inteligência.</li>
+<li>Ouvir quem executa e questionar se o que está sendo feito ainda faz sentido para o resultado real. Quem está na operação vê o que quem coordena não vê. Mudar a forma de fazer quando o processo não serve mais também é humildade, mesmo quando exige abrir mão do que você já dominava.</li>
+<li>Ouvir para entender, não para esperar a vez de responder. Quem já decidiu enquanto o outro ainda fala não está ouvindo. Está esperando.</li>
+<li>Reconhecer o erro antes que o custo cresça e receber a correção pelo que ela diz, não pelo tom de quem a deu. Se o erro é real, a primeira pergunta é &quot;isso é verdade?&quot;, não &quot;por que ele foi assim comigo?&quot;</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail negative">
+          <summary><span>O que NÃO É</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ul>
+<li>Ausência de posição. Pessoa humilde tem opinião e a defende. O que muda é o motivo para ceder: cede por argumento, não por pressão.</li>
+<li>Modéstia performática, aparece de formas reconhecíveis: dizer &quot;não foi nada&quot; sobre uma entrega que claramente exigiu esforço, esperando o reconhecimento vir depois; abrir reunião com &quot;sou só o coordenador, vocês sabem mais que eu&quot; e em seguida discordar de tudo e precisar ter a última palavra; recusar crédito em público (&quot;foi a equipe&quot;) enquanto em particular deixa claro que foi você quem conduziu. Humildade real não precisa ser anunciada, e não coexiste com competição por crédito por baixo dos panos.</li>
+<li>Concordar com tudo para evitar conflito. Isso é passividade. Pessoa humilde discorda quando precisa, com clareza e sem ataque.</li>
+<li>Esconder o que sabe para parecer mais acessível. Saber e esconder é disfunção. Humildade é conhecer com precisão o que sabe e o que não sabe.</li>
+<li>Ausência de ambição. Os dois valores coexistem. A pessoa mais ambiciosa da sala pode ser a mais humilde, se a ambição é pelo resultado, não pelo reconhecimento pessoal.</li>
+<li>Aceitar qualquer crítica sem avaliar. Humildade não é engolir todo feedback. É saber separar crítica ao trabalho de ataque à pessoa. O primeiro merece abertura. O segundo merece clareza.</li>
+<li>Não absorver a correção por não gostar do modo como ela chegou. Se o erro é real, precisa ser corrigido independente do tom. Deixar o desconforto com a forma bloquear a aprendizagem é a falta de humildade de maior custo, o erro continua ativo.</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail deepdive">
+          <summary><span>Humildade na prática, três pontos que confundem</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Humildade não é fraqueza: Pessoa humilde tem posição, defende com dados e
+atualiza quando os dados mudam. O líder que não recebe feedback desfavorável não está sendo respeitado, está isolado.
+Energia na correção é necessária: Sem ela, a correção chega como sugestão.
+O que distingue correção de humilhação não é a intensidade, é o alvo. Energia direcionada ao erro ensina. Energia direcionada à pessoa constrange sem
+ensinar. Humilhar é condenável porque não corrige, e o mais importante é
+sempre a correção.
+Antifragilidade, melhorar com o dano: Cultura frágil esconde o erro até virar
+crise. Cultura antifrágil evidencia o erro cedo para corrigir o processo. Onde
+errar tem custo pessoal alto, as pessoas escondem. Onde esconder tem custo
+alto, reportam. Só com visibilidade há aprendizado real.</p>
+</div>
+        </details>
+<details class="manifest-detail warning">
+          <summary><span>Como identificar a ausência de humildade</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>A falta de humildade raramente aparece como arrogância declarada, ela
+aparece como padrão de fechamento. Alguns sinais:</p>
+<ul>
+<li><p>Não muda de posição, independente do argumento. Ouve, anui, e executa
+como planejava antes</p>
+</li>
+<li><p>Apropria resultado coletivo como individual, na hora de reportar, o &quot;nós&quot;
+some e sobra o &quot;eu&quot;</p>
+</li>
+<li><p>Não pede ajuda até que o problema seja visível para todo mundo</p>
+</li>
+<li><p>A reação ao erro é defensividade ou silêncio, nunca &quot;errei, aqui está o
+que muda&quot;</p>
+</li>
+<li><p>Só ouve quem está hierarquicamente acima, feedback de quem está
+abaixo é ignorado ou descartado sem avaliação</p>
+</li>
+<li><p>Trata crítica ao trabalho como ataque pessoal, o mesmo padrão de fusão
+entre identidade e resultado descrito em Ética</p>
+</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail action">
+          <summary><span>O que fazer quando a humildade está ausente</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><p>Antes de concluir, entender a causa, a resposta muda conforme a origem:</p>
+<ul>
+<li>Ambiente que pune vulnerabilidade → a pessoa aprendeu que assumir erro
+tem custo alto; a armadura é racional, não de caráter. Resposta: mudar o sinal primeiro, o líder que assume erro em público modela o que é seguro
+fazer. Enquanto o modelo for invulnerabilidade, o time vai espelhar invulnerabilidade.</li>
+<li>Ego atrelado ao resultado → a posição certa virou identidade; mudar de
+ideia é perder a si mesmo. Resposta: separar explicitamente o argumento
+da pessoa, mostrar que atualizar posição é sinal de inteligência, não de
+fraqueza. &quot;Mudar porque o argumento é melhor não é perder, é o
+movimento mais inteligente disponível.&quot;</li>
+<li>Nunca aprendeu a ouvir → não teve modelo ou feedback sobre como receber crítica. Resposta: nomear o padrão, treinar a postura de ouvir antes de
+responder, criar situações de prática com custo baixo.</li>
+<li>Postura crônica de controle → independente do ambiente, precisa ter a última palavra, apropriar o crédito, ser a referência. Resposta: conversa direta
+e individual. &quot;O padrão que você cria aqui fecha o fluxo de informação para
+você e para o time. Isso tem custo mensurável. O que você quer mudar?&quot;</li>
+</ul>
+</div>
+        </details>
+<details class="manifest-detail protocol">
+          <summary><span>Protocolo</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="detail-body"><ol>
+<li>Nomear o padrão com dado, &quot;nas últimas 3 situações em que alguém
+trouxe argumento contrário, a posição não mudou, independente da
+qualidade do argumento&quot;</li>
+<li>Ouvir o que a pessoa diz sobre como recebe feedback, a própria resposta
+à pergunta já revela o problema</li>
+<li>Distinguir: é ambiente (foi punido por ser vulnerável), ego (identidade
+atrelada à posição) ou postura crônica?</li>
+<li>Mudar o sinal no ambiente antes de cobrar a postura individual, cultura
+de humildade começa na liderança</li>
+<li>Acompanhar em momentos reais, não em treinamento, mas no próximo
+erro, na próxima discordância, no próximo resultado</li>
+</ol>
+<p>O que não fazer: confundir humildade com ausência de posição. Cobrar abertura num ambiente que pune vulnerabilidade, a incoerência cancela a cobrança. Tratar qualquer concordância como humildade, pode ser passividade. Usar &quot;falta de humildade&quot; para desqualificar quem discorda com
+argumento sólido.</p>
+</div>
+        </details>
+    </section>
+  </main>
+</div>
+
+<footer class="footer"><strong>NEX Telecom · Manifesto da Cultura</strong><div>Versão 1.3 · Atualizado em 07/08/2026</div><div class="tagline">Cultura que orienta decisões, relações e resultados.</div></footer>
+<button class="back-top" id="backTop" aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>
+<script>
+(function() {
+  const progress = document.getElementById('progressBar');
+  const back = document.getElementById('backTop');
+  const links = [...document.querySelectorAll('#sideNav a')];
+  const anchors = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const update = () => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+    progress.style.width = pct + '%';
+    back.classList.toggle('show', window.scrollY > 650);
+  };
+  window.addEventListener('scroll', update, {passive:true}); update();
+  back.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + entry.target.id));
+      }
+    });
+  }, {rootMargin:'-20% 0px -70% 0px', threshold:0});
+  anchors.forEach(el => observer.observe(el));
+})();
+</script>
+</body>
+</html>

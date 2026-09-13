@@ -1,0 +1,279 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, extname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { query } from './db.js';
+import { logAudit } from './auth.repository.js';
+
+const uploadRoot = '/opt/rede-nex/uploads';
+const allowedTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']);
+
+// Magic bytes signatures per MIME type
+const MAGIC = {
+  'image/jpeg': { offset: 0, bytes: [[0xFF, 0xD8, 0xFF]] },
+  'image/jpg':  { offset: 0, bytes: [[0xFF, 0xD8, 0xFF]] },
+  'image/png':  { offset: 0, bytes: [[0x89, 0x50, 0x4E, 0x47]] },
+  'image/gif':  { offset: 0, bytes: [[0x47, 0x49, 0x46, 0x38]] },
+  'image/webp': { offset: 0, bytes: [[0x52, 0x49, 0x46, 0x46]], extra: { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] } },
+  'video/mp4':  { offset: 4, bytes: [[0x66, 0x74, 0x79, 0x70]] },
+  'video/webm': { offset: 0, bytes: [[0x1A, 0x45, 0xDF, 0xA3]] },
+  'audio/webm': { offset: 0, bytes: [[0x1A, 0x45, 0xDF, 0xA3]] },
+  'audio/ogg':  { offset: 0, bytes: [[0x4F, 0x67, 0x67, 0x53]] },
+  'audio/mp4':  { offset: 4, bytes: [[0x66, 0x74, 0x79, 0x70]] },
+  'audio/mpeg': { offset: 0, bytes: [[0xFF, 0xFB], [0xFF, 0xF3], [0xFF, 0xF2], [0x49, 0x44, 0x33]] },
+  'audio/wav':  { offset: 0, bytes: [[0x52, 0x49, 0x46, 0x46]] },
+};
+
+function validateMagicBytes(buffer, fileType) {
+  const rule = MAGIC[fileType];
+  if (!rule || buffer.length < 12) return;
+  const matches = rule.bytes.some(sig =>
+    sig.every((b, i) => buffer[rule.offset + i] === b)
+  );
+  if (!matches) throw new Error('Conteúdo do arquivo não corresponde ao tipo declarado');
+  if (rule.extra) {
+    const extraMatch = rule.extra.bytes.every((b, i) => buffer[rule.extra.offset + i] === b);
+    if (!extraMatch) throw new Error('Conteúdo do arquivo não corresponde ao tipo declarado');
+  }
+}
+const allowedWikiTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.ogg', '.m4a', '.mp3', '.wav', '.pdf', '.doc', '.docx', '.xls', '.xlsx']);
+
+function extensionFor(fileName, fileType) {
+  const current = extname(fileName || '').toLowerCase();
+  if (current && allowedExtensions.has(current)) return current;
+  const map = {
+    'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif',
+    'video/mp4': '.mp4', 'video/webm': '.webm',
+    'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a',
+    'audio/mpeg': '.mp3', 'audio/wav': '.wav',
+    'application/pdf': '.pdf', 'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  };
+  return map[fileType] || '.jpg';
+}
+
+export async function saveUserAvatar(user, input) {
+  if (!input?.data || !input?.file_name || !input?.file_type) {
+    throw new Error('Arquivo inválido');
+  }
+  if (!allowedTypes.has(input.file_type)) {
+    throw new Error('Formato de imagem não permitido');
+  }
+
+  const base64 = String(input.data).includes(',')
+    ? String(input.data).split(',').pop()
+    : String(input.data);
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) throw new Error('Arquivo vazio');
+  if (buffer.length > 5 * 1024 * 1024) throw new Error('Imagem maior que 5MB');
+  validateMagicBytes(buffer, input.file_type);
+
+  const bucket = 'avatars';
+  const fileName = `${user.id}-${randomUUID()}${extensionFor(input.file_name, input.file_type)}`;
+  const relativePath = `${bucket}/${fileName}`;
+  const targetDir = join(uploadRoot, bucket);
+  const targetPath = join(targetDir, fileName);
+
+  await mkdir(targetDir, { recursive: true });
+  await writeFile(targetPath, buffer);
+
+  const { rows } = await query(
+    `
+      insert into media_assets (
+        bucket,
+        path,
+        public_url,
+        file_name,
+        file_type,
+        file_size,
+        owner_id,
+        context
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, 'avatar')
+      returning *
+    `,
+    [bucket, relativePath, `/uploads/${relativePath}`, input.file_name, input.file_type, buffer.length, user.id]
+  );
+  const media = rows[0];
+  await query('update users set photo_url = $2 where id = $1', [user.id, media.public_url]);
+  await logAudit({
+    actorId: user.id,
+    action: 'UPLOAD_AVATAR',
+    entityType: 'media_assets',
+    entityId: media.id,
+    newData: { public_url: media.public_url, file_name: media.file_name, file_size: media.file_size },
+  });
+  return media;
+}
+
+export async function saveWikiMedia(user, input) {
+  if (!input?.data || !input?.file_name || !input?.file_type) {
+    throw new Error('Arquivo inválido');
+  }
+  if (!allowedWikiTypes.has(input.file_type)) {
+    throw new Error('Formato não permitido para a Wiki');
+  }
+
+  const base64 = String(input.data).includes(',')
+    ? String(input.data).split(',').pop()
+    : String(input.data);
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) throw new Error('Arquivo vazio');
+  if (buffer.length > 30 * 1024 * 1024) throw new Error('Arquivo maior que 30MB');
+  validateMagicBytes(buffer, input.file_type);
+
+  const bucket = 'wiki';
+  const fileName = `${randomUUID()}${extensionFor(input.file_name, input.file_type)}`;
+  const relativePath = `${bucket}/${fileName}`;
+  const targetDir = join(uploadRoot, bucket);
+  const targetPath = join(targetDir, fileName);
+
+  await mkdir(targetDir, { recursive: true });
+  await writeFile(targetPath, buffer);
+
+  const { rows } = await query(
+    `
+      insert into media_assets (
+        bucket,
+        path,
+        public_url,
+        file_name,
+        file_type,
+        file_size,
+        owner_id,
+        context,
+        wiki_article_id
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, 'wiki', $8)
+      returning *
+    `,
+    [
+      bucket,
+      relativePath,
+      `/uploads/${relativePath}`,
+      input.file_name,
+      input.file_type,
+      buffer.length,
+      user.id,
+      input.wiki_article_id ?? null,
+    ]
+  );
+  const media = rows[0];
+  await logAudit({
+    actorId: user.id,
+    action: 'UPLOAD_WIKI_MEDIA',
+    entityType: 'media_assets',
+    entityId: media.id,
+    newData: { public_url: media.public_url, file_name: media.file_name, file_size: media.file_size },
+  });
+  return media;
+}
+
+export async function getMediaContent(id) {
+  const { rows } = await query('select path, file_type from media_assets where id = $1 limit 1', [id]);
+  if (!rows[0]) return null;
+  const { path, file_type } = rows[0];
+  const filePath = join(uploadRoot, path);
+  const file_data = await readFile(filePath).catch(() => null);
+  if (!file_data) return null;
+  return { file_data, file_type };
+}
+
+export async function saveUserCover(user, input) {
+  if (!input?.data || !input?.file_name || !input?.file_type) throw new Error('Arquivo inválido');
+  if (!allowedTypes.has(input.file_type)) throw new Error('Formato de imagem não permitido');
+  const base64 = String(input.data).includes(',') ? String(input.data).split(',').pop() : String(input.data);
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) throw new Error('Arquivo vazio');
+  if (buffer.length > 5 * 1024 * 1024) throw new Error('Imagem maior que 5MB');
+  validateMagicBytes(buffer, input.file_type);
+  const bucket = 'covers';
+  const fileName = `${user.id}-cover-${randomUUID()}${extensionFor(input.file_name, input.file_type)}`;
+  const relativePath = `${bucket}/${fileName}`;
+  const targetDir = join(uploadRoot, bucket);
+  const targetPath = join(targetDir, fileName);
+  await mkdir(targetDir, { recursive: true });
+  await writeFile(targetPath, buffer);
+  const { rows } = await query(
+    `insert into media_assets (bucket, path, public_url, file_name, file_type, file_size, owner_id, context)
+     values ($1, $2, $3, $4, $5, $6, $7, 'cover') returning *`,
+    [bucket, relativePath, `/uploads/${relativePath}`, input.file_name, input.file_type, buffer.length, user.id]
+  );
+  const media = rows[0];
+  await query('update users set cover_url = $2 where id = $1', [user.id, media.public_url]);
+  return media;
+}
+
+export async function saveChatMedia(userId, input) {
+  if (!input?.data || !input?.file_name || !input?.file_type) throw new Error('Arquivo inválido');
+  const allowedChatTypes = new Set([
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'video/mp4', 'video/webm',
+    'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav',
+    'application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ]);
+  if (!allowedChatTypes.has(input.file_type)) throw new Error('Formato não permitido no chat');
+  const base64 = String(input.data).includes(',') ? String(input.data).split(',').pop() : String(input.data);
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) throw new Error('Arquivo vazio');
+  if (buffer.length > 20 * 1024 * 1024) throw new Error('Arquivo maior que 20MB');
+  validateMagicBytes(buffer, input.file_type);
+  const bucket = 'chat';
+  const fileName = `${randomUUID()}${extensionFor(input.file_name, input.file_type)}`;
+  const relativePath = `${bucket}/${fileName}`;
+  const targetDir = join(uploadRoot, bucket);
+  const targetPath = join(targetDir, fileName);
+  await mkdir(targetDir, { recursive: true });
+  await writeFile(targetPath, buffer);
+  const publicUrl = `/uploads/${relativePath}`;
+  const { rows } = await query(
+    `insert into media_assets (bucket, path, public_url, file_name, file_type, file_size, owner_id, context)
+     values ($1, $2, $3, $4, $5, $6, $7, 'chat') returning *`,
+    [bucket, relativePath, publicUrl, input.file_name, input.file_type, buffer.length, userId]
+  );
+  return rows[0];
+}
+
+export async function saveChatAvatar(userId, conversationId, input) {
+  if (!input?.data || !input?.file_name || !input?.file_type) throw new Error('Arquivo inválido');
+  if (!allowedTypes.has(input.file_type)) throw new Error('Formato de imagem não permitido');
+  const base64 = String(input.data).includes(',') ? String(input.data).split(',').pop() : String(input.data);
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) throw new Error('Arquivo vazio');
+  if (buffer.length > 5 * 1024 * 1024) throw new Error('Imagem maior que 5MB');
+  validateMagicBytes(buffer, input.file_type);
+  const bucket = 'chat-avatars';
+  const fileName = `${conversationId}-${randomUUID()}${extensionFor(input.file_name, input.file_type)}`;
+  const relativePath = `${bucket}/${fileName}`;
+  const targetDir = join(uploadRoot, bucket);
+  const targetPath = join(targetDir, fileName);
+  await mkdir(targetDir, { recursive: true });
+  await writeFile(targetPath, buffer);
+  const publicUrl = `/uploads/${relativePath}`;
+  const { rows } = await query(
+    `insert into media_assets (bucket, path, public_url, file_name, file_type, file_size, owner_id, context)
+     values ($1, $2, $3, $4, $5, $6, $7, 'chat-avatar') returning *`,
+    [bucket, relativePath, publicUrl, input.file_name, input.file_type, buffer.length, userId]
+  );
+  await query('update chat_conversations set avatar_url = $2 where id = $1', [conversationId, publicUrl]);
+  return rows[0];
+}

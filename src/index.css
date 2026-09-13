@@ -1,0 +1,1803 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 97%;
+    --foreground: 220 20% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
+    --primary: 24 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 100% 36%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 8% 46%;
+    --accent: 220 14% 94%;
+    --accent-foreground: 220 20% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 88%;
+    --input: 220 13% 90%;
+    --ring: 24 100% 50%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 215 28% 14%;   /* slate-850 — fundo principal */
+    --foreground: 0 0% 100%;     /* branco puro */
+    --card: 215 25% 20%;         /* card — slate-750 */
+    --card-foreground: 0 0% 100%;
+    --popover: 215 25% 20%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 24 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 100% 55%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 215 22% 26%;        /* slate-700 */
+    --muted-foreground: 215 16% 63%;
+    --accent: 215 22% 26%;
+    --accent-foreground: 210 30% 92%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 22% 28%;
+    --input: 215 22% 24%;
+    --ring: 24 100% 50%;
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    zoom: 1.1;
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      zoom: 1.3;
+    }
+  }
+
+  body {
+    @apply text-foreground;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 18px;
+    line-height: 1.6;
+    color-scheme: light;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Global dark mode overrides — paleta moderada, seletores exatos */
+  .dark body { color-scheme: dark; }
+
+  /* Backgrounds principais (exceto chat que tem seu próprio dark) */
+  .dark .bg-white:not(.chat-dark *) { background-color: hsl(var(--card)) !important; }
+  .dark .bg-white\/90:not(.chat-dark *) { background-color: hsl(215 25% 20% / 0.97) !important; }
+  .dark .bg-slate-50:not(.chat-dark *) { background-color: hsl(215 22% 22%) !important; }
+  .dark .bg-slate-100:not(.chat-dark *) { background-color: hsl(215 22% 25%) !important; }
+  .dark .bg-slate-200:not(.chat-dark *) { background-color: hsl(215 22% 28%) !important; }
+
+  /* Bordas */
+  .dark .border-slate-100:not(.chat-dark *) { border-color: hsl(var(--border)) !important; }
+  .dark .border-slate-200:not(.chat-dark *) { border-color: hsl(var(--border)) !important; }
+  .dark .divide-slate-100:not(.chat-dark *) > * + * { border-color: hsl(var(--border)) !important; }
+  .dark .divide-slate-200:not(.chat-dark *) > * + * { border-color: hsl(var(--border)) !important; }
+
+  /* Textos */
+  .dark .text-slate-950:not(.chat-dark *) { color: hsl(var(--foreground)) !important; }
+  .dark .text-slate-900:not(.chat-dark *) { color: hsl(var(--foreground)) !important; }
+  .dark .text-slate-800:not(.chat-dark *) { color: hsl(0 0% 100%) !important; }
+  .dark .text-slate-700:not(.chat-dark *) { color: hsl(0 0% 96%) !important; }
+  .dark .text-slate-600:not(.chat-dark *) { color: hsl(0 0% 90%) !important; }
+  .dark .text-slate-500:not(.chat-dark *) { color: hsl(0 0% 82%) !important; }
+  .dark .text-slate-400:not(.chat-dark *) { color: hsl(0 0% 74%) !important; }
+
+  /* Inputs, textareas, selects */
+  .dark input:not(.chat-dark *):not([type="color"]):not([type="checkbox"]):not([type="radio"]) {
+    background-color: hsl(var(--input)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  .dark textarea:not(.chat-dark *) {
+    background-color: hsl(var(--input)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  .dark select:not(.chat-dark *) {
+    background-color: hsl(var(--input)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  .dark input::placeholder:not(.chat-dark *),
+  .dark textarea::placeholder:not(.chat-dark *) { color: hsl(215 14% 60%) !important; }
+
+  /* Hovers */
+  .dark .hover\:bg-slate-50:hover:not(.chat-dark *) { background-color: hsl(215 22% 24%) !important; }
+  .dark .hover\:bg-slate-100:hover:not(.chat-dark *) { background-color: hsl(215 22% 27%) !important; }
+
+  /* Badges e pills laranja já são coloridas — mantém */
+  /* Botões com bg-white explícito que são botões de ação (outline style) */
+  .dark button.bg-white:not(.chat-dark *) { background-color: hsl(var(--card)) !important; }
+
+  /* Dropdown menus do shadcn/radix */
+  .dark [data-radix-popper-content-wrapper] .bg-white,
+  .dark [role="menu"] { background-color: hsl(var(--card)) !important; border-color: hsl(var(--border)) !important; }
+  .dark [role="menuitem"]:hover { background-color: hsl(var(--muted)) !important; }
+
+  /* Wiki sidebar — itens ativos com texto azul (#0057b8) ficam invisíveis em dark mode */
+  .dark .wiki-sidebar-root-active,
+  .dark .wiki-sidebar-article-active { color: #5aabff !important; }
+  .dark .wiki-sidebar-section-active { color: hsl(var(--foreground)) !important; }
+
+  /* Compensação de zoom para portais Radix — evita que o dropdown apareça fora do viewport */
+  /* O zoom no html faz getBCR retornar valores ×zoom. Radix usa esses valores como CSS px,
+     causando posicionamento ×zoom² fisicamente. Cancelamos o zoom no wrapper e re-aplicamos no conteúdo. */
+  [data-radix-popper-content-wrapper] {
+    zoom: calc(1 / 1.1) !important;
+  }
+  [data-radix-popper-content-wrapper] > * {
+    zoom: 1.1 !important;
+  }
+  @media (min-width: 1024px) {
+    [data-radix-popper-content-wrapper] {
+      zoom: calc(1 / 1.3) !important;
+    }
+    [data-radix-popper-content-wrapper] > * {
+      zoom: 1.3 !important;
+    }
+  }
+
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Prevent iOS auto-zoom on inputs */
+  @media (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Safe area padding for notch devices */
+  @supports (padding: max(0px)) {
+    .safe-top    { padding-top: max(0px, env(safe-area-inset-top)); }
+    .safe-bottom { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
+  }
+}
+
+@layer utilities {
+  .layout-gradient {
+    background: linear-gradient(135deg, #0057b8 0%, #1e88e5 25%, #fef3e8 50%, #ff7a00 75%, #ff9a40 100%);
+  }
+  .layout-radial {
+    opacity: 0.6;
+    background: radial-gradient(ellipse at top left, rgba(0,87,184,0.4) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(255,122,0,0.4) 0%, transparent 50%);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 2px; }
+}
+
+@layer components {
+  /* Card with hover lift */
+  .card-lift {
+    @apply transition-all duration-200 ease-out cursor-pointer;
+    @apply hover:-translate-y-1 hover:shadow-lg;
+  }
+  .card-lift:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+  }
+  .card-lift:active {
+    @apply translate-y-0 shadow-md;
+  }
+
+  /* Interactive button base */
+  .btn-interactive {
+    @apply transition-all duration-150 ease-out active:scale-95;
+  }
+
+  /* Glow effects */
+  .glow-orange {
+    box-shadow: 0 0 20px rgba(255, 122, 0, 0.25);
+  }
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(0, 87, 184, 0.25);
+  }
+
+  /* Post card */
+  .post-card {
+    @apply bg-white rounded-2xl border border-white/80 shadow-sm;
+    @apply transition-all duration-200;
+  }
+  .post-card:hover {
+    @apply shadow-md;
+    box-shadow: 0 4px 24px rgba(0, 87, 184, 0.08);
+  }
+
+  .social-feed-shell {
+    @apply grid grid-cols-1 gap-4 xl:grid-cols-[220px_minmax(0,1fr)_240px];
+  }
+
+  .social-left-panel,
+  .social-right-panel {
+    @apply hidden flex-col gap-5 xl:flex;
+  }
+
+  .social-profile-card,
+  .social-panel,
+  .social-toolbar,
+  .social-composer,
+  .social-post {
+    @apply overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm;
+  }
+
+  .social-profile-cover {
+    @apply h-14;
+    background:
+      linear-gradient(135deg, rgba(0, 87, 184, 0.96), rgba(255, 122, 0, 0.9)),
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4), transparent 30%);
+  }
+
+  .social-panel {
+    @apply p-4;
+  }
+
+  .social-hero {
+    @apply relative overflow-hidden rounded-lg border border-white/80 px-4 py-3 text-white shadow-sm;
+    background:
+      linear-gradient(135deg, rgba(0, 87, 184, 0.96), rgba(0, 61, 128, 0.94) 48%, rgba(255, 122, 0, 0.9)),
+      linear-gradient(90deg, #0057b8, #ff7a00);
+  }
+
+  .social-hero h1 {
+    @apply text-lg font-black leading-tight;
+  }
+
+  .social-hero p {
+    @apply mt-1 max-w-2xl text-sm leading-6 text-white/80;
+  }
+
+  .social-hero-metrics {
+    @apply mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3;
+  }
+
+  .social-hero-metrics span {
+    @apply rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white/80 backdrop-blur;
+  }
+
+  .social-hero-metrics strong {
+    @apply mr-1 text-base font-black text-white;
+  }
+
+  .social-stories {
+    @apply flex gap-3 overflow-x-auto rounded-2xl border border-white/80 bg-white p-3 shadow-sm scrollbar-thin;
+  }
+
+  .social-story {
+    @apply flex min-w-28 flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm;
+  }
+
+  .social-story span {
+    @apply flex h-10 w-10 items-center justify-center rounded-full;
+  }
+
+  .social-story-create span {
+    @apply bg-[#0057b8] text-white;
+  }
+
+  .social-toolbar {
+    @apply space-y-3 p-4;
+  }
+
+  .social-search {
+    @apply flex h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-slate-400 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/20;
+  }
+
+  .social-search input {
+    @apply w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none;
+  }
+
+  .social-filter-strip {
+    @apply flex gap-2 overflow-x-auto pb-0.5 scrollbar-thin;
+  }
+
+  .social-filter-pill {
+    @apply inline-flex flex-shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition-all hover:border-orange-400 hover:text-orange-600;
+  }
+
+  .social-filter-pill-active {
+    @apply border-orange-500 bg-orange-500 text-white shadow-sm hover:text-white;
+  }
+
+  .social-compose-trigger {
+    @apply h-12 flex-1 rounded-full border border-slate-200 bg-slate-50 px-5 text-left text-sm font-medium text-slate-400 transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600;
+  }
+
+  .social-composer {
+    @apply p-4;
+  }
+
+  .social-composer-icon,
+  .social-composer-tool,
+  .social-small-action,
+  .social-menu-button {
+    @apply inline-flex items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 active:scale-95;
+  }
+
+  .social-composer-icon {
+    @apply h-11 w-11;
+  }
+
+  .social-composer-tool {
+    @apply h-10 w-10 hover:bg-orange-50 hover:text-orange-600;
+  }
+
+  .social-small-action {
+    @apply h-8 w-8 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700;
+  }
+
+  .social-menu-button {
+    @apply h-9 w-9 flex-shrink-0;
+  }
+
+  .social-compose-type {
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800;
+  }
+
+  .social-compose-type-active {
+    @apply bg-orange-500 text-white shadow-sm hover:bg-orange-500 hover:text-white;
+  }
+
+  .social-cancel-button {
+    @apply rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100;
+  }
+
+  .social-submit-button {
+    @apply inline-flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-2 text-sm font-bold text-white transition-all hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400;
+  }
+
+  .social-post {
+    @apply relative;
+  }
+
+  .social-post-bar {
+    @apply h-1.5 w-full;
+  }
+
+  .social-pinned {
+    @apply flex items-center gap-2 border-b border-orange-100 bg-orange-50 px-5 py-3 text-sm font-bold text-orange-700;
+  }
+
+  .social-author-type {
+    @apply absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-white shadow-sm;
+  }
+
+  .social-post-stats {
+    @apply mt-5 flex items-center justify-between border-b border-slate-100 pb-3 text-sm font-medium text-slate-400;
+  }
+
+  .social-post-stats button {
+    @apply hover:text-slate-700 hover:underline;
+  }
+
+  .social-reaction-dot {
+    @apply flex h-5 w-5 items-center justify-center rounded-full border border-white text-white;
+  }
+
+  .social-actions {
+    @apply mt-3 flex items-center gap-2;
+  }
+
+  .social-action-button {
+    @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-800 active:scale-95;
+  }
+
+  .social-action-button-active {
+    @apply bg-blue-50 text-blue-700;
+  }
+
+  .social-reaction-picker {
+    @apply absolute bottom-full left-0 z-20 mb-2 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white px-2 py-2 shadow-2xl animate-slide-up;
+  }
+
+  .social-reaction-choice {
+    @apply rounded-xl p-2.5 transition-transform hover:scale-125 active:scale-110;
+  }
+
+  .social-comment-box {
+    @apply flex h-11 flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/20;
+  }
+
+  .social-comment-box input {
+    @apply h-full flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none;
+  }
+
+  .social-comment-box button {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white transition-all hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .social-community-row,
+  .social-trending-row {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-orange-50;
+  }
+
+  .social-community-icon {
+    @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600;
+  }
+
+  .social-type-row {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900;
+  }
+
+  .social-type-row-active {
+    @apply bg-orange-50 text-orange-700;
+  }
+
+  .social-empty-state {
+    @apply flex flex-col items-center justify-center rounded-2xl border border-white/80 bg-white p-12 text-center text-slate-400 shadow-sm;
+  }
+
+  .social-empty-state h3 {
+    @apply mt-4 text-lg font-black text-slate-800;
+  }
+
+  .social-empty-state p {
+    @apply mt-2 max-w-sm text-sm text-slate-500;
+  }
+
+  /* Wiki tree item */
+  .wiki-tree-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer;
+    @apply transition-all duration-150;
+  }
+  .wiki-tree-item:hover {
+    @apply bg-orange-50 text-orange-700;
+    transform: translateX(4px);
+  }
+  .wiki-tree-item.active {
+    @apply bg-orange-100 text-orange-700 font-semibold;
+  }
+
+  .wiki-shell {
+    @apply bg-slate-100 border border-slate-200 shadow-xl overflow-hidden;
+    min-height: calc(100vh - 7.5rem);
+    border-radius: 8px;
+  }
+
+  .wiki-topbar {
+    @apply flex items-center gap-4 border-b border-slate-200 bg-white px-4 py-3;
+  }
+
+  .wiki-global-search {
+    @apply mx-auto flex min-w-0 h-10 max-w-2xl flex-1 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 shadow-inner;
+  }
+
+  .wiki-layout {
+    @apply grid min-h-[calc(100vh-11rem)] grid-cols-1 bg-white md:grid-cols-[280px_minmax(0,1fr)];
+    transition: grid-template-columns 0.28s ease;
+  }
+
+  .wiki-sidebar {
+    @apply hidden min-h-full md:block;
+  }
+
+  /* Mobile sidebar overlay — shown when toggle is active on small screens */
+  @media (max-width: 767px) {
+    .wiki-sidebar:not(.wiki-sidebar-collapsed) {
+      display: block !important;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 60;
+      width: 280px;
+      overflow-y: auto;
+      box-shadow: 4px 0 32px rgba(0, 0, 0, 0.18);
+    }
+    .wiki-sidebar-backdrop {
+      display: block !important;
+    }
+  }
+
+  .wiki-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: rgba(15, 23, 42, 0.35);
+  }
+
+  .wiki-sidebar-collapsed {
+    @apply md:hidden;
+  }
+
+  .wiki-sidebar-collapsed + .wiki-main,
+  .wiki-layout:has(.wiki-sidebar-collapsed) {
+    @apply md:grid-cols-1;
+  }
+
+  .wiki-main {
+    @apply min-w-0 bg-slate-50 p-4 md:p-6;
+  }
+
+  .wiki-icon-button {
+    @apply h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900;
+  }
+
+  .wiki-primary-button {
+    @apply inline-flex items-center gap-2 rounded-md bg-[#0057b8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#00499b] active:scale-95;
+  }
+
+  .wiki-version-badge {
+    @apply rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black leading-none text-orange-700;
+  }
+
+  .wiki-muted-button {
+    @apply inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900;
+  }
+
+  .wiki-secondary-action {
+    @apply flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900;
+  }
+
+  .wiki-sidebar-root {
+    @apply flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-base font-semibold text-slate-600 transition-colors hover:bg-white hover:text-[#0057b8];
+  }
+
+  .wiki-sidebar-root-active {
+    @apply bg-white text-[#0057b8] shadow-sm;
+  }
+
+  .wiki-sidebar-add {
+    @apply inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-[#0057b8] shadow-sm transition-colors hover:border-[#0057b8] hover:bg-blue-50;
+  }
+
+  .wiki-sidebar-section {
+    @apply flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2.5 text-left text-base font-semibold text-slate-700 transition-colors hover:bg-white hover:text-slate-950;
+  }
+
+  .wiki-sidebar-section-active {
+    @apply bg-white text-slate-950 shadow-sm;
+  }
+
+  .wiki-sidebar-subitem,
+  .wiki-sidebar-article {
+    @apply flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors;
+  }
+
+  .wiki-sidebar-article {
+    @apply text-slate-600 hover:bg-white hover:text-[#0057b8];
+  }
+
+  .wiki-sidebar-article-active {
+    @apply border-l-2 border-[#0057b8] bg-white font-semibold text-[#0057b8] shadow-sm;
+  }
+
+  .wiki-sidebar-row-action {
+    @apply ml-1 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-slate-300 opacity-0 transition-all hover:bg-white hover:text-[#0057b8] group-hover:opacity-100;
+  }
+
+  .wiki-category-form {
+    @apply mt-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm;
+  }
+
+  .wiki-category-form input,
+  .wiki-category-form textarea {
+    @apply w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:border-[#0057b8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100;
+  }
+
+  .wiki-category-form textarea {
+    @apply resize-none leading-5;
+  }
+
+  .wiki-category-form .wiki-category-color {
+    @apply h-9 w-11 flex-shrink-0 cursor-pointer p-1;
+  }
+
+  .wiki-category-save {
+    @apply inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-[#0057b8] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#00499b] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .wiki-category-cancel {
+    @apply rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900;
+  }
+
+  .wiki-category-delete {
+    @apply inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-600 transition-colors hover:bg-red-100;
+  }
+
+  .wiki-home {
+    @apply mx-auto max-w-7xl space-y-6;
+  }
+
+  .wiki-hero {
+    @apply relative flex flex-col gap-6 overflow-hidden rounded-lg border border-slate-200 bg-white p-6 shadow-sm xl:flex-row xl:items-end xl:justify-between;
+  }
+
+  .wiki-hero::before {
+    content: "";
+    @apply absolute inset-x-0 top-0 h-1;
+    background: linear-gradient(90deg, #0057b8, #ff7a00, #16a34a);
+  }
+
+  .wiki-hero::after {
+    content: "";
+    @apply pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-70;
+    background:
+      linear-gradient(135deg, rgba(0, 87, 184, 0.08), transparent 55%),
+      linear-gradient(225deg, rgba(255, 122, 0, 0.10), transparent 60%);
+  }
+
+  .wiki-hero h2,
+  .wiki-page-title h2 {
+    @apply relative mt-1 text-2xl font-bold leading-tight text-slate-950 md:text-3xl;
+  }
+
+  .wiki-page-title {
+    @apply pt-2;
+  }
+
+  .wiki-hero p {
+    @apply relative mt-2 text-sm leading-6 text-slate-600;
+  }
+
+  .wiki-eyebrow {
+    @apply text-xs font-bold uppercase tracking-wider text-[#0057b8];
+  }
+
+  .wiki-hero-stats {
+    @apply relative grid grid-cols-3 gap-3 xl:min-w-80;
+  }
+
+  .wiki-metric {
+    @apply rounded-md border border-slate-200 bg-white/85 px-4 py-3 text-center shadow-sm backdrop-blur;
+  }
+
+  .wiki-metric strong {
+    @apply block text-2xl font-bold text-slate-950;
+  }
+
+  .wiki-metric span {
+    @apply text-xs font-medium text-slate-500;
+  }
+
+  .wiki-category-strip {
+    @apply flex flex-nowrap gap-2 overflow-x-auto pb-1 scrollbar-thin;
+  }
+
+  .wiki-category-pill {
+    @apply inline-flex flex-shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-base font-semibold text-slate-600 transition-colors hover:border-[#0057b8] hover:text-[#0057b8];
+  }
+
+  .wiki-category-pill span {
+    @apply rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-500;
+  }
+
+  .wiki-category-pill-active {
+    @apply border-[#0057b8] bg-[#0057b8] text-white hover:text-white;
+  }
+
+  .wiki-category-pill-active span {
+    @apply bg-white/20 text-white;
+  }
+
+  .wiki-panel {
+    @apply rounded-lg border border-slate-200 bg-white shadow-sm;
+  }
+
+  .wiki-section-head {
+    @apply flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4;
+  }
+
+  .wiki-section-head h3 {
+    @apply text-base font-bold text-slate-950;
+  }
+
+  .wiki-section-head p {
+    @apply truncate text-xs text-slate-500;
+  }
+
+  .wiki-section-icon {
+    @apply flex h-10 w-10 items-center justify-center rounded-md;
+  }
+
+  .wiki-article-row {
+    @apply flex cursor-pointer items-start gap-4 rounded-xl border-2 border-slate-200 bg-white px-5 py-4 shadow-sm transition-all;
+    margin: 6px 0;
+    border-left: 4px solid #0057b8;
+  }
+
+  .wiki-article-icon {
+    @apply flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md;
+  }
+
+  .wiki-article-row h4 {
+    @apply text-lg font-bold text-slate-900 transition-colors group-hover:text-[#0057b8];
+  }
+
+  .wiki-article-row p {
+    @apply line-clamp-2 text-base leading-6 text-slate-500;
+  }
+
+  .wiki-row-category {
+    @apply hidden rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:inline-flex;
+  }
+
+  .wiki-row-meta {
+    @apply mt-2 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-400;
+  }
+
+  .wiki-row-edit {
+    @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-300 opacity-0 transition-all hover:bg-white hover:text-[#0057b8] group-hover:opacity-100;
+  }
+
+  .wiki-aside-title {
+    @apply mb-3 flex items-center gap-2 text-base font-bold text-slate-900;
+  }
+
+  .wiki-recent-item {
+    @apply flex w-full flex-col rounded-md px-2 py-2.5 text-left transition-colors hover:bg-slate-50;
+  }
+
+  .wiki-recent-item span {
+    @apply text-base font-semibold text-slate-700;
+  }
+
+  .wiki-recent-item small {
+    @apply text-xs text-slate-400;
+  }
+
+  .wiki-governance-item {
+    @apply flex items-start gap-2 rounded-md bg-slate-50 p-3;
+  }
+
+  .wiki-governance-item svg {
+    @apply mt-0.5 flex-shrink-0 text-[#0057b8];
+  }
+
+  .wiki-empty-state {
+    @apply flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400;
+  }
+
+  .wiki-empty-state h3 {
+    @apply mt-4 text-lg font-bold text-slate-800;
+  }
+
+  .wiki-empty-state p {
+    @apply mb-5 mt-2 text-sm text-slate-500;
+  }
+
+  .wiki-document-layout {
+    @apply grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_260px];
+  }
+
+  .wiki-document-layout--full {
+    @apply xl:grid-cols-1;
+  }
+
+  .wiki-document {
+    @apply min-w-0 rounded-xl border-2 border-slate-200 bg-white shadow-md;
+  }
+
+  .wiki-breadcrumb {
+    @apply flex items-center gap-2 border-b border-slate-100 px-6 py-3 text-sm text-slate-500;
+  }
+
+  .wiki-breadcrumb button {
+    @apply inline-flex items-center gap-1 font-semibold text-[#0057b8] hover:text-[#00499b];
+  }
+
+  .wiki-document-header {
+    @apply border-b border-slate-100 px-8 py-8 md:px-14;
+  }
+
+  .wiki-document-header h2 {
+    @apply text-3xl font-bold leading-tight text-slate-950 md:text-4xl;
+  }
+
+  .wiki-document-category,
+  .wiki-status-badge {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold;
+  }
+
+  .wiki-status-badge {
+    @apply bg-emerald-50 text-emerald-700;
+  }
+
+  .wiki-document-meta {
+    @apply mt-4 flex flex-wrap items-center gap-3 text-xs font-medium text-slate-500;
+  }
+
+  .wiki-document-meta img {
+    @apply h-6 w-6 rounded-full object-cover;
+  }
+
+  .wiki-right-rail {
+    @apply hidden space-y-4 xl:block;
+    position: sticky;
+    top: 1rem;
+    align-self: start;
+    max-height: calc(100vh - 5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #e2e8f0 transparent;
+  }
+
+  .wiki-toc-link {
+    @apply block rounded px-2 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#0057b8];
+  }
+
+  .wiki-tag {
+    @apply rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600;
+  }
+
+  .wiki-comment-item {
+    @apply flex gap-2 py-2 border-b border-slate-100 last:border-0;
+  }
+
+  .wiki-comment-avatar {
+    @apply h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5;
+  }
+
+  .wiki-comment-input {
+    @apply w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-[#0057b8] focus:bg-white focus:outline-none transition-colors;
+  }
+
+  .wiki-stat-row {
+    @apply flex items-center justify-between text-xs text-slate-500 py-1;
+  }
+
+  /* ── Wiki Category Cards (home redesign) ───────────────────────────────── */
+  .wiki-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 1rem;
+  }
+  .wiki-category-card {
+    @apply relative flex flex-col rounded-xl border-2 border-slate-100 bg-white overflow-hidden cursor-pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+
+  .wiki-category-card:hover {
+    transform: translateY(-4px);
+    @apply shadow-lg;
+  }
+
+  .wiki-category-card-header {
+    @apply h-36 flex items-center justify-center relative overflow-hidden;
+  }
+
+  .wiki-category-card-header::before {
+    content: '';
+    @apply absolute inset-0 opacity-10;
+    background: radial-gradient(circle at 80% 20%, white 0%, transparent 70%);
+  }
+
+  .wiki-category-card-icon {
+    @apply relative z-10 h-20 w-20 rounded-3xl flex items-center justify-center bg-white/25 shadow-sm;
+  }
+
+  .wiki-category-card-body {
+    @apply p-4 flex flex-col flex-1 border-t border-slate-100;
+  }
+
+  .wiki-category-card h4 {
+    @apply text-base font-bold text-slate-900; overflow-wrap: break-word; word-break: break-word;
+  }
+
+  .wiki-category-card p {
+    @apply text-sm text-slate-500 mt-1.5 leading-5 flex-1;
+  }
+
+  .wiki-category-card-count {
+    @apply mt-4 flex items-center justify-between text-sm font-semibold text-slate-400;
+  }
+
+  .wiki-category-card-count span {
+    @apply rounded-full bg-slate-100 px-3 py-1;
+  }
+
+  /* Enhanced hover for article rows */
+  .wiki-article-row:hover {
+    @apply shadow-md bg-blue-50/20;
+    border-left-color: #ff7a00;
+    transform: translateX(2px);
+  }
+
+  /* Sidebar section hover enhancement */
+  .wiki-sidebar-section {
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  /* Category pill hover enhancement */
+  .wiki-category-pill {
+    transition: all 0.15s ease;
+  }
+
+  .wiki-category-pill:hover:not(.wiki-category-pill-active) {
+    transform: translateY(-1px);
+    @apply shadow-sm;
+  }
+
+  /* Compact hero */
+  .wiki-hero-compact {
+    @apply relative flex flex-wrap items-center gap-6 overflow-hidden rounded-xl border border-slate-200 bg-white px-8 py-7 shadow-sm;
+  }
+
+  .wiki-hero-compact::before {
+    content: '';
+    @apply absolute inset-x-0 top-0 h-1;
+    background: linear-gradient(90deg, #0057b8, #ff7a00, #16a34a);
+  }
+
+  .wiki-hero-compact::after {
+    content: '';
+    @apply pointer-events-none absolute right-0 top-0 h-full w-64 opacity-60;
+    background: radial-gradient(circle at 80% 50%, rgba(0,87,184,0.08) 0%, transparent 70%);
+  }
+
+  /* Step badge */
+  .wiki-step-badge {
+    @apply flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white;
+    background: linear-gradient(135deg, #0057b8, #ff7a00);
+  }
+
+  .wiki-content {
+    @apply px-8 py-6 text-slate-900 md:px-14;
+  }
+
+  .wiki-content--html {
+    @apply p-0 overflow-hidden;
+  }
+
+  .wiki-content h1 {
+    @apply mb-5 text-4xl font-black text-slate-950 md:text-5xl;
+  }
+
+  .wiki-content h2 {
+    @apply mb-2 mt-5 border-b border-slate-200 pb-1.5 text-2xl font-black text-slate-950 md:text-3xl;
+  }
+
+  .wiki-content h3 {
+    @apply mb-1.5 mt-4 text-xl font-bold text-slate-900 md:text-2xl;
+  }
+
+  .wiki-content h4 {
+    @apply mb-1 mt-3 text-lg font-bold text-slate-800 md:text-xl;
+  }
+
+  .wiki-content p {
+    @apply mb-2 w-full leading-relaxed text-slate-900;
+    font-size: 1.12rem;
+  }
+
+  /* Consecutive single-sentence paragraphs (Wiki.js export artifact) */
+  .wiki-content p + p {
+    margin-top: 0;
+  }
+
+  .wiki-content strong {
+    @apply font-bold text-slate-950;
+  }
+
+  .wiki-content em {
+    @apply italic text-slate-700;
+  }
+
+  .wiki-content hr {
+    @apply my-6 border-slate-200;
+  }
+
+  .wiki-content tr {
+    @apply border-b border-slate-100;
+  }
+
+  .wiki-content td {
+    @apply px-4 py-2 text-base text-slate-900;
+  }
+
+  /* Markdown-rendered tables */
+  .wiki-table-wrap {
+    @apply my-5 overflow-x-auto rounded-xl border border-slate-200 shadow-sm;
+  }
+
+  .wiki-table {
+    @apply w-full border-collapse text-sm;
+    min-width: 400px;
+  }
+
+  .wiki-table th {
+    @apply bg-slate-50 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600;
+    border-bottom: 2px solid theme('colors.slate.200');
+  }
+
+  .wiki-table td {
+    @apply px-4 py-2.5 text-slate-800;
+    border-bottom: 1px solid theme('colors.slate.100');
+  }
+
+  .wiki-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .wiki-table tbody tr:hover td {
+    @apply bg-blue-50/30;
+  }
+
+  /* HTML-format tables (raw HTML articles) */
+  .wiki-content table {
+    @apply w-full border-collapse my-5;
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .wiki-content a {
+    @apply text-blue-600 underline hover:text-blue-800 transition-colors;
+  }
+
+  /* Force HTML-export sections/divs to fill the full column width */
+  .wiki-content section,
+  .wiki-content article,
+  .wiki-content > div,
+  .wiki-content > details {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .wiki-ul,
+  .wiki-ol {
+    @apply w-full pl-6 mb-3;
+  }
+
+  .wiki-ul { list-style-type: disc; }
+  .wiki-ol { list-style-type: decimal; }
+
+  .wiki-bullet,
+  .wiki-ordered {
+    @apply w-full leading-7 text-slate-900;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .wiki-code {
+    @apply my-5 w-full overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-4 text-sm leading-6 text-emerald-300;
+  }
+
+  .wiki-code-label {
+    @apply mb-3 border-b border-slate-800 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400;
+  }
+
+  .wiki-inline-code {
+    @apply rounded border border-blue-100 bg-blue-50 px-1.5 py-0.5 font-mono text-[0.85em] text-[#0057b8];
+  }
+
+  .wiki-media-image,
+  .wiki-content img {
+    @apply mx-auto my-6 block w-full rounded-lg border border-slate-200 bg-white shadow-sm;
+    max-height: none;
+    object-fit: contain;
+  }
+
+  /* GIFs — full size, natural animation */
+  .wiki-content img[src$=".gif"] {
+    object-fit: unset;
+    height: auto;
+    max-height: none;
+    width: 100%;
+  }
+
+  .wiki-file-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    margin: 0.25rem 0;
+    cursor: default;
+    user-select: none;
+    max-width: 100%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .wiki-file-card-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wiki-file-view {
+    padding: 0.2rem 0.55rem;
+    background: #0057b8;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .wiki-file-view:hover { background: #0047a0; }
+
+  .wiki-content figure.image {
+    @apply mx-auto my-6;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .wiki-content figure.image img {
+    @apply mx-auto block w-full rounded-lg border border-slate-200 bg-white shadow-sm;
+    max-height: none;
+    object-fit: contain;
+  }
+
+  .wiki-content figcaption {
+    @apply mt-2 text-center text-xs italic text-slate-500;
+  }
+
+  .wiki-media-video,
+  .wiki-content video {
+    @apply mx-auto my-6 aspect-video w-full max-w-4xl rounded-lg border border-slate-200 bg-slate-950 shadow-sm;
+  }
+
+  .wiki-content iframe {
+    @apply mx-auto my-6 block w-full max-w-5xl rounded-lg border border-slate-200 shadow-sm;
+    min-height: 500px;
+  }
+
+  .wiki-content blockquote {
+    @apply my-5 max-w-3xl rounded-r-lg border-l-4 border-blue-300 bg-blue-50/50 py-3 pl-5 pr-4 italic text-slate-600;
+  }
+
+  .wiki-content ul,
+  .wiki-content ol {
+    @apply my-3 ml-6 max-w-3xl space-y-1;
+  }
+
+  .wiki-content ul li {
+    @apply list-disc text-base leading-7 text-slate-900;
+  }
+
+  .wiki-content ol li {
+    @apply list-decimal text-base leading-7 text-slate-900;
+  }
+
+  .wiki-content th {
+    @apply bg-slate-50 px-4 py-2 text-left text-sm font-bold text-slate-800;
+  }
+
+  .wiki-content caption {
+    @apply pb-2 text-xs font-semibold text-slate-500;
+  }
+
+  /* Wiki.js imported content classes */
+  .wiki-content .paragrafo {
+    @apply mb-3 text-base leading-7 text-slate-900;
+  }
+
+  .wiki-content .titulo {
+    @apply mb-2 mt-5 text-2xl font-black text-slate-950;
+  }
+
+  .wiki-content .subtitulo {
+    @apply mb-1 mt-4 text-xl font-bold text-slate-900;
+  }
+
+  .wiki-content .links a {
+    @apply text-[#0057b8] underline hover:text-[#003d82];
+  }
+
+  .wiki-content .spanner {
+    display: inline;
+  }
+
+  .wiki-content details {
+    @apply my-4 max-w-4xl rounded-lg border border-blue-200 bg-blue-50/60 p-4;
+  }
+
+  .wiki-content summary {
+    @apply cursor-pointer font-bold text-[#0057b8];
+  }
+
+  /* Gamification toast animations */
+  @keyframes xpSlideIn {
+    from { opacity: 0; transform: translateX(110%); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes xpSlideOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(110%); }
+  }
+
+  .xp-toast { will-change: transform, opacity; }
+  .xp-toast-enter { animation: xpSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+  .xp-toast-exit  { animation: xpSlideOut 0.4s ease-in forwards; }
+
+  /* ── Global Notifications (calls + messages) ───────────────────────────── */
+  @keyframes notifDropIn {
+    from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes notifSlideIn {
+    from { opacity: 0; transform: translateX(48px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .global-call-card {
+    @apply fixed top-4 right-4 z-[9998] w-72 rounded-2xl p-4 shadow-2xl;
+    background: linear-gradient(145deg, #1e1e3f 0%, #0f0f23 100%);
+    border: 1px solid rgba(255,255,255,0.10);
+    animation: notifDropIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .global-call-reject {
+    @apply flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white transition-colors;
+    background: rgba(239,68,68,0.85);
+  }
+  .global-call-reject:hover { background: rgba(220,38,38,0.95); }
+
+  .global-call-accept {
+    @apply flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white transition-colors;
+    background: rgba(34,197,94,0.85);
+  }
+  .global-call-accept:hover { background: rgba(22,163,74,0.95); }
+
+  .global-msg-stack {
+    @apply fixed bottom-24 right-4 z-[9997] flex flex-col-reverse gap-2;
+    pointer-events: none;
+  }
+
+  .global-msg-card {
+    @apply flex w-72 cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg transition-shadow hover:shadow-xl;
+    pointer-events: auto;
+    animation: notifSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .wiki-editor {
+    @apply mx-auto max-w-6xl space-y-4;
+  }
+
+  .wiki-editor-toolbar {
+    @apply flex items-center gap-4;
+  }
+
+  .wiki-editor-toolbar h2 {
+    @apply truncate text-lg font-bold text-slate-950;
+  }
+
+  .wiki-editor-card {
+    @apply overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm;
+  }
+
+  .wiki-editor-titlebar {
+    @apply border-b border-slate-100 p-5;
+  }
+
+  .wiki-editor-titlebar input {
+    @apply w-full bg-transparent text-2xl font-bold text-slate-950 placeholder:text-slate-300 focus:outline-none;
+  }
+
+  .wiki-editor-select {
+    @apply mb-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-200;
+  }
+
+  .wiki-editor-tabs {
+    @apply flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-5 py-2;
+  }
+
+  .wiki-editor-tabs button {
+    @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-900;
+  }
+
+  .wiki-editor-tabs button.active {
+    @apply bg-[#0057b8] text-white shadow-sm;
+  }
+
+  .wiki-editor textarea {
+    @apply min-h-[560px] w-full resize-none bg-white p-6 font-mono text-sm leading-7 text-slate-700 placeholder:text-slate-300 focus:outline-none;
+  }
+
+  .wiki-editor-preview {
+    @apply min-h-[560px];
+  }
+
+  .wiki-mode-editor {
+    @apply -m-4 flex min-h-[calc(100vh-9rem)] flex-col overflow-hidden bg-[#ececec] text-slate-900 md:-m-6;
+  }
+
+  .wiki-mode-topbar {
+    @apply grid h-16 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center bg-black px-6 text-white;
+  }
+
+  .wiki-mode-brand {
+    @apply text-lg font-semibold tracking-wide;
+  }
+
+  .wiki-mode-title {
+    @apply text-center text-sm font-bold;
+  }
+
+  .wiki-mode-actions {
+    @apply flex items-center justify-end gap-6 text-sm font-bold tracking-wide;
+  }
+
+  .wiki-mode-actions button,
+  .wiki-mode-actions span {
+    @apply inline-flex items-center gap-2 text-white transition-colors hover:text-blue-300 disabled:opacity-50;
+  }
+
+  .wiki-mode-actions button:first-child svg {
+    @apply text-green-500;
+  }
+
+  .wiki-mode-actions button:last-child svg {
+    @apply text-red-500;
+  }
+
+  .wiki-mode-pagebar {
+    @apply flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 py-2;
+  }
+
+  .wiki-mode-pagebar select,
+  .wiki-mode-pagebar input {
+    @apply rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#0057b8] focus:outline-none focus:ring-2 focus:ring-blue-100;
+  }
+
+  .wiki-mode-pagebar input {
+    @apply min-w-0 flex-1 font-semibold;
+  }
+
+  .wiki-visual-toolbar,
+  .wiki-source-toolbar {
+    @apply flex h-12 flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-300 bg-[#d9d9d9] px-5;
+  }
+
+  .wiki-source-toolbar {
+    @apply bg-[#1976c9] text-white;
+  }
+
+  .wiki-visual-toolbar select {
+    @apply mr-1 h-8 rounded border border-slate-300 bg-slate-100 px-2 text-xs text-slate-800 focus:outline-none;
+  }
+
+  .wiki-visual-toolbar button,
+  .wiki-source-toolbar button {
+    @apply inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-sm font-bold transition-colors hover:bg-white/40;
+  }
+
+  .wiki-source-toolbar button {
+    @apply hover:bg-white/15;
+  }
+
+  .wiki-tb-sep {
+    @apply mx-1 inline-block h-5 w-px flex-shrink-0 bg-slate-400/40;
+  }
+
+  /* Color picker labels in toolbar */
+  .wiki-tb-color {
+    @apply relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded hover:bg-white/40;
+  }
+  .wiki-tb-color input[type="color"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Image float controls bar */
+  .wiki-img-controls {
+    @apply flex flex-shrink-0 items-center gap-1 border-b border-blue-200 bg-blue-50 px-4 py-1 text-xs font-semibold text-blue-700;
+  }
+  .wiki-img-controls button {
+    @apply rounded px-2 py-0.5 hover:bg-blue-200 transition-colors;
+  }
+  .wiki-img-controls .wiki-tb-sep {
+    @apply bg-blue-300/50;
+  }
+
+  .wiki-word-stage {
+    @apply flex flex-1 justify-center overflow-auto bg-[#ededed] p-8;
+  }
+
+  .wiki-word-page {
+    @apply min-h-[900px] w-full max-w-[980px] bg-white px-10 py-9 text-base leading-7 text-slate-700 shadow-sm outline-none;
+  }
+
+  /* Column layouts inside visual editor */
+  .wiki-word-page .wiki-columns {
+    display: flex;
+    gap: 1rem;
+    margin: 0.75rem 0;
+    border: 1px dashed #cbd5e1;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+  }
+  .wiki-word-page .wiki-col {
+    flex: 1;
+    min-width: 0;
+    border: 1px dashed #e2e8f0;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+  }
+  /* Also render columns in article view */
+  .wiki-content .wiki-columns {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .wiki-content .wiki-col {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .wiki-word-page:empty::before {
+    content: "Type the page content here";
+    @apply text-slate-400;
+  }
+
+  .wiki-code-shell {
+    @apply grid flex-1 grid-cols-[72px_minmax(0,1fr)] overflow-hidden bg-[#191919];
+  }
+
+  .wiki-code-rail {
+    @apply flex flex-col items-center gap-8 bg-[#242424] py-10 text-slate-400;
+  }
+
+  .wiki-code-rail svg {
+    @apply cursor-pointer transition-colors hover:text-white;
+  }
+
+  .wiki-code-shell textarea {
+    @apply h-full w-full resize-none bg-[#191919] px-8 py-4 font-mono text-sm leading-8 text-slate-100 outline-none placeholder:text-slate-500;
+  }
+
+  .wiki-split-editor {
+    @apply grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)];
+  }
+
+  .wiki-source-pane {
+    @apply grid min-h-[620px] grid-cols-[56px_minmax(0,1fr)] overflow-hidden bg-[#1b1b1b];
+  }
+
+  .wiki-line-number {
+    @apply border-r border-black/30 bg-[#202020] px-3 py-4 text-right font-mono text-sm text-slate-500;
+  }
+
+  .wiki-source-pane textarea {
+    @apply h-full w-full resize-none bg-[#1b1b1b] px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none placeholder:text-slate-500;
+  }
+
+  .wiki-preview-pane {
+    @apply min-h-[620px] overflow-auto bg-white;
+  }
+
+  .wiki-preview-pane .wiki-content {
+    @apply px-8 py-8;
+  }
+
+  .wiki-split-asciidoc .wiki-content h2,
+  .wiki-split-asciidoc .wiki-content h3 {
+    @apply border-slate-400 text-slate-700;
+  }
+
+  .wiki-mode-statusbar {
+    @apply grid h-7 flex-shrink-0 grid-cols-[70px_1fr_auto_1fr] items-center bg-[#4a4a4a] text-xs text-white;
+  }
+
+  .wiki-mode-statusbar span,
+  .wiki-mode-statusbar strong {
+    @apply px-3;
+  }
+
+  .wiki-mode-statusbar strong {
+    @apply text-center font-semibold;
+  }
+
+  .wiki-mode-statusbar span:last-child {
+    @apply text-right;
+  }
+
+  /* Reaction button */
+  .reaction-btn {
+    @apply flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium;
+    @apply transition-all duration-150 ease-out active:scale-95;
+    @apply hover:scale-105;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4;
+  }
+}
+
+/* Animate in keyframes */
+@keyframes slideInFromTop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInFromBottom {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.animate-slide-in { animation: slideInFromTop 0.2s ease-out; }
+.animate-slide-up { animation: slideInFromBottom 0.2s ease-out; }
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.pulse-overdue  { animation: pulse-slow 7s ease-in-out infinite; }
+.pulse-near     { animation: pulse-slow 10s ease-in-out infinite; }
+
+@keyframes pageEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-enter { animation: pageEnter 0.22s ease-out forwards; }
+
+@media (min-width: 1024px) {
+  .page-enter { animation: pageEnter 0.3s ease-out forwards; }
+}
+
+@keyframes navUnderline {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+.nav-underline-enter {
+  animation: navUnderline 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform-origin: left center;
+}
+
+/* ── Chat Dark Mode ─────────────────────────────────────────────────────── */
+.chat-dark {
+  color-scheme: dark;
+}
+
+/* Sidebar */
+.chat-dark aside {
+  background-color: #111b21 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark aside .border-b,
+.chat-dark aside [class*="border-slate"] {
+  border-color: #2a3942 !important;
+}
+.chat-dark aside .bg-white,
+.chat-dark aside [class*="bg-orange-50"],
+.chat-dark aside [class*="bg-slate-50"],
+.chat-dark aside [class*="bg-slate-100"] {
+  background-color: #111b21 !important;
+}
+.chat-dark aside [class*="hover:bg-slate-50"]:hover,
+.chat-dark aside [class*="hover:bg-slate-100"]:hover {
+  background-color: #2a3942 !important;
+}
+/* selected conversation */
+.chat-dark aside .bg-orange-50 {
+  background-color: #2a3942 !important;
+}
+.chat-dark aside [class*="text-slate-900"],
+.chat-dark aside [class*="text-slate-800"] {
+  color: #e9edef !important;
+}
+.chat-dark aside [class*="text-slate-600"],
+.chat-dark aside [class*="text-slate-500"],
+.chat-dark aside [class*="text-slate-400"] {
+  color: #8696a0 !important;
+}
+.chat-dark aside input {
+  background-color: #2a3942 !important;
+  border-color: #3b4a54 !important;
+  color: #e9edef !important;
+}
+.chat-dark aside input::placeholder {
+  color: #8696a0 !important;
+}
+.chat-dark aside button[class*="text-slate-500"],
+.chat-dark aside button[class*="text-slate-600"] {
+  color: #8696a0 !important;
+}
+
+/* Main header */
+.chat-dark main > div:first-child {
+  background-color: #1f2c34 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark main > div:first-child [class*="text-slate-900"],
+.chat-dark main > div:first-child [class*="text-slate-800"] {
+  color: #e9edef !important;
+}
+.chat-dark main > div:first-child [class*="text-slate-600"],
+.chat-dark main > div:first-child [class*="text-slate-500"] {
+  color: #8696a0 !important;
+}
+.chat-dark main > div:first-child button[class*="text-slate-500"],
+.chat-dark main > div:first-child button[class*="hover:bg-slate-100"]:hover {
+  color: #8696a0 !important;
+  background-color: #2a3942 !important;
+}
+.chat-dark main > div:first-child [class*="border-slate-100"],
+.chat-dark main > div:first-child [class*="border-b"] {
+  border-color: #2a3942 !important;
+}
+
+/* Message search bar */
+.chat-dark main [class*="bg-slate-50"] {
+  background-color: #1f2c34 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark main [class*="bg-slate-50"] input {
+  background-color: #2a3942 !important;
+  border-color: #3b4a54 !important;
+  color: #e9edef !important;
+}
+.chat-dark main [class*="bg-slate-50"] input::placeholder {
+  color: #8696a0 !important;
+}
+
+/* Message input area (bottom bar) */
+.chat-dark .chat-input-bar {
+  background-color: #1f2c34 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark .chat-input-bar textarea {
+  background-color: #2a3942 !important;
+  color: #e9edef !important;
+}
+.chat-dark .chat-input-bar textarea::placeholder {
+  color: #8696a0 !important;
+}
+.chat-dark .chat-input-bar button[class*="text-slate-500"],
+.chat-dark .chat-input-bar button[class*="text-slate-400"] {
+  color: #8696a0 !important;
+}
+.chat-dark .chat-input-bar button[class*="hover:bg-slate-100"]:hover,
+.chat-dark .chat-input-bar button[class*="hover:bg-slate-50"]:hover {
+  background-color: #2a3942 !important;
+}
+
+/* Other person's message bubble */
+.chat-dark .chat-bubble-other {
+  background-color: #202c33 !important;
+  color: #e9edef !important;
+}
+.chat-dark .chat-bubble-other [class*="text-slate-"] {
+  color: #8696a0 !important;
+}
+
+/* Emoji/sticker panels */
+.chat-dark .chat-emoji-panel,
+.chat-dark .chat-sticker-panel {
+  background-color: #233138 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark .chat-emoji-panel button:hover,
+.chat-dark .chat-sticker-panel button:hover {
+  background-color: #2a3942 !important;
+}
+
+/* Right panel (users) */
+.chat-dark aside:last-of-type {
+  background-color: #111b21 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark aside:last-of-type [class*="text-slate-900"],
+.chat-dark aside:last-of-type [class*="text-slate-800"] {
+  color: #e9edef !important;
+}
+.chat-dark aside:last-of-type [class*="text-slate-600"],
+.chat-dark aside:last-of-type [class*="text-slate-500"] {
+  color: #8696a0 !important;
+}
+
+/* "No conversation selected" placeholder */
+.chat-dark .chat-empty-state {
+  background-color: #0d1418 !important;
+  color: #8696a0 !important;
+}
+
+/* Mobile users drawer */
+.chat-dark .chat-users-drawer {
+  background-color: #111b21 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark .chat-users-drawer [class*="text-slate-900"],
+.chat-dark .chat-users-drawer [class*="text-slate-800"] {
+  color: #e9edef !important;
+}
+.chat-dark .chat-users-drawer [class*="text-slate-600"],
+.chat-dark .chat-users-drawer [class*="text-slate-500"] {
+  color: #8696a0 !important;
+}
+.chat-dark .chat-users-drawer input {
+  background-color: #2a3942 !important;
+  border-color: #3b4a54 !important;
+  color: #e9edef !important;
+}
+.chat-dark .chat-users-drawer [class*="hover:bg-slate-50"]:hover,
+.chat-dark .chat-users-drawer [class*="hover:bg-slate-100"]:hover {
+  background-color: #2a3942 !important;
+}
+
+/* Group settings panel */
+.chat-dark .chat-group-settings {
+  background-color: #111b21 !important;
+  border-color: #2a3942 !important;
+}
+.chat-dark .chat-group-settings [class*="text-slate-900"],
+.chat-dark .chat-group-settings [class*="text-slate-800"] {
+  color: #e9edef !important;
+}
+.chat-dark .chat-group-settings [class*="text-slate-600"],
+.chat-dark .chat-group-settings [class*="text-slate-500"] {
+  color: #8696a0 !important;
+}
+.chat-dark .chat-group-settings [class*="bg-slate-50"],
+.chat-dark .chat-group-settings [class*="bg-white"] {
+  background-color: #111b21 !important;
+}
+.chat-dark .chat-group-settings [class*="border-slate"] {
+  border-color: #2a3942 !important;
+}
+.chat-dark .chat-group-settings [class*="hover:bg-slate-50"]:hover,
+.chat-dark .chat-group-settings [class*="hover:bg-slate-100"]:hover {
+  background-color: #2a3942 !important;
+}
+.chat-dark .chat-group-settings input {
+  background-color: #2a3942 !important;
+  border-color: #3b4a54 !important;
+  color: #e9edef !important;
+}
+
+/* Chat page — fill viewport, prevent scroll offset */
+html:has(.chat-shell) {
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  html:has(.chat-shell) {
+    font-size: 12px;
+  }
+  body:has(.chat-shell) {
+    overflow: hidden;
+  }
+  body:has(.chat-shell) main.pt-14 {
+    height: calc(100dvh / 1.3) !important;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+  .chat-shell {
+    height: calc(100dvh / 1.3 - 3.5rem) !important;
+  }
+}
+
