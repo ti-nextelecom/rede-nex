@@ -13,7 +13,40 @@ const SUGGESTIONS = [
   'Como criar uma tarefa nova?',
   'Como ganho pontos XP?',
   'Como crio um grupo no chat?',
+  'Minha internet está lenta, o que fazer?',
+  'O que é fibra óptica e como funciona?',
+  'Como melhorar o sinal do Wi-Fi em casa?',
+  'Qual a diferença entre 2.4 GHz e 5 GHz?',
+  'O que é CGNAT e por que não tenho IP fixo?',
+  'Como funciona a portabilidade de número?',
+  'O que é VoIP e como usar telefonia IP?',
+  'Como fazer um diagnóstico de lentidão?',
 ];
+
+
+function renderMd(text: string): string {
+  let s = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // code inline
+  s = s.replace(/`([^`]+)`/g, '<code style="background:rgba(249,115,22,0.15);color:#fb923c;padding:1px 5px;border-radius:3px;font-size:0.75rem;font-family:monospace;white-space:nowrap">$1</code>');
+  // bold / italic
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight:700">$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // headings
+  s = s.replace(/^### (.+)$/gm, '<div style="font-size:0.82rem;font-weight:700;margin:10px 0 3px">$1</div>');
+  s = s.replace(/^## (.+)$/gm, '<div style="font-size:0.92rem;font-weight:700;margin:12px 0 4px">$1</div>');
+  s = s.replace(/^# (.+)$/gm, '<div style="font-size:1.05rem;font-weight:700;margin:14px 0 5px">$1</div>');
+  // lists
+  s = s.replace(/^[-*] (.+)$/gm, '<div style="margin:2px 0 2px 10px">• $1</div>');
+  s = s.replace(/^(\d+)\. (.+)$/gm, '<div style="margin:2px 0 2px 10px"><span style="font-weight:600;color:#f97316;margin-right:5px">$1.</span>$2</div>');
+  // hr
+  s = s.replace(/^---+$/gm, '<hr style="border:0;border-top:1px solid rgba(150,150,150,0.35);margin:8px 0"/>');
+  // paragraphs
+  s = s.replace(/\n\n/g, '<br><br>');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
 
 export function CopilotoPage() {
   const [messages, setMessages] = useState<Message[]>([
@@ -92,8 +125,10 @@ export function CopilotoPage() {
                 ? <Bot size={15} className="text-white" />
                 : <User size={15} className="text-white" />}
             </div>
-            <div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${msg.role === 'assistant' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm' : 'bg-orange-500 text-white rounded-tr-sm'}`}>
-              {msg.content}
+            <div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${msg.role === 'assistant' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-tl-sm' : 'bg-orange-500 text-white rounded-tr-sm'}`}>
+              {msg.role === 'assistant'
+                ? <div className="max-w-none text-slate-900 dark:text-slate-50" dangerouslySetInnerHTML={{ __html: renderMd(msg.content) }} />
+                : msg.content}
             </div>
           </div>
         ))}

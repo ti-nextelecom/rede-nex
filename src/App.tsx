@@ -37,6 +37,7 @@ const PrestacaoContasPage = lazy(() => import('./pages/PrestacaoContasPage').the
 const JRHPage          = lazy(() => import('./pages/JRHPage').then(m => ({ default: m.JRHPage })));
 const ForgotPassword   = lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
 const ResetPassword    = lazy(() => import('./pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
+const PainelTIPage = lazy(() => import('./pages/PainelTIPage').then(m => ({ default: m.PainelTIPage })));
 
 
 class RouteErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -131,6 +132,7 @@ function App() {
               <Route path="/configuracoes" element={<Suspense fallback={<PageFallback />}><ConfiguracoesPage /></Suspense>} />
               <Route path="/projetos" element={<Suspense fallback={<PageFallback />}><ProjetosPage /></Suspense>} />
               <Route path="/prestacao-contas" element={<Suspense fallback={<PageFallback />}><PrestacaoContasPage /></Suspense>} />
+              <Route path="/gestao-ti" element={<Suspense fallback={<PageFallback />}><PainelTIPage /></Suspense>} />
             </Route>
           </Routes>
         </Suspense>

@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -82,7 +83,7 @@ const statusLabel: Record<Status, string> = {
   'Concluído': 'Concluído',
   'Concluído Antes do Prazo': 'Concluído antes do prazo',
   'Atrasado': 'Atrasado',
-  'Atenção': 'Atenção',
+  'Atenção': 'Andamento',
   'Não iniciado': 'Aguardando',
 };
 
@@ -673,7 +674,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               <Paperclip size={13} /> Anexos <span className="heading-count">{attachments.length}</span>
             </button>
           </div>
-          {activeTab === 'steps' && isAdmin && (
+          {activeTab === 'steps' && (
             <button className="primary-button" onClick={() => setShowStepForm(true)}><Plus size={16} /> Nova etapa</button>
           )}
         </div>
@@ -683,7 +684,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
             {doneCount > 0 && <span className="perf-item perf-done"><CheckCircle2 size={12} /> {doneCount} concluída{doneCount > 1 ? 's' : ''}</span>}
             {progressCount > 0 && <span className="perf-item perf-progress"><Clock3 size={12} /> {progressCount} em andamento</span>}
             {lateCount > 0 && <span className="perf-item perf-late"><AlertTriangle size={12} /> {lateCount} atrasada{lateCount > 1 ? 's' : ''}</span>}
-            {attentionCount > 0 && <span className="perf-item perf-attention">⚠ {attentionCount} em atenção</span>}
+            {attentionCount > 0 && <span className="perf-item perf-attention">⚠ {attentionCount} em andamento</span>}
             {doneCount === 0 && progressCount === 0 && lateCount === 0 && attentionCount === 0 && (
               <span className="perf-item perf-idle">{total} não iniciada{total > 1 ? 's' : ''}</span>
             )}
@@ -1080,7 +1081,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
         ))}
       </div>
 
-      {showStepForm && (
+      {showStepForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowStepForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1156,10 +1157,10 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
-      {editingStep && (
+      {editingStep && createPortal(
         <div className="modal-overlay" onClick={() => setEditingStep(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1197,10 +1198,10 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
-      {editingStepStatus && (
+      {editingStepStatus && createPortal(
         <div className="modal-overlay" onClick={() => setEditingStepStatus(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1245,10 +1246,10 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
-      {deliveryStep && (
+      {deliveryStep && createPortal(
         <div className="modal-overlay" onClick={() => { setDeliveryStep(null); setEditingDelivery(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1267,10 +1268,10 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
-      {historyStep && (
+      {historyStep && createPortal(
         <div className="modal-overlay" onClick={() => setHistoryStep(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:560}}>
             <div className="modal-header">
@@ -1300,10 +1301,10 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </div>
             )}
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
-      {assigningStep && (
+      {assigningStep && createPortal(
         <div className="modal-overlay" onClick={() => setAssigningStep(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1337,8 +1338,8 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </form>
             )}
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
       {lightboxSrc && (
         <div className="lightbox-overlay" onClick={() => setLightboxSrc(null)}>
           <button className="lightbox-close" onClick={() => setLightboxSrc(null)}>✕</button>

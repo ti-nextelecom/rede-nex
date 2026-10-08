@@ -319,6 +319,13 @@ export async function submitPeriodo(id, user_id) {
      WHERE id=$1 AND status IN ('aberto','atrasado') RETURNING *`,
     [id, user_id]
   );
+  if (r.rows[0]) {
+    await query(
+      `INSERT INTO pc_comentarios_periodo (periodo_id, autor_id, tipo, texto)
+       VALUES ($1,$2,'submit','Período enviado para validação.')`,
+      [id, user_id]
+    );
+  }
   return r.rows[0];
 }
 
@@ -332,6 +339,27 @@ export async function validarPeriodo(id, user_id) {
     await query(
       `UPDATE pc_lancamentos SET status='aprovado', validado_por=$2, validado_em=NOW()
        WHERE periodo_id=$1 AND status='pendente'`,
+      [id, user_id]
+    );
+    await query(
+      `INSERT INTO pc_comentarios_periodo (periodo_id, autor_id, tipo, texto)
+       VALUES ($1,$2,'validado','Período validado.')`,
+      [id, user_id]
+    );
+  }
+  return r.rows[0];
+}
+
+export async function cancelarSubmissaoPeriodo(id, user_id) {
+  const r = await query(
+    `UPDATE pc_periodos SET status='aberto', data_submissao=NULL, submetido_por=NULL
+     WHERE id=$1 AND status='aguardando_validacao' RETURNING *`,
+    [id]
+  );
+  if (r.rows[0]) {
+    await query(
+      `INSERT INTO pc_comentarios_periodo (periodo_id, autor_id, tipo, texto)
+       VALUES ($1,$2,'cancelamento','Envio cancelado. Período retornou para edição.')`,
       [id, user_id]
     );
   }

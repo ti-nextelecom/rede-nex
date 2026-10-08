@@ -15,6 +15,7 @@ import { useAuth } from '../lib/auth';
 import { dispatchXPEvent } from '../lib/xpEvents';
 import { cn } from '../lib/utils';
 import type { User as UserType } from '../types';
+import { AccessibleModal } from '../components/AccessibleModal';
 
 /* ── types ─────────────────────────────────────────────────────────────── */
 interface ChecklistItem { id: string; content: string; completed: boolean; assignee_id?: string; assignee?: TaskUser; sort_order: number; }
@@ -687,8 +688,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <AccessibleModal title={task.title} onClose={onClose} className="nex-task-detail fixed top-0 right-0 z-50 h-dvh w-full max-w-[960px] outline-none">
 
       <div className="relative ml-auto flex h-full w-full flex-col sm:flex-row bg-white dark:bg-slate-900 shadow-2xl overflow-hidden" style={{ maxWidth: 960 }}>
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-orange-400 z-10" />
@@ -1152,7 +1152,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
           </div>
         </div>
       )}
-    </div>
+    </AccessibleModal>
   );
 }
 
@@ -1179,8 +1179,7 @@ function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultLi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <AccessibleModal title="Nova tarefa" onClose={() => { if (!saving) onClose(); }} className="nex-task-create fixed left-1/2 top-1/2 z-50 w-[calc(100%-24px)] max-w-lg -translate-x-1/2 -translate-y-1/2 outline-none">
       <div className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
         <div className="h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-orange-400" />
         <div className="p-5 sm:p-6 space-y-4">
@@ -1189,7 +1188,7 @@ function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultLi
             <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200"><X size={16} /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Título da tarefa *"
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Título da tarefa *" aria-label="Título da tarefa" required
               className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-4 text-sm outline-none focus:border-orange-400 font-semibold transition-colors hover:border-slate-300" />
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Descrição (opcional)"
               className="w-full rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-4 py-3 text-sm outline-none focus:border-orange-400 resize-none transition-colors hover:border-slate-300" />
@@ -1235,7 +1234,7 @@ function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultLi
           </form>
         </div>
       </div>
-    </div>
+    </AccessibleModal>
   );
 }
 
@@ -1249,7 +1248,7 @@ function KanbanView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) =>
   }, [tasks]);
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 min-h-0 flex-1">
+    <div aria-label="Tarefas agrupadas por prazo" className="tasks-kanban flex gap-4 overflow-x-auto pb-4 min-h-0 flex-1">
       {KANBAN_COLS.map(col => (
         <div key={col.id} className="flex flex-col flex-shrink-0 w-72">
           <div className={cn('mb-3 rounded-t-xl border-t-4 bg-white dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700 shadow-sm', col.color)}>
@@ -1277,7 +1276,12 @@ function KanbanView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) =>
 /* ── ListView ────────────────────────────────────────────────────────────── */
 function ListView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => void }) {
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto shadow-sm">
+    <>
+    <div className="tasks-mobile-cards">
+      {tasks.map(task => <TaskCard key={task.id} task={task} onClick={() => onSelect(task)} />)}
+      {!tasks.length && <p className="nex-empty-state">Nenhuma tarefa encontrada. Ajuste os filtros ou crie uma tarefa.</p>}
+    </div>
+    <div className="tasks-desktop-table rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto shadow-sm">
       <table className="w-full text-sm min-w-[600px]">
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
@@ -1293,7 +1297,7 @@ function ListView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => v
             <tr key={t.id} onClick={() => onSelect(t)}
               className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-orange-50/40 dark:hover:bg-orange-900/10 cursor-pointer transition-all duration-150 active:bg-orange-100/50 dark:active:bg-orange-900/20">
               <td className="px-4 py-3">
-                <p className="font-semibold text-slate-800 dark:text-slate-100 truncate max-w-xs">{t.title}</p>
+                <button className="font-semibold text-slate-800 dark:text-slate-100 text-left max-w-xs hover:underline" onClick={event => { event.stopPropagation(); onSelect(t); }}>{t.title}</button>
                 {t.description && <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{t.description}</p>}
               </td>
               <td className="px-4 py-3 whitespace-nowrap">
@@ -1325,6 +1329,7 @@ function ListView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => v
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -1774,7 +1779,8 @@ function TemplatesView({ templates, users, onUseTemplate, onDelete, onRefresh }:
 export function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
-  const [view, setView] = useState<View>('prazo');
+  const [view, setView] = useState<View>(() => window.matchMedia('(max-width: 639px)').matches ? 'lista' : 'prazo');
+  const [loadError, setLoadError] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1793,8 +1799,13 @@ export function Tasks() {
   const initialUrlRef = useRef(false);
 
   const load = useCallback(async () => {
-    const [t, u, ls, tmpl] = await Promise.all([api.list(), getUsers(), listApi.list(), templateApi.list()]);
-    setTasks(t); setUsers(u); setCustomLists(ls); setTemplates(tmpl); setLoading(false);
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [t, u, ls, tmpl] = await Promise.all([api.list(), getUsers(), listApi.list(), templateApi.list()]);
+      setTasks(t); setUsers(u); setCustomLists(ls); setTemplates(tmpl);
+    } catch (error) { setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar as tarefas.'); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -1851,15 +1862,16 @@ export function Tasks() {
   }
 
   async function handleDeleteList(id: string) {
+    if (!window.confirm('Excluir esta lista de tarefas?')) return;
     await listApi.remove(id);
     setCustomLists(prev => prev.filter(l => l.id !== id));
     if (selectedListId === id) setSelectedListId(null);
   }
 
   return (
-    <div className="-mx-4 -my-6 flex flex-col" style={{ height: 'calc(100vh - 4.5rem)' }}>
+    <div className="tasks-workspace">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 flex-shrink-0">
+      <div className="tasks-header flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <ListTodo size={20} className="text-orange-500" />
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Tarefas</h1>
@@ -1869,13 +1881,13 @@ export function Tasks() {
           onClick={() => setCreating(true)}
           className="flex items-center gap-2 h-9 px-4 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md"
         >
-          <Plus size={15} /> Criar
+          <Plus size={15} /> Nova tarefa
         </button>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
+        <div className="tasks-search flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Título ou protocolo…" aria-label="Buscar tarefas por título ou protocolo"
             className="h-9 flex-1 sm:w-40 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors" />
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          <select aria-label="Filtrar tarefas por status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             className="h-9 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors cursor-pointer">
             <option value="">Todos</option>
             <option value="todo">A Fazer</option>
@@ -1885,10 +1897,19 @@ export function Tasks() {
         </div>
       </div>
 
+      <div className="tasks-mobile-lists">
+        {addingList ? <form onSubmit={handleCreateList} className="flex min-w-0 flex-1 gap-2">
+          <input autoFocus value={newListName} onChange={e => setNewListName(e.target.value)} aria-label="Nome da nova lista" placeholder="Nome da lista" required />
+          <button type="submit">Salvar</button><button type="button" aria-label="Cancelar nova lista" onClick={() => setAddingList(false)}><X size={16} /></button>
+        </form> : <>
+          <select aria-label="Selecionar lista de tarefas" value={selectedListId || ''} onChange={e => setSelectedListId(e.target.value || null)}><option value="">Todas as listas ({tasks.length})</option>{customLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}</select>
+          <button onClick={() => setAddingList(true)} aria-label="Criar nova lista"><FolderPlus size={18} /></button>
+        </>}
+      </div>
       {/* Body: sidebar + main */}
       <div className="flex flex-1 min-h-0">
         {/* Left sidebar — Custom Lists */}
-        <aside className="w-44 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-y-auto hidden sm:flex">
+        <aside aria-label="Listas de tarefas" className="tasks-sidebar w-44 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-y-auto hidden sm:flex">
           <div className="p-3 flex-shrink-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 px-1">Listas</p>
             <button
@@ -1944,9 +1965,9 @@ export function Tasks() {
         {/* Right: views */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
       {/* View tabs */}
-      <div className="flex items-center gap-0.5 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 flex-shrink-0 overflow-x-auto">
+      <div aria-label="Visualizações de tarefas" className="tasks-views flex items-center gap-0.5 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 flex-shrink-0 overflow-x-auto">
         {VIEWS.map(v => (
-          <button key={v.id} onClick={() => setView(v.id)}
+          <button key={v.id} aria-pressed={view === v.id} onClick={() => setView(v.id)}
             className={cn('flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-all duration-200 whitespace-nowrap flex-shrink-0',
               view === v.id ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-200')}>
             <v.icon size={14} /> {v.label}
@@ -1955,9 +1976,11 @@ export function Tasks() {
       </div>
 
       {/* Content */}
-      <div className={cn('flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 p-4 overflow-auto', view === 'prazo' && 'flex flex-col')}>
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
+      <div className={cn('tasks-content flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 p-4 overflow-auto', view === 'prazo' && 'flex flex-col')}>
+        {loadError ? (
+          <div className="nex-error-state" role="alert"><h2>Não foi possível carregar as tarefas</h2><p>{loadError}</p><button className="nex-retry" onClick={() => { void load(); }}>Tentar novamente</button></div>
+        ) : loading ? (
+          <div role="status" aria-label="Carregando tarefas" className="flex items-center justify-center h-full">
             <Loader2 size={28} className="animate-spin text-orange-400" />
           </div>
         ) : view === 'prazo' ? (
@@ -1973,7 +1996,7 @@ export function Tasks() {
             templates={templates}
             users={users}
             onUseTemplate={(tmpl) => { setTemplateForCreate(tmpl); setView('lista'); setCreating(true); }}
-            onDelete={async (id) => { await templateApi.remove(id); setTemplates(prev => prev.filter(t => t.id !== id)); }}
+            onDelete={async (id) => { if (!window.confirm('Excluir este modelo de tarefa?')) return; await templateApi.remove(id); setTemplates(prev => prev.filter(t => t.id !== id)); }}
             onRefresh={async () => setTemplates(await templateApi.list())}
           />
         ) : (

@@ -1371,10 +1371,7 @@ export function Chat() {
               <p className={cn("text-xs", darkMode ? "text-[#8696a0]" : "text-slate-600")}>Mensagens, diretas e grupos</p>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={toggleDark} className={cn('h-9 w-9 rounded-lg flex items-center justify-center transition-colors', darkMode ? 'bg-slate-700 text-yellow-300 hover:bg-slate-600' : 'text-slate-500 hover:bg-slate-100')} title={darkMode ? 'Modo claro' : 'Modo noturno'}>
-                {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-              <button onClick={() => setShowTheme(v => !v)} className={cn('h-9 w-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100', showTheme && 'bg-orange-50 text-orange-600')} title="Personalizar"><Palette size={16} /></button>
+<button onClick={() => setShowTheme(v => !v)} className={cn('h-9 w-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100', showTheme && 'bg-orange-50 text-orange-600')} title="Personalizar"><Palette size={16} /></button>
               <button onClick={() => setNewGroupOpen(v => !v)} className="h-9 w-9 rounded-lg bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600" title="Criar grupo"><Plus size={17} /></button>
             </div>
           </div>
@@ -1892,7 +1889,7 @@ export function Chat() {
                     </button>
                     <button onClick={() => setProfileUser(item)} className="min-w-0 flex-1 text-left">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-[15px] font-semibold text-slate-800">{item.name}</p>
+                        <p className="break-words text-[15px] font-semibold text-slate-800">{item.name}</p>
                         {unread > 0 && <span className="flex-shrink-0 min-w-[18px] text-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-tight">{unread}</span>}
                       </div>
                       <p className="truncate text-xs text-emerald-600">Online</p>
@@ -1924,7 +1921,7 @@ export function Chat() {
                     </button>
                     <button onClick={() => setProfileUser(item)} className="min-w-0 flex-1 text-left">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-[15px] font-semibold text-slate-800">{item.name}</p>
+                        <p className="break-words text-[15px] font-semibold text-slate-800">{item.name}</p>
                         {unread > 0 && <span className="flex-shrink-0 min-w-[18px] text-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-tight">{unread}</span>}
                       </div>
                       <p className="truncate text-xs text-slate-500">{presenceLabel(item)}</p>

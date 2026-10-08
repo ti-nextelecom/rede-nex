@@ -15,6 +15,31 @@ const WELCOME: Message = {
   content: 'Olá! Sou o Copiloto da Rede Nex 👋\n\nComo posso ajudar?',
 };
 
+
+function renderMd(text: string): string {
+  let s = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // code inline
+  s = s.replace(/`([^`]+)`/g, '<code style="background:rgba(249,115,22,0.15);color:#fb923c;padding:1px 5px;border-radius:3px;font-size:0.75rem;font-family:monospace;white-space:nowrap">$1</code>');
+  // bold / italic
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight:700">$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // headings
+  s = s.replace(/^### (.+)$/gm, '<div style="font-size:0.82rem;font-weight:700;margin:10px 0 3px">$1</div>');
+  s = s.replace(/^## (.+)$/gm, '<div style="font-size:0.92rem;font-weight:700;margin:12px 0 4px">$1</div>');
+  s = s.replace(/^# (.+)$/gm, '<div style="font-size:1.05rem;font-weight:700;margin:14px 0 5px">$1</div>');
+  // lists
+  s = s.replace(/^[-*] (.+)$/gm, '<div style="margin:2px 0 2px 10px">• $1</div>');
+  s = s.replace(/^(\d+)\. (.+)$/gm, '<div style="margin:2px 0 2px 10px"><span style="font-weight:600;color:#f97316;margin-right:5px">$1.</span>$2</div>');
+  // hr
+  s = s.replace(/^---+$/gm, '<hr style="border:0;border-top:1px solid rgba(150,150,150,0.35);margin:8px 0"/>');
+  // paragraphs
+  s = s.replace(/\n\n/g, '<br><br>');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+
 export function CopilotoWidget() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -129,16 +154,20 @@ export function CopilotoWidget() {
                     ? <Bot size={12} className="text-white" />
                     : <User size={12} className="text-white" />}
                 </div>
-                <div
-                  className={`max-w-[78%] rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap shadow-sm ${
-                    msg.role === 'assistant' ? 'rounded-tl-sm' : 'rounded-tr-sm'
-                  }`}
-                  style={msg.role === 'assistant'
-                    ? { background: 'rgba(255,255,255,0.08)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.1)' }
-                    : { background: 'linear-gradient(135deg, #ff7a00, #e06500)', color: '#fff' }}
-                >
-                  {msg.content}
-                </div>
+                {msg.role === 'assistant' ? (
+                  <div
+                    className="max-w-[78%] rounded-xl rounded-tl-sm px-3 py-2 text-xs leading-relaxed shadow-sm"
+                    style={{ background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.2)' }}
+                    dangerouslySetInnerHTML={{ __html: renderMd(msg.content) }}
+                  />
+                ) : (
+                  <div
+                    className="max-w-[78%] rounded-xl rounded-tr-sm px-3 py-2 text-xs leading-relaxed shadow-sm"
+                    style={{ background: 'linear-gradient(135deg, #ff7a00, #e06500)', color: '#fff' }}
+                  >
+                    {msg.content}
+                  </div>
+                )}
               </div>
             ))}
             {loading && (

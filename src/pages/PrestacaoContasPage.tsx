@@ -13,7 +13,7 @@ import {
   pcGetMinhasPermissoes,
   pcListPermissoes, pcCreatePermissao, pcDeletePermissao,
   pcDeleteSetor,
-  pcSubmitPeriodo, pcValidarPeriodo, pcInconsistenciaPeriodo, pcCorrigirPeriodo,
+  pcSubmitPeriodo, pcValidarPeriodo, pcInconsistenciaPeriodo, pcCorrigirPeriodo, pcCancelarSubmissaoPeriodo,
   pcListComentariosPeriodo, pcCreateComentarioPeriodo,
 } from '../lib/prestacaoContasApi';
 import type { Setor, Periodo, Lancamento, Comentario, Anexo, FaturaData, PcPermissao, ComentarioPeriodo } from '../lib/prestacaoContasApi';
@@ -123,6 +123,7 @@ export function PrestacaoContasPage() {
   const [drawerLanc, setDrawerLanc] = useState<Lancamento | null>(null);
   const [drawerComs, setDrawerComs] = useState<Comentario[]>([]);
   const [drawerAnexos, setDrawerAnexos] = useState<Anexo[]>([]);
+  const [editModalAnexos, setEditModalAnexos] = useState<Anexo[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [comentario, setComentario] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -419,7 +420,7 @@ export function PrestacaoContasPage() {
     doc: '', valor: '', parcelado: false, parcelas: '', setor_area: setor?.nome || '', obs: '',
   });
 
-  const openEditLancamento = () => {
+  const openEditLancamento = async () => {
     const l = drawerLanc; if (!l) return;
     openModal('edit-lancamento', {
       data: l.data?.slice(0, 10) || '', compra: l.data_compra?.slice(0, 10) || '',
@@ -427,6 +428,8 @@ export function PrestacaoContasPage() {
       valor: l.valor, parcelado: l.parcelado, parcelas: l.num_parcelas?.toString() || '',
       setor_area: l.setor_area || '', obs: l.observacoes || '',
     });
+    try { const { data: a } = await pcListAnexos(l.id); setEditModalAnexos(a); }
+    catch { setEditModalAnexos([]); }
   };
 
   const openEditDirect = async (lancId: string) => {
@@ -439,6 +442,8 @@ export function PrestacaoContasPage() {
         valor: l.valor, parcelado: l.parcelado, parcelas: l.num_parcelas?.toString() || '',
         setor_area: l.setor_area || '', obs: l.observacoes || '',
       });
+      try { const { data: a } = await pcListAnexos(lancId); setEditModalAnexos(a); }
+      catch { setEditModalAnexos([]); }
     } catch (e: unknown) { toast(e instanceof Error ? e.message : String(e)); }
   };
 
@@ -496,6 +501,18 @@ export function PrestacaoContasPage() {
       setPeriodoComentarios(coms);
       if (setor) await loadPeriodos(setor);
       setCorrigirModal(false); setCorrigirTexto('');
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const cancelarSubmissao = async () => {
+    if (!periodo) return;
+    if (!confirm('Cancelar envio para validação? O período voltará ao status aberto.')) return;
+    try {
+      const { data: r } = await pcCancelarSubmissaoPeriodo(periodo.id);
+      setPeriodo(r); toast('↩ Envio cancelado. Período voltou para edição.');
+      const { data: coms } = await pcListComentariosPeriodo(periodo.id);
+      setPeriodoComentarios(coms); setPeriodoTab('comentarios');
+      if (setor) await loadPeriodos(setor);
     } catch (e: unknown) { toast(e instanceof Error ? e.message : String(e)); }
   };
 
@@ -560,7 +577,12 @@ export function PrestacaoContasPage() {
         if (!confirm) {
           const periodoFim = new Date(String(periodo.data_fim).slice(0, 10) + 'T12:00:00');
           const nextMonthStart = new Date(periodoFim.getFullYear(), periodoFim.getMonth() + 1, 1);
-          if (new Date() >= nextMonthStart) {
+          const compraStr = String(form.compra || '');
+          const compraInPeriodMonth = compraStr ? (() => {
+            const d = new Date(compraStr + 'T12:00:00');
+            return d.getFullYear() === periodoFim.getFullYear() && d.getMonth() === periodoFim.getMonth();
+          })() : false;
+          if (new Date() >= nextMonthStart && !compraInPeriodMonth) {
             const ny = periodoFim.getMonth() === 11 ? periodoFim.getFullYear() + 1 : periodoFim.getFullYear();
             const nm = (periodoFim.getMonth() + 1) % 12;
             const lastDay = new Date(ny, nm + 1, 0).getDate();
@@ -648,6 +670,14 @@ export function PrestacaoContasPage() {
         if ((prev.data?.slice(0, 10) || '') !== data) changes.push(`Data: ${fmtDate(prev.data)} → ${fmtDate(data)}`);
         if ((prev.data_compra?.slice(0, 10) || '') !== (data_compra || '')) changes.push(`Data compra: ${fmtDate(prev.data_compra)} → ${fmtDate(data_compra)}`);
         if (!!prev.parcelado !== parcelado) changes.push(`Parcelado: ${prev.parcelado ? 'Sim' : 'Não'} → ${parcelado ? 'Sim' : 'Não'}`);
+        if (selectedFiles.current?.length) {
+          for (const file of Array.from(selectedFiles.current)) {
+            try {
+              const fileData = await readAsDataUrl(file);
+              await pcCreateAnexo(drawerLanc.id, { file_name: file.name, file_type: file.type, data: fileData });
+            } catch (fe) { toast(`Erro ${file.name}: ${fe instanceof Error ? fe.message : String(fe)}`); }
+          }
+        }
         const logText = `✏️ Editado em ${new Date().toLocaleString('pt-BR')}${changes.length ? ': ' + changes.join(' | ') : ''}`;
         await pcCreateComentario(drawerLanc.id, logText);
         toast('Lançamento atualizado!'); setModal(null);
@@ -917,6 +947,9 @@ export function PrestacaoContasPage() {
                   <button className="pc-btn" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }} onClick={() => setIncDialogOpen(true)}>⚠ Inconsistência</button>
                 </>
               )}
+              {periodo.status === 'aguardando_validacao' && (isAdmin || user?.id === periodo.responsavel_user_id) && (
+                <button className="pc-btn" style={{ background: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }} onClick={cancelarSubmissao}>↩ Cancelar Envio</button>
+              )}
               {periodo.status === 'inconsistencia' && (
                 <button className="pc-btn pc-btn-primary" onClick={handleCorrigirPeriodo}>🔧 Corrigir e Reenviar</button>
               )}
@@ -1016,10 +1049,17 @@ export function PrestacaoContasPage() {
                   <div className="pc-comentarios" style={{ marginBottom: 12 }}>
                     {periodoComentarios.map(c => {
                       const isInc = c.tipo === 'inconsistencia', isCor = c.tipo === 'correcao';
+                      const isSubmit = c.tipo === 'submit', isVal = c.tipo === 'validado', isCan = c.tipo === 'cancelamento';
+                      const cStyle = isInc ? { borderLeft: '3px solid #ef4444', background: '#fff1f2' }
+                        : isCor ? { borderLeft: '3px solid #22c55e', background: '#f0fdf4' }
+                        : isSubmit ? { borderLeft: '3px solid #3b82f6', background: '#eff6ff' }
+                        : isVal ? { borderLeft: '3px solid #16a34a', background: '#dcfce7' }
+                        : isCan ? { borderLeft: '3px solid #f97316', background: '#fff7ed' }
+                        : {};
                       return (
-                        <div key={c.id} className="pc-comentario" style={isInc ? { borderLeft: '3px solid #ef4444', background: '#fff1f2' } : isCor ? { borderLeft: '3px solid #22c55e', background: '#f0fdf4' } : {}}>
+                        <div key={c.id} className="pc-comentario" style={cStyle}>
                           <div className="pc-com-hd">
-                            <strong>{isInc ? '⚠ INCONSISTÊNCIA' : isCor ? '✔ CORREÇÃO' : ''} {c.autor_nome}</strong>
+                            <strong>{isInc ? '⚠ INCONSISTÊNCIA' : isCor ? '✔ CORREÇÃO' : isSubmit ? '📤 ENVIADO' : isVal ? '✓ VALIDADO' : isCan ? '↩ CANCELADO' : ''} {c.autor_nome}</strong>
                             <span>{new Date(c.created_at).toLocaleString('pt-BR')}</span>
                           </div>
                           <p>{c.texto}</p>
@@ -1090,7 +1130,7 @@ export function PrestacaoContasPage() {
                         )}
                         {(periodo.status === 'aberto' && canValidate || isAdmin) && (
                           <td onClick={e => e.stopPropagation()}>
-                            {periodo.status === 'aberto' && canValidate && (
+                            {(periodo.status === 'aberto' && canValidate || isAdmin || (periodo.status === 'aguardando_validacao' && user?.id === periodo.responsavel_user_id)) && (
                               <button
                                 className="pc-btn pc-btn-ghost pc-btn-sm"
                                 onClick={() => openEditDirect(l.id)}
@@ -1305,8 +1345,8 @@ export function PrestacaoContasPage() {
       {/* ── DRAWER ── */}
       {drawerOpen && (
         <>
-          <div className="pc-drawer-overlay" onClick={closeDrawer} />
-          <div className="pc-drawer">
+          <div className="pc-drawer-overlay open" onClick={closeDrawer} />
+          <div className="pc-drawer open">
             <div className="pc-drawer-hd">
               <strong>Detalhe do Lançamento</strong>
               <button className="pc-btn pc-btn-ghost pc-btn-sm" onClick={closeDrawer}>✕</button>
@@ -1582,9 +1622,19 @@ export function PrestacaoContasPage() {
                     <label>Observações</label>
                     <textarea value={String(form.obs || '')} onChange={e => setF('obs', e.target.value)} rows={2} placeholder="Observações adicionais..." />
                   </div>
-                  {modal === 'novo-lancamento' && (
+                  {(modal === 'novo-lancamento' || modal === 'edit-lancamento') && (
                     <div className="pc-form-group" style={{ gridColumn: 'span 2' }}>
                       <label>Anexos</label>
+                      {modal === 'edit-lancamento' && editModalAnexos.length > 0 && (
+                        <ul style={{ margin: '4px 0 8px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {editModalAnexos.map(a => (
+                            <li key={a.id} style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <a href={a.public_url || `/${a.caminho}`} target="_blank" rel="noreferrer" style={{ color: 'var(--pc-primary)' }}>📄 {a.nome_original}</a>
+                              <span style={{ color: 'var(--pc-muted)', fontSize: 11 }}>({(a.tamanho / 1024).toFixed(0)} KB)</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <label className="pc-file-label">
                         📎 {fileNames || 'Selecionar arquivos'}
                         <input type="file" multiple style={{ display: 'none' }}

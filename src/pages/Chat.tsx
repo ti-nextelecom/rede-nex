@@ -892,6 +892,8 @@ export function Chat() {
   const [groupPhotoPreview, setGroupPhotoPreview] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const groupPhotoRef = useRef<HTMLInputElement>(null);
+  const [groupBroadcast, setGroupBroadcast] = useState(false);
+  const [groupUserSearch, setGroupUserSearch] = useState('');
 
   // Notifications
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -1232,7 +1234,8 @@ export function Chat() {
     if (!groupName.trim()) return;
     const conversation = await createConversation({ name: groupName.trim(), type: 'group', participant_ids: selectedUsers });
     if (groupPhoto) { try { await uploadConversationAvatar(conversation.id, groupPhoto); } catch {} }
-    setGroupName(''); setSelectedUsers([]); setGroupPhoto(null); setGroupPhotoPreview(''); setNewGroupOpen(false);
+    if (groupBroadcast) { try { await updateConversationSettings(conversation.id, { broadcast_mode: true }); } catch {} }
+    setGroupName(''); setSelectedUsers([]); setGroupPhoto(null); setGroupPhotoPreview(''); setGroupBroadcast(false); setGroupUserSearch(''); setNewGroupOpen(false);
     await loadConversations();
     setSelectedId(conversation.id);
   }
@@ -1378,8 +1381,7 @@ export function Chat() {
 
   return (
     <div
-      className={cn('chat-shell flex overflow-hidden z-10 fixed left-0 right-0 top-14 bottom-20 lg:relative lg:inset-auto lg:-mx-6 lg:-my-6 lg:h-[calc(100vh-56px)] lg:rounded-2xl lg:border-2 lg:border-slate-200/70 lg:shadow-2xl', darkMode ? 'bg-[#111b21] chat-dark' : 'bg-slate-50')}
-      style={{ minHeight: 480 }}
+      className={cn('chat-shell flex overflow-hidden', darkMode ? 'bg-[#111b21] chat-dark' : 'bg-slate-50')}
     >
       {/* Lightbox */}
       {lightboxSrc && (
@@ -1446,19 +1448,73 @@ export function Chat() {
           </div>
         </div>
 
-        {/* New group form */}
-        {newGroupOpen && (
-          <form onSubmit={handleCreateGroup} className="border-b border-slate-100 bg-orange-50/50 p-4 flex-shrink-0 space-y-3">
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => groupPhotoRef.current?.click()} className="relative h-12 w-12 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 hover:opacity-80">
-                {groupPhotoPreview ? <img src={groupPhotoPreview} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-slate-500"><Camera size={18} /></div>}
-              </button>
-              <input ref={groupPhotoRef} type="file" accept="image/*" className="hidden" onChange={handleGroupPhoto} />
-              <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Nome do grupo" className="h-10 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-orange-400" />
+        {/* New group modal */}
+        {newGroupOpen && createPortal(
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={e => { if (e.target === e.currentTarget) { setNewGroupOpen(false); setGroupName(''); setGroupPhoto(null); setGroupPhotoPreview(''); setSelectedUsers([]); setGroupBroadcast(false); setGroupUserSearch(''); } }}>
+            <div className={cn('w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh]', darkMode ? 'bg-[#1f2c34]' : 'bg-white')}>
+              <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', darkMode ? 'border-[#2a3942]' : 'border-slate-100')}>
+                <span className={cn('text-base font-semibold', darkMode ? 'text-[#e9edef]' : 'text-slate-800')}>Novo grupo</span>
+                <button type="button" onClick={() => { setNewGroupOpen(false); setGroupName(''); setGroupPhoto(null); setGroupPhotoPreview(''); setSelectedUsers([]); setGroupBroadcast(false); setGroupUserSearch(''); }} className={cn('h-8 w-8 rounded-full flex items-center justify-center transition-colors', darkMode ? 'text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef]' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600')}>
+                  <X size={18} />
+                </button>
+              </div>
+              <form onSubmit={handleCreateGroup} className="flex flex-col flex-1 overflow-hidden">
+                <div className="px-5 pt-5 pb-4 flex items-center gap-4 flex-shrink-0">
+                  <button type="button" onClick={() => groupPhotoRef.current?.click()} className="relative h-16 w-16 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity">
+                    {groupPhotoPreview ? <img src={groupPhotoPreview} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-slate-500"><Camera size={22} /></div>}
+                  </button>
+                  <input ref={groupPhotoRef} type="file" accept="image/*" className="hidden" onChange={handleGroupPhoto} />
+                  <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Nome do grupo" autoFocus className={cn('h-10 flex-1 rounded-lg border px-3 text-sm outline-none focus:border-orange-400', darkMode ? 'bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]' : 'border-slate-200')} />
+                </div>
+                <div className={cn('mx-5 mb-4 rounded-xl border p-3 flex items-center gap-3 flex-shrink-0', darkMode ? 'border-[#2a3942] bg-[#2a3942]/50' : 'border-slate-100 bg-slate-50')}>
+                  <div className="flex-1">
+                    <p className={cn('text-sm font-medium', darkMode ? 'text-[#e9edef]' : 'text-slate-700')}>Grupo informativo</p>
+                    <p className={cn('text-xs mt-0.5', darkMode ? 'text-[#8696a0]' : 'text-slate-500')}>Apenas admins podem enviar mensagens</p>
+                  </div>
+                  <button type="button" onClick={() => setGroupBroadcast(v => !v)} className={cn('relative h-6 w-11 rounded-full transition-colors flex-shrink-0', groupBroadcast ? 'bg-orange-500' : (darkMode ? 'bg-[#3b4a54]' : 'bg-slate-200'))}>
+                    <span className={cn('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform', groupBroadcast ? 'translate-x-5' : 'translate-x-0.5')} />
+                  </button>
+                </div>
+                <div className={cn('mx-5 mb-2 text-xs font-semibold uppercase tracking-wide flex-shrink-0', darkMode ? 'text-[#8696a0]' : 'text-slate-500')}>
+                  Participantes{selectedUsers.length > 0 && <span className="normal-case font-normal"> ({selectedUsers.length} selecionados)</span>}
+                </div>
+                <div className="px-5 mb-2 relative flex-shrink-0">
+                  <Search size={14} className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input value={groupUserSearch} onChange={e => setGroupUserSearch(e.target.value)} placeholder="Buscar participantes..." className={cn('h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400', darkMode ? 'bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]' : 'border-slate-200')} />
+                </div>
+                <div className="overflow-y-auto px-5 pb-2 flex-1" style={{ minHeight: '160px' }}>
+                  {users.filter(u => u.id !== user?.id).filter(u => {
+                    if (!groupUserSearch.trim()) return true;
+                    const q = groupUserSearch.toLowerCase();
+                    return u.name.toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+                  }).map(u => {
+                    const sel = selectedUsers.includes(u.id);
+                    return (
+                      <button key={u.id} type="button" onClick={() => setSelectedUsers(v => sel ? v.filter(id => id !== u.id) : [...v, u.id])} className={cn('w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors', sel ? (darkMode ? 'bg-orange-500/20' : 'bg-orange-50') : (darkMode ? 'hover:bg-[#2a3942]' : 'hover:bg-slate-50'))}>
+                        <div className="relative h-9 w-9 flex-shrink-0">
+                          {u.photo_url ? <img src={u.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" /> : <div className="h-9 w-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-sm font-semibold">{u.name.charAt(0).toUpperCase()}</div>}
+                          {u.online && <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn('text-sm font-medium truncate', darkMode ? 'text-[#e9edef]' : 'text-slate-800')}>{u.name}</p>
+                          {u.position && <p className={cn('text-xs truncate', darkMode ? 'text-[#8696a0]' : 'text-slate-500')}>{u.position}</p>}
+                        </div>
+                        <div className={cn('h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors', sel ? 'border-orange-500 bg-orange-500' : (darkMode ? 'border-[#3b4a54]' : 'border-slate-300'))}>
+                          {sel && <Check size={11} className="text-white" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className={cn('px-5 py-4 border-t flex-shrink-0', darkMode ? 'border-[#2a3942]' : 'border-slate-100')}>
+                  <button type="submit" disabled={!groupName.trim()} className="h-10 w-full rounded-xl bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
+                    Criar grupo{selectedUsers.length > 0 ? ` com ${selectedUsers.length} participante${selectedUsers.length > 1 ? 's' : ''}` : ''}
+                  </button>
+                </div>
+              </form>
             </div>
-            <p className="text-xs text-slate-600">{selectedUsers.length} participante(s) selecionado(s)</p>
-            <button disabled={!groupName.trim()} className="h-9 w-full rounded-lg bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50">Criar grupo</button>
-          </form>
+          </div>,
+          document.body
         )}
 
         <StoriesBar />

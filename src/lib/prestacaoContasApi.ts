@@ -77,7 +77,7 @@ export interface ComentarioPeriodo {
   periodo_id: string;
   autor_id: string | null;
   autor_nome: string;
-  tipo: 'comentario' | 'inconsistencia' | 'correcao';
+  tipo: 'comentario' | 'inconsistencia' | 'correcao' | 'submit' | 'validado' | 'cancelamento';
   texto: string;
   created_at: string;
 }
@@ -151,5 +151,6 @@ export const pcSubmitPeriodo = (id: string): R<Periodo> => apiPut(`/pc/periodos/
 export const pcValidarPeriodo = (id: string): R<Periodo> => apiPut(`/pc/periodos/${id}/validar`, {});
 export const pcInconsistenciaPeriodo = (id: string, data: { texto: string }): R<Periodo> => apiPut(`/pc/periodos/${id}/inconsistencia`, data);
 export const pcCorrigirPeriodo = (id: string, texto?: string): R<Periodo> => apiPut(`/pc/periodos/${id}/corrigir`, { texto });
+export const pcCancelarSubmissaoPeriodo = (id: string): R<Periodo> => apiPut(`/pc/periodos/${id}/cancelar-submissao`, {});
 export const pcListComentariosPeriodo = (id: string): R<ComentarioPeriodo[]> => apiGet(`/pc/periodos/${id}/comentarios`);
 export const pcCreateComentarioPeriodo = (id: string, texto: string): R<ComentarioPeriodo> => apiPost(`/pc/periodos/${id}/comentarios`, { texto });

@@ -3,49 +3,42 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 97%;
-    --foreground: 220 20% 15%;
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 15%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 15%;
-    --primary: 24 100% 50%;
+  :root, .dark {
+    /* ── Dark Mode (Only Mode) ──────────────────────────────────────────── */
+    --background: 220 25% 7%;
+    --foreground: 210 20% 92%;
+    --card: 220 22% 11%;
+    --card-foreground: 210 20% 92%;
+    --popover: 220 22% 11%;
+    --popover-foreground: 210 20% 92%;
+    --primary: 24 95% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 213 100% 36%;
+    --secondary: 213 80% 55%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 220 14% 94%;
-    --muted-foreground: 220 8% 46%;
-    --accent: 220 14% 94%;
-    --accent-foreground: 220 20% 15%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 88%;
-    --input: 220 13% 90%;
-    --ring: 24 100% 50%;
-    --radius: 0.75rem;
-  }
-
-  .dark {
-    --background: 215 28% 14%;   /* slate-850 — fundo principal */
-    --foreground: 0 0% 100%;     /* branco puro */
-    --card: 215 25% 20%;         /* card — slate-750 */
-    --card-foreground: 0 0% 100%;
-    --popover: 215 25% 20%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 24 100% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 213 100% 55%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 215 22% 26%;        /* slate-700 */
-    --muted-foreground: 215 16% 63%;
-    --accent: 215 22% 26%;
-    --accent-foreground: 210 30% 92%;
+    --muted: 220 18% 15%;
+    --muted-foreground: 215 15% 52%;
+    --accent: 220 18% 17%;
+    --accent-foreground: 210 20% 92%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 215 22% 28%;
-    --input: 215 22% 24%;
-    --ring: 24 100% 50%;
+    --border: 220 15% 17%;
+    --input: 220 20% 13%;
+    --ring: 24 95% 50%;
+    --radius: 0.75rem;
+
+    /* Gradient pairs */
+    --gradient-primary-start: 24 95% 50%;
+    --gradient-primary-end: 15 90% 48%;
+    --gradient-secondary-start: 213 80% 50%;
+    --gradient-secondary-end: 200 85% 48%;
+    --gradient-accent-start: 260 60% 55%;
+    --gradient-accent-end: 280 70% 50%;
+
+    --color-success: 160 84% 39%;
+    --color-warning: 38 92% 50%;
+    --color-text-secondary: 215 16% 55%;
+    --color-text-muted: 215 14% 40%;
+
     color-scheme: dark;
   }
 
@@ -53,49 +46,87 @@
     @apply border-border;
   }
 
-  @media (min-width: 1024px) {
-    html {
-      zoom: 1.1;
-    }
-  }
-
   body {
-    @apply text-foreground;
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 18px;
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 17px;
     line-height: 1.6;
-    color-scheme: light;
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Global dark mode overrides — paleta moderada, seletores exatos */
-  .dark body { color-scheme: dark; }
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
 
-  /* Backgrounds principais (exceto chat que tem seu próprio dark) */
+  /* ── Scrollbar ─────────────────────────────────────────────────────── */
+  html {
+    scroll-behavior: smooth;
+    scrollbar-gutter: stable;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.1) transparent; }
+
+  /* ── Selection ─────────────────────────────────────────────────────── */
+  ::selection { background: hsl(var(--primary) / 0.3); color: hsl(var(--foreground)); }
+
+  /* ── Focus ─────────────────────────────────────────────────────────── */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background rounded;
+  }
+
+  /* Prevent iOS auto-zoom */
+  @media (max-width: 768px) {
+    input, select, textarea { font-size: 17px !important; }
+  }
+
+  /* Safe area */
+  @supports (padding: max(0px)) {
+    .safe-top { padding-top: max(0px, env(safe-area-inset-top)); }
+    .safe-bottom { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
+  }
+
+  /* ── Global Dark Mode Overrides ────────────────────────────────────── */
+  /* Only active when .dark is on <html>. Excludes .chat-dark internals. */
+
+  /* Backgrounds */
   .dark .bg-white:not(.chat-dark *) { background-color: hsl(var(--card)) !important; }
-  .dark .bg-white\/90:not(.chat-dark *) { background-color: hsl(215 25% 20% / 0.97) !important; }
-  .dark .bg-slate-50:not(.chat-dark *) { background-color: hsl(215 22% 22%) !important; }
-  .dark .bg-slate-100:not(.chat-dark *) { background-color: hsl(215 22% 25%) !important; }
-  .dark .bg-slate-200:not(.chat-dark *) { background-color: hsl(215 22% 28%) !important; }
+  .dark .bg-white\/90:not(.chat-dark *) { background-color: hsl(var(--card) / 0.97) !important; }
+  .dark .bg-slate-50:not(.chat-dark *) { background-color: hsl(220 18% 13%) !important; }
+  .dark .bg-slate-100:not(.chat-dark *) { background-color: hsl(var(--muted)) !important; }
+  .dark .bg-slate-200:not(.chat-dark *) { background-color: hsl(var(--accent)) !important; }
 
-  /* Bordas */
+  /* Borders */
   .dark .border-slate-100:not(.chat-dark *) { border-color: hsl(var(--border)) !important; }
   .dark .border-slate-200:not(.chat-dark *) { border-color: hsl(var(--border)) !important; }
+  .dark .border-slate-300:not(.chat-dark *) { border-color: hsl(var(--border)) !important; }
+  .dark .divide-slate-50:not(.chat-dark *) > * + * { border-color: hsl(var(--border)) !important; }
   .dark .divide-slate-100:not(.chat-dark *) > * + * { border-color: hsl(var(--border)) !important; }
   .dark .divide-slate-200:not(.chat-dark *) > * + * { border-color: hsl(var(--border)) !important; }
 
-  /* Textos */
+  /* Text */
   .dark .text-slate-950:not(.chat-dark *) { color: hsl(var(--foreground)) !important; }
   .dark .text-slate-900:not(.chat-dark *) { color: hsl(var(--foreground)) !important; }
-  .dark .text-slate-800:not(.chat-dark *) { color: hsl(0 0% 100%) !important; }
-  .dark .text-slate-700:not(.chat-dark *) { color: hsl(0 0% 96%) !important; }
-  .dark .text-slate-600:not(.chat-dark *) { color: hsl(0 0% 90%) !important; }
-  .dark .text-slate-500:not(.chat-dark *) { color: hsl(0 0% 82%) !important; }
-  .dark .text-slate-400:not(.chat-dark *) { color: hsl(0 0% 74%) !important; }
+  .dark .text-slate-800:not(.chat-dark *) { color: hsl(var(--foreground)) !important; }
+  .dark .text-slate-700:not(.chat-dark *) { color: hsl(var(--foreground) / 0.85) !important; }
+  .dark .text-slate-600:not(.chat-dark *) { color: hsl(var(--muted-foreground)) !important; }
+  .dark .text-slate-500:not(.chat-dark *) { color: hsl(var(--muted-foreground)) !important; }
+  .dark .text-slate-400:not(.chat-dark *) { color: hsl(var(--muted-foreground) / 0.8) !important; }
 
   /* Inputs, textareas, selects */
-  .dark input:not(.chat-dark *):not([type="color"]):not([type="checkbox"]):not([type="radio"]) {
+  .dark input:not(.chat-dark *):not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
     background-color: hsl(var(--input)) !important;
     border-color: hsl(var(--border)) !important;
     color: hsl(var(--foreground)) !important;
@@ -110,115 +141,290 @@
     border-color: hsl(var(--border)) !important;
     color: hsl(var(--foreground)) !important;
   }
-  .dark input::placeholder:not(.chat-dark *),
-  .dark textarea::placeholder:not(.chat-dark *) { color: hsl(215 14% 60%) !important; }
+  .dark input::placeholder, .dark textarea::placeholder { color: hsl(var(--muted-foreground)) !important; }
 
   /* Hovers */
-  .dark .hover\:bg-slate-50:hover:not(.chat-dark *) { background-color: hsl(215 22% 24%) !important; }
-  .dark .hover\:bg-slate-100:hover:not(.chat-dark *) { background-color: hsl(215 22% 27%) !important; }
+  .dark .hover\:bg-slate-50:hover:not(.chat-dark *) { background-color: hsl(var(--muted)) !important; }
+  .dark .hover\:bg-slate-100:hover:not(.chat-dark *) { background-color: hsl(var(--accent)) !important; }
+  .dark .hover\:bg-orange-50:hover:not(.chat-dark *) { background-color: hsl(var(--primary) / 0.08) !important; }
 
-  /* Badges e pills laranja já são coloridas — mantém */
-  /* Botões com bg-white explícito que são botões de ação (outline style) */
+  /* Buttons with bg-white */
   .dark button.bg-white:not(.chat-dark *) { background-color: hsl(var(--card)) !important; }
 
-  /* Dropdown menus do shadcn/radix */
+  /* Dropdown menus (shadcn/radix) */
   .dark [data-radix-popper-content-wrapper] .bg-white,
   .dark [role="menu"] { background-color: hsl(var(--card)) !important; border-color: hsl(var(--border)) !important; }
   .dark [role="menuitem"]:hover { background-color: hsl(var(--muted)) !important; }
 
-  /* Wiki sidebar — itens ativos com texto azul (#0057b8) ficam invisíveis em dark mode */
+  /* Tinted backgrounds — subtle in dark */
+  .dark .bg-orange-50:not(.chat-dark *) { background-color: hsl(var(--primary) / 0.06) !important; }
+  .dark .bg-orange-100:not(.chat-dark *) { background-color: hsl(var(--primary) / 0.1) !important; }
+  .dark .bg-blue-50:not(.chat-dark *) { background-color: hsl(var(--secondary) / 0.06) !important; }
+  .dark .bg-blue-100:not(.chat-dark *) { background-color: hsl(var(--secondary) / 0.1) !important; }
+  .dark .bg-emerald-50:not(.chat-dark *) { background-color: rgba(16, 185, 129, 0.06) !important; }
+  .dark .bg-emerald-100:not(.chat-dark *) { background-color: rgba(16, 185, 129, 0.1) !important; }
+  .dark .bg-violet-50:not(.chat-dark *) { background-color: rgba(139, 92, 246, 0.06) !important; }
+  .dark .bg-red-50:not(.chat-dark *) { background-color: rgba(239, 68, 68, 0.06) !important; }
+  .dark .bg-amber-50:not(.chat-dark *) { background-color: rgba(245, 158, 11, 0.06) !important; }
+  .dark .bg-purple-50:not(.chat-dark *) { background-color: rgba(168, 85, 247, 0.06) !important; }
+  .dark .bg-indigo-50:not(.chat-dark *) { background-color: rgba(99, 102, 241, 0.06) !important; }
+  .dark .bg-indigo-100:not(.chat-dark *) { background-color: rgba(99, 102, 241, 0.1) !important; }
+  .dark .bg-green-50:not(.chat-dark *) { background-color: rgba(34, 197, 94, 0.06) !important; }
+  .dark .bg-yellow-50:not(.chat-dark *) { background-color: rgba(234, 179, 8, 0.06) !important; }
+  .dark .bg-cyan-50:not(.chat-dark *) { background-color: rgba(6, 182, 212, 0.06) !important; }
+  .dark .bg-teal-50:not(.chat-dark *) { background-color: rgba(20, 184, 166, 0.06) !important; }
+
+  /* Border tints */
+  .dark .border-orange-100:not(.chat-dark *) { border-color: hsl(var(--primary) / 0.15) !important; }
+  .dark .border-orange-200:not(.chat-dark *) { border-color: hsl(var(--primary) / 0.2) !important; }
+  .dark .border-orange-400:not(.chat-dark *) { border-color: hsl(var(--primary) / 0.4) !important; }
+  .dark .border-blue-100:not(.chat-dark *) { border-color: hsl(var(--secondary) / 0.15) !important; }
+  .dark .border-blue-200:not(.chat-dark *) { border-color: hsl(var(--secondary) / 0.2) !important; }
+  .dark .border-emerald-200:not(.chat-dark *) { border-color: rgba(16, 185, 129, 0.2) !important; }
+  .dark .border-red-200:not(.chat-dark *) { border-color: rgba(239, 68, 68, 0.2) !important; }
+  .dark .border-amber-200:not(.chat-dark *) { border-color: rgba(245, 158, 11, 0.2) !important; }
+
+  /* Ring/focus */
+  .dark .focus\:border-orange-400:focus:not(.chat-dark *) { border-color: hsl(var(--ring)) !important; }
+  .dark .focus-within\:border-orange-400:focus-within:not(.chat-dark *) { border-color: hsl(var(--ring)) !important; }
+  .dark .focus-within\:ring-orange-400\/20:focus-within:not(.chat-dark *) { --tw-ring-color: hsl(var(--ring) / 0.2) !important; }
+
+  /* Shadow overrides — remove white-ish shadows */
+  .dark .shadow-sm:not(.chat-dark *) { box-shadow: 0 1px 2px rgba(0,0,0,0.3) !important; }
+  .dark .shadow-md:not(.chat-dark *) { box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important; }
+  .dark .shadow-lg:not(.chat-dark *) { box-shadow: 0 10px 15px rgba(0,0,0,0.3) !important; }
+  .dark .shadow-xl:not(.chat-dark *) { box-shadow: 0 20px 25px rgba(0,0,0,0.3) !important; }
+  .dark .shadow-2xl:not(.chat-dark *) { box-shadow: 0 25px 50px rgba(0,0,0,0.4) !important; }
+
+  /* Wiki sidebar dark mode fix */
   .dark .wiki-sidebar-root-active,
-  .dark .wiki-sidebar-article-active { color: #5aabff !important; }
+  .dark .wiki-sidebar-article-active { color: hsl(var(--primary)) !important; }
   .dark .wiki-sidebar-section-active { color: hsl(var(--foreground)) !important; }
-
-  /* Compensação de zoom para portais Radix — evita que o dropdown apareça fora do viewport */
-  /* O zoom no html faz getBCR retornar valores ×zoom. Radix usa esses valores como CSS px,
-     causando posicionamento ×zoom² fisicamente. Cancelamos o zoom no wrapper e re-aplicamos no conteúdo. */
-  @media (min-width: 1024px) {
-    [data-radix-popper-content-wrapper] {
-      zoom: calc(1 / 1.1) !important;
-    }
-    [data-radix-popper-content-wrapper] > * {
-      zoom: 1.1 !important;
-    }
-  }
-
-
-  #root {
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-
-  /* Prevent iOS auto-zoom on inputs */
-  @media (max-width: 768px) {
-    input, select, textarea {
-      font-size: 16px !important;
-    }
-  }
-
-  /* Safe area padding for notch devices */
-  @supports (padding: max(0px)) {
-    .safe-top    { padding-top: max(0px, env(safe-area-inset-top)); }
-    .safe-bottom { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
-  }
 }
 
 @layer utilities {
-  .layout-gradient {
-    background: linear-gradient(135deg, #0057b8 0%, #1e88e5 25%, #fef3e8 50%, #ff7a00 75%, #ff9a40 100%);
-  }
-  .layout-radial {
-    opacity: 0.6;
-    background: radial-gradient(ellipse at top left, rgba(0,87,184,0.4) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(255,122,0,0.4) 0%, transparent 50%);
+  /* ── Glass Effects ─────────────────────────────────────────────────── */
+  .glass {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
+  .glass-card {
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(16px) saturate(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(1.1);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
+
+  .glass-subtle {
+    background: rgba(15, 23, 42, 0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── Neon Glows ────────────────────────────────────────────────────── */
+  .glow-cyan { box-shadow: 0 0 20px rgba(0, 229, 255, 0.25), 0 0 60px rgba(0, 229, 255, 0.1); }
+  .glow-purple { box-shadow: 0 0 20px rgba(168, 85, 247, 0.25), 0 0 60px rgba(168, 85, 247, 0.1); }
+  .glow-pink { box-shadow: 0 0 20px rgba(236, 72, 153, 0.25), 0 0 60px rgba(236, 72, 153, 0.1); }
+  .glow-orange { box-shadow: 0 0 20px rgba(249, 115, 22, 0.25), 0 0 60px rgba(249, 115, 22, 0.1); }
+
+  /* ── Gradient Text ─────────────────────────────────────────────────── */
+  .text-gradient-cyan {
+    background: linear-gradient(135deg, #e65b12, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-purple {
+    background: linear-gradient(135deg, #0057b8, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-warm {
+    background: linear-gradient(135deg, #f97316, #ef4444);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Gradient Borders ──────────────────────────────────────────────── */
+  .border-gradient {
+    position: relative;
+    border: none !important;
+  }
+  .border-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(168, 85, 247, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* ── Mesh Background ───────────────────────────────────────────────── */
+  .bg-mesh {
+    background-image:
+      radial-gradient(at 0% 0%, rgba(0, 229, 255, 0.08) 0%, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0%, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.06) 0%, transparent 50%);
+  }
+
+  .bg-grid {
+    background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .bg-dots {
+    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* ── Scrollbar thin ────────────────────────────────────────────────── */
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
   .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 2px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* ── Shimmer / Skeleton ────────────────────────────────────────────── */
+  .shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent);
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded;
+    background: linear-gradient(90deg, hsl(var(--muted)), hsl(var(--muted) / 0.5), hsl(var(--muted)));
+    background-size: 200% 100%;
+    animation: skeleton-pulse 2s ease-in-out infinite;
+  }
 }
 
 @layer components {
-  /* Card with hover lift */
-  .card-lift {
-    @apply transition-all duration-200 ease-out cursor-pointer;
-    @apply hover:-translate-y-1 hover:shadow-lg;
-  }
-  .card-lift:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
-  }
-  .card-lift:active {
-    @apply translate-y-0 shadow-md;
+  /* ── Futuristic Card ───────────────────────────────────────────────── */
+  .card-futuristic {
+    @apply relative rounded-2xl overflow-hidden transition-all duration-300;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
   }
 
-  /* Interactive button base */
+  .card-futuristic:hover {
+    border-color: rgba(0, 229, 255, 0.15);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 229, 255, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .card-futuristic::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.3), rgba(168, 85, 247, 0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .card-futuristic:hover::before { opacity: 1; }
+
+  /* ── Futuristic Button ─────────────────────────────────────────────── */
+  .btn-futuristic {
+    @apply relative inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm;
+    @apply transition-all duration-200 active:scale-95;
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 4px 16px hsl(var(--primary) / 0.3);
+  }
+
+  .btn-futuristic:hover {
+    box-shadow: 0 6px 24px hsl(var(--primary) / 0.4), 0 0 40px hsl(var(--primary) / 0.15);
+    transform: translateY(-1px);
+  }
+
+  .btn-glass {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium text-sm;
+    @apply transition-all duration-200 active:scale-95;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: hsl(var(--foreground));
+  }
+
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* ── Stat Card ─────────────────────────────────────────────────────── */
+  .stat-card {
+    @apply relative rounded-2xl p-5 overflow-hidden transition-all duration-300;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--stat-accent, linear-gradient(90deg, #e65b12, #3b82f6));
+  }
+
+  .stat-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ── Interactive hover ─────────────────────────────────────────────── */
+  .card-lift {
+    @apply transition-all duration-300 ease-out cursor-pointer;
+  }
+  .card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  }
+  .card-lift:active {
+    transform: translateY(-1px);
+  }
+
   .btn-interactive {
     @apply transition-all duration-150 ease-out active:scale-95;
   }
 
-  /* Glow effects */
-  .glow-orange {
-    box-shadow: 0 0 20px rgba(255, 122, 0, 0.25);
-  }
-  .glow-blue {
-    box-shadow: 0 0 20px rgba(0, 87, 184, 0.25);
-  }
-
-  /* Post card */
-  .post-card {
-    @apply bg-white rounded-2xl border border-white/80 shadow-sm;
-    @apply transition-all duration-200;
-  }
-  .post-card:hover {
-    @apply shadow-md;
-    box-shadow: 0 4px 24px rgba(0, 87, 184, 0.08);
+  /* ── Post Card ─────────────────────────────────────────────────────── */
+  .post-card, .social-post {
+    @apply relative rounded-2xl overflow-hidden transition-all duration-300;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
+  .post-card:hover, .social-post:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ── Social Feed Shell ─────────────────────────────────────────────── */
   .social-feed-shell {
-    @apply grid grid-cols-1 gap-4 xl:grid-cols-[220px_minmax(0,1fr)_240px];
+    @apply grid grid-cols-1 gap-5 xl:grid-cols-[240px_minmax(0,1fr)_260px];
   }
 
   .social-left-panel,
@@ -229,1565 +435,935 @@
   .social-profile-card,
   .social-panel,
   .social-toolbar,
-  .social-composer,
-  .social-post {
-    @apply overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm;
+  .social-composer {
+    @apply overflow-hidden rounded-2xl;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .social-profile-cover {
-    @apply h-14;
-    background:
-      linear-gradient(135deg, rgba(0, 87, 184, 0.96), rgba(255, 122, 0, 0.9)),
-      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4), transparent 30%);
+    @apply h-16;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.4), rgba(168, 85, 247, 0.4));
   }
 
-  .social-panel {
-    @apply p-4;
-  }
+  .social-panel { @apply p-4; }
 
   .social-hero {
-    @apply relative overflow-hidden rounded-lg border border-white/80 px-4 py-3 text-white shadow-sm;
-    background:
-      linear-gradient(135deg, rgba(0, 87, 184, 0.96), rgba(0, 61, 128, 0.94) 48%, rgba(255, 122, 0, 0.9)),
-      linear-gradient(90deg, #0057b8, #ff7a00);
+    @apply relative overflow-hidden rounded-2xl px-5 py-4 text-white;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(168, 85, 247, 0.15));
+    border: 1px solid rgba(0, 229, 255, 0.2);
   }
 
-  .social-hero h1 {
-    @apply text-lg font-black leading-tight;
-  }
-
-  .social-hero p {
-    @apply mt-1 max-w-2xl text-sm leading-6 text-white/80;
-  }
+  .social-hero h1 { @apply text-lg font-black leading-tight; }
+  .social-hero p { @apply mt-1 max-w-2xl text-sm leading-6 text-white/70; }
 
   .social-hero-metrics {
-    @apply mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3;
+    @apply mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3;
   }
-
   .social-hero-metrics span {
-    @apply rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white/80 backdrop-blur;
+    @apply rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 backdrop-blur;
   }
-
-  .social-hero-metrics strong {
-    @apply mr-1 text-base font-black text-white;
-  }
+  .social-hero-metrics strong { @apply mr-1 text-base font-black text-white; }
 
   .social-stories {
-    @apply flex gap-3 overflow-x-auto rounded-2xl border border-white/80 bg-white p-3 shadow-sm scrollbar-thin;
+    @apply flex gap-3 overflow-x-auto rounded-2xl p-3 scrollbar-thin;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .social-story {
-    @apply flex min-w-28 flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm;
+    @apply flex min-w-28 flex-col items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold transition-all;
+    color: hsl(var(--muted-foreground));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .social-story:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(0, 229, 255, 0.2);
   }
 
-  .social-story span {
-    @apply flex h-10 w-10 items-center justify-center rounded-full;
-  }
+  .social-story span { @apply flex h-10 w-10 items-center justify-center rounded-full; }
+  .social-story-create span { @apply bg-primary/20 text-primary; }
 
-  .social-story-create span {
-    @apply bg-[#0057b8] text-white;
-  }
-
-  .social-toolbar {
-    @apply space-y-3 p-4;
-  }
+  .social-toolbar { @apply space-y-3 p-4; }
 
   .social-search {
-    @apply flex h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-slate-400 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/20;
+    @apply flex h-11 items-center gap-3 rounded-xl px-4;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--muted-foreground));
   }
-
+  .social-search:focus-within {
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+  }
   .social-search input {
-    @apply w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none;
+    @apply w-full bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none;
+    color: hsl(var(--foreground));
   }
 
-  .social-filter-strip {
-    @apply flex gap-2 overflow-x-auto pb-0.5 scrollbar-thin;
-  }
+  .social-filter-strip { @apply flex gap-2 overflow-x-auto pb-0.5 scrollbar-thin; }
 
   .social-filter-pill {
-    @apply inline-flex flex-shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition-all hover:border-orange-400 hover:text-orange-600;
+    @apply inline-flex flex-shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all;
+    color: hsl(var(--muted-foreground));
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
-
+  .social-filter-pill:hover {
+    border-color: hsl(var(--primary) / 0.4);
+    color: hsl(var(--primary));
+  }
   .social-filter-pill-active {
-    @apply border-orange-500 bg-orange-500 text-white shadow-sm hover:text-white;
+    background: hsl(var(--primary) / 0.15);
+    border-color: hsl(var(--primary) / 0.4);
+    color: hsl(var(--primary));
   }
 
   .social-compose-trigger {
-    @apply h-12 flex-1 rounded-full border border-slate-200 bg-slate-50 px-5 text-left text-sm font-medium text-slate-400 transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600;
+    @apply h-12 flex-1 rounded-full px-5 text-left text-sm font-medium transition-all;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--muted-foreground));
+  }
+  .social-compose-trigger:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    background: rgba(255, 255, 255, 0.06);
   }
 
-  .social-composer {
-    @apply p-4;
-  }
+  .social-composer { @apply p-4; }
 
   .social-composer-icon,
   .social-composer-tool,
   .social-small-action,
   .social-menu-button {
-    @apply inline-flex items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 active:scale-95;
+    @apply inline-flex items-center justify-center rounded-full transition-all active:scale-95;
+    color: hsl(var(--muted-foreground));
   }
-
-  .social-composer-icon {
-    @apply h-11 w-11;
-  }
-
-  .social-composer-tool {
-    @apply h-10 w-10 hover:bg-orange-50 hover:text-orange-600;
-  }
-
-  .social-small-action {
-    @apply h-8 w-8 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700;
-  }
-
-  .social-menu-button {
-    @apply h-9 w-9 flex-shrink-0;
-  }
+  .social-composer-icon { @apply h-11 w-11; }
+  .social-composer-icon:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--primary)); }
+  .social-composer-tool { @apply h-10 w-10; }
+  .social-composer-tool:hover { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
+  .social-small-action { @apply h-8 w-8; background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
+  .social-small-action:hover { background: hsl(var(--primary) / 0.2); }
+  .social-menu-button { @apply h-9 w-9 flex-shrink-0; }
+  .social-menu-button:hover { background: rgba(255, 255, 255, 0.08); }
 
   .social-compose-type {
-    @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800;
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-colors;
+    color: hsl(var(--muted-foreground));
   }
-
+  .social-compose-type:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
   .social-compose-type-active {
-    @apply bg-orange-500 text-white shadow-sm hover:bg-orange-500 hover:text-white;
+    background: hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary));
   }
 
   .social-cancel-button {
-    @apply rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100;
+    @apply rounded-lg px-4 py-2 text-sm font-semibold transition-colors;
+    color: hsl(var(--muted-foreground));
   }
+  .social-cancel-button:hover { background: rgba(255, 255, 255, 0.06); }
 
   .social-submit-button {
-    @apply inline-flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-2 text-sm font-bold text-white transition-all hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400;
+    @apply btn-futuristic;
   }
 
-  .social-post {
-    @apply relative;
-  }
-
-  .social-post-bar {
-    @apply h-1.5 w-full;
-  }
+  .social-post-bar { @apply h-1 w-full; }
 
   .social-pinned {
-    @apply flex items-center gap-2 border-b border-orange-100 bg-orange-50 px-5 py-3 text-sm font-bold text-orange-700;
+    @apply flex items-center gap-2 px-5 py-3 text-sm font-bold;
+    background: hsl(var(--primary) / 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: hsl(var(--primary));
   }
 
   .social-author-type {
-    @apply absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-white shadow-sm;
+    @apply absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 shadow-sm;
+    border-color: hsl(var(--card));
+    background: hsl(var(--card));
   }
 
   .social-post-stats {
-    @apply mt-5 flex items-center justify-between border-b border-slate-100 pb-3 text-sm font-medium text-slate-400;
+    @apply mt-5 flex items-center justify-between pb-3 text-sm font-medium;
+    color: hsl(var(--muted-foreground));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-
-  .social-post-stats button {
-    @apply hover:text-slate-700 hover:underline;
-  }
+  .social-post-stats button { @apply hover:text-foreground hover:underline; }
 
   .social-reaction-dot {
     @apply flex h-5 w-5 items-center justify-center rounded-full border border-white text-white;
   }
 
-  .social-actions {
-    @apply mt-3 flex items-center gap-2;
-  }
+  .social-actions { @apply mt-3 flex items-center gap-2; }
 
   .social-action-button {
-    @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-800 active:scale-95;
+    @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95;
+    color: hsl(var(--muted-foreground));
   }
-
-  .social-action-button-active {
-    @apply bg-blue-50 text-blue-700;
-  }
+  .social-action-button:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .social-action-button-active { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
 
   .social-reaction-picker {
-    @apply absolute bottom-full left-0 z-20 mb-2 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white px-2 py-2 shadow-2xl animate-slide-up;
+    @apply absolute bottom-full left-0 z-20 mb-2 flex items-center gap-1 rounded-2xl px-2 py-2 shadow-2xl animate-slide-up;
+    background: hsl(var(--card));
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .social-reaction-choice {
-    @apply rounded-xl p-2.5 transition-transform hover:scale-125 active:scale-110;
-  }
+  .social-reaction-choice { @apply rounded-xl p-2.5 transition-transform hover:scale-125 active:scale-110; }
 
   .social-comment-box {
-    @apply flex h-11 flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/20;
+    @apply flex h-11 flex-1 items-center gap-2 rounded-full px-4;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
-
+  .social-comment-box:focus-within {
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+  }
   .social-comment-box input {
-    @apply h-full flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none;
+    @apply h-full flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none;
+    color: hsl(var(--foreground));
   }
-
   .social-comment-box button {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white transition-all hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
   }
 
   .social-community-row,
   .social-trending-row {
-    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-orange-50;
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors;
+  }
+  .social-community-row:hover, .social-trending-row:hover {
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .social-community-icon {
-    @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600;
+    @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl;
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
   }
 
   .social-type-row {
-    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900;
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors;
+    color: hsl(var(--muted-foreground));
   }
-
-  .social-type-row-active {
-    @apply bg-orange-50 text-orange-700;
-  }
+  .social-type-row:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--foreground)); }
+  .social-type-row-active { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
 
   .social-empty-state {
-    @apply flex flex-col items-center justify-center rounded-2xl border border-white/80 bg-white p-12 text-center text-slate-400 shadow-sm;
+    @apply flex flex-col items-center justify-center rounded-2xl p-12 text-center;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: hsl(var(--muted-foreground));
+  }
+  .social-empty-state h3 { @apply mt-4 text-lg font-black text-foreground; }
+  .social-empty-state p { @apply mt-2 max-w-sm text-sm; color: hsl(var(--muted-foreground)); }
+
+  /* ── Section Header ────────────────────────────────────────────────── */
+  .section-header {
+    @apply text-xs font-semibold uppercase tracking-widest mb-4;
+    color: hsl(var(--muted-foreground));
   }
 
-  .social-empty-state h3 {
-    @apply mt-4 text-lg font-black text-slate-800;
+  /* ── Reaction Button ───────────────────────────────────────────────── */
+  .reaction-btn {
+    @apply flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium;
+    @apply transition-all duration-150 ease-out active:scale-95 hover:scale-105;
   }
 
-  .social-empty-state p {
-    @apply mt-2 max-w-sm text-sm text-slate-500;
-  }
-
-  /* Wiki tree item */
-  .wiki-tree-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer;
-    @apply transition-all duration-150;
-  }
-  .wiki-tree-item:hover {
-    @apply bg-orange-50 text-orange-700;
-    transform: translateX(4px);
-  }
-  .wiki-tree-item.active {
-    @apply bg-orange-100 text-orange-700 font-semibold;
-  }
-
+  /* ── Wiki (keeping essential structure) ─────────────────────────────── */
   .wiki-shell {
-    @apply bg-slate-100 border border-slate-200 shadow-xl overflow-hidden;
+    @apply overflow-hidden rounded-xl;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     min-height: calc(100vh - 7.5rem);
-    border-radius: 8px;
   }
 
   .wiki-topbar {
-    @apply flex items-center gap-4 border-b border-slate-200 bg-white px-4 py-3;
+    @apply flex items-center gap-4 px-4 py-3;
+    background: rgba(15, 23, 42, 0.6);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .wiki-global-search {
-    @apply mx-auto flex min-w-0 h-10 max-w-2xl flex-1 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 shadow-inner;
+    @apply mx-auto flex min-w-0 h-10 max-w-2xl flex-1 items-center gap-3 rounded-lg px-3;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .wiki-layout {
-    @apply grid min-h-[calc(100vh-11rem)] grid-cols-1 bg-white md:grid-cols-[280px_minmax(0,1fr)];
+    @apply grid min-h-[calc(100vh-11rem)] grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)];
     transition: grid-template-columns 0.28s ease;
   }
 
-  .wiki-sidebar {
-    @apply hidden min-h-full md:block;
-  }
+  .wiki-sidebar { @apply hidden min-h-full md:block; background: rgba(15, 23, 42, 0.3); }
 
-  /* Mobile sidebar overlay — shown when toggle is active on small screens */
   @media (max-width: 767px) {
     .wiki-sidebar:not(.wiki-sidebar-collapsed) {
-      display: block !important;
-      position: fixed;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      z-index: 60;
-      width: 280px;
-      overflow-y: auto;
-      box-shadow: 4px 0 32px rgba(0, 0, 0, 0.18);
+      display: block !important; position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+      width: 280px; overflow-y: auto;
+      box-shadow: 4px 0 32px rgba(0, 0, 0, 0.4);
+      background: hsl(var(--card));
     }
-    .wiki-sidebar-backdrop {
-      display: block !important;
-    }
+    .wiki-sidebar-backdrop { display: block !important; }
   }
 
   .wiki-sidebar-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 59;
-    background: rgba(15, 23, 42, 0.35);
+    display: none; position: fixed; inset: 0; z-index: 59;
+    background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);
   }
 
-  .wiki-sidebar-collapsed {
-    @apply md:hidden;
-  }
-
-  .wiki-sidebar-collapsed + .wiki-main,
-  .wiki-layout:has(.wiki-sidebar-collapsed) {
-    @apply md:grid-cols-1;
-  }
-
-  .wiki-main {
-    @apply min-w-0 bg-slate-50 p-4 md:p-6;
-  }
+  .wiki-sidebar-collapsed { @apply md:hidden; }
+  .wiki-sidebar-collapsed + .wiki-main, .wiki-layout:has(.wiki-sidebar-collapsed) { @apply md:grid-cols-1; }
+  .wiki-main { @apply min-w-0 p-4 md:p-6; }
 
   .wiki-icon-button {
-    @apply h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900;
+    @apply h-9 w-9 items-center justify-center rounded-lg transition-colors;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-icon-button:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--foreground)); }
 
   .wiki-primary-button {
-    @apply inline-flex items-center gap-2 rounded-md bg-[#0057b8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#00499b] active:scale-95;
+    @apply btn-futuristic text-sm;
   }
 
   .wiki-version-badge {
-    @apply rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black leading-none text-orange-700;
+    @apply rounded px-1.5 py-0.5 text-[10px] font-black leading-none;
+    background: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
   }
 
   .wiki-muted-button {
-    @apply inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900;
+    @apply btn-glass text-sm;
   }
 
   .wiki-secondary-action {
-    @apply flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900;
+    @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors;
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-secondary-action:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
 
   .wiki-sidebar-root {
-    @apply flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-base font-semibold text-slate-600 transition-colors hover:bg-white hover:text-[#0057b8];
+    @apply flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-base font-semibold transition-colors;
+    color: hsl(var(--muted-foreground));
   }
-
+  .wiki-sidebar-root:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--primary)); }
   .wiki-sidebar-root-active {
-    @apply bg-white text-[#0057b8] shadow-sm;
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
   }
 
   .wiki-sidebar-add {
-    @apply inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-[#0057b8] shadow-sm transition-colors hover:border-[#0057b8] hover:bg-blue-50;
+    @apply inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors;
+    background: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary));
   }
+  .wiki-sidebar-add:hover { background: hsl(var(--primary) / 0.2); }
 
   .wiki-sidebar-section {
-    @apply flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2.5 text-left text-base font-semibold text-slate-700 transition-colors hover:bg-white hover:text-slate-950;
+    @apply flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2.5 text-left text-base font-semibold transition-colors;
+    color: hsl(var(--foreground) / 0.8);
   }
-
-  .wiki-sidebar-section-active {
-    @apply bg-white text-slate-950 shadow-sm;
-  }
+  .wiki-sidebar-section:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .wiki-sidebar-section-active { background: rgba(255, 255, 255, 0.08); color: hsl(var(--foreground)); }
 
   .wiki-sidebar-subitem,
   .wiki-sidebar-article {
     @apply flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors;
   }
-
-  .wiki-sidebar-article {
-    @apply text-slate-600 hover:bg-white hover:text-[#0057b8];
-  }
-
+  .wiki-sidebar-article { color: hsl(var(--muted-foreground)); }
+  .wiki-sidebar-article:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--primary)); }
   .wiki-sidebar-article-active {
-    @apply border-l-2 border-[#0057b8] bg-white font-semibold text-[#0057b8] shadow-sm;
+    border-left: 2px solid hsl(var(--primary));
+    background: hsl(var(--primary) / 0.08);
+    font-weight: 600;
+    color: hsl(var(--primary));
   }
 
   .wiki-sidebar-row-action {
-    @apply ml-1 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-slate-300 opacity-0 transition-all hover:bg-white hover:text-[#0057b8] group-hover:opacity-100;
+    @apply ml-1 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100;
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-sidebar-row-action:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--primary)); }
 
   .wiki-category-form {
-    @apply mt-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm;
+    @apply mt-3 space-y-2 rounded-xl p-3;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
-
-  .wiki-category-form input,
-  .wiki-category-form textarea {
-    @apply w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:border-[#0057b8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100;
+  .wiki-category-form input, .wiki-category-form textarea {
+    @apply w-full rounded-lg px-3 py-2 text-xs font-medium placeholder:text-muted-foreground focus:outline-none;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--foreground));
   }
-
-  .wiki-category-form textarea {
-    @apply resize-none leading-5;
+  .wiki-category-form input:focus, .wiki-category-form textarea:focus {
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
   }
+  .wiki-category-form textarea { @apply resize-none leading-5; }
+  .wiki-category-form .wiki-category-color { @apply h-9 w-11 flex-shrink-0 cursor-pointer p-1; }
 
-  .wiki-category-form .wiki-category-color {
-    @apply h-9 w-11 flex-shrink-0 cursor-pointer p-1;
-  }
-
-  .wiki-category-save {
-    @apply inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-[#0057b8] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#00499b] disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
+  .wiki-category-save { @apply btn-futuristic text-xs py-2; }
   .wiki-category-cancel {
-    @apply rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900;
+    @apply btn-glass text-xs py-2;
   }
-
   .wiki-category-delete {
-    @apply inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-600 transition-colors hover:bg-red-100;
+    @apply inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
   }
+  .wiki-category-delete:hover { background: rgba(239, 68, 68, 0.2); }
 
-  .wiki-home {
-    @apply mx-auto max-w-7xl space-y-6;
-  }
+  .wiki-home { @apply mx-auto max-w-7xl space-y-6; }
 
   .wiki-hero {
-    @apply relative flex flex-col gap-6 overflow-hidden rounded-lg border border-slate-200 bg-white p-6 shadow-sm xl:flex-row xl:items-end xl:justify-between;
+    @apply relative flex flex-col gap-6 overflow-hidden rounded-2xl p-6 xl:flex-row xl:items-end xl:justify-between;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
-
   .wiki-hero::before {
-    content: "";
-    @apply absolute inset-x-0 top-0 h-1;
-    background: linear-gradient(90deg, #0057b8, #ff7a00, #16a34a);
+    content: ""; @apply absolute inset-x-0 top-0 h-1;
+    background: linear-gradient(90deg, #e65b12, #0057b8, #3b82f6);
   }
-
   .wiki-hero::after {
-    content: "";
-    @apply pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-70;
-    background:
-      linear-gradient(135deg, rgba(0, 87, 184, 0.08), transparent 55%),
-      linear-gradient(225deg, rgba(255, 122, 0, 0.10), transparent 60%);
+    content: ""; @apply pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-40;
+    background: radial-gradient(circle at 80% 50%, rgba(0, 229, 255, 0.1), transparent 60%);
   }
 
-  .wiki-hero h2,
-  .wiki-page-title h2 {
-    @apply relative mt-1 text-2xl font-bold leading-tight text-slate-950 md:text-3xl;
+  .wiki-hero h2, .wiki-page-title h2 {
+    @apply relative mt-1 text-2xl font-bold leading-tight md:text-3xl;
+    color: hsl(var(--foreground));
   }
-
-  .wiki-page-title {
-    @apply pt-2;
-  }
-
-  .wiki-hero p {
-    @apply relative mt-2 text-sm leading-6 text-slate-600;
-  }
+  .wiki-page-title { @apply pt-2; }
+  .wiki-hero p { @apply relative mt-2 text-sm leading-6; color: hsl(var(--muted-foreground)); }
 
   .wiki-eyebrow {
-    @apply text-xs font-bold uppercase tracking-wider text-[#0057b8];
+    @apply text-xs font-bold uppercase tracking-wider;
+    color: hsl(var(--primary));
   }
 
-  .wiki-hero-stats {
-    @apply relative grid grid-cols-3 gap-3 xl:min-w-80;
-  }
+  .wiki-hero-stats { @apply relative grid grid-cols-3 gap-3 xl:min-w-80; }
 
   .wiki-metric {
-    @apply rounded-md border border-slate-200 bg-white/85 px-4 py-3 text-center shadow-sm backdrop-blur;
+    @apply rounded-xl px-4 py-3 text-center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
+  .wiki-metric strong { @apply block text-2xl font-bold; color: hsl(var(--foreground)); }
+  .wiki-metric span { @apply text-xs font-medium; color: hsl(var(--muted-foreground)); }
 
-  .wiki-metric strong {
-    @apply block text-2xl font-bold text-slate-950;
-  }
-
-  .wiki-metric span {
-    @apply text-xs font-medium text-slate-500;
-  }
-
-  .wiki-category-strip {
-    @apply flex flex-nowrap gap-2 overflow-x-auto pb-1 scrollbar-thin;
-  }
+  .wiki-category-strip { @apply flex flex-nowrap gap-2 overflow-x-auto pb-1 scrollbar-thin; }
 
   .wiki-category-pill {
-    @apply inline-flex flex-shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-base font-semibold text-slate-600 transition-colors hover:border-[#0057b8] hover:text-[#0057b8];
+    @apply inline-flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-base font-semibold transition-all;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--muted-foreground));
   }
-
-  .wiki-category-pill span {
-    @apply rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-500;
-  }
-
+  .wiki-category-pill:hover { border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
+  .wiki-category-pill span { @apply rounded px-2 py-0.5 text-sm; background: rgba(255, 255, 255, 0.06); }
   .wiki-category-pill-active {
-    @apply border-[#0057b8] bg-[#0057b8] text-white hover:text-white;
+    background: hsl(var(--primary) / 0.15);
+    border-color: hsl(var(--primary) / 0.4);
+    color: hsl(var(--primary));
   }
-
-  .wiki-category-pill-active span {
-    @apply bg-white/20 text-white;
-  }
+  .wiki-category-pill-active span { background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); }
 
   .wiki-panel {
-    @apply rounded-lg border border-slate-200 bg-white shadow-sm;
+    @apply rounded-xl;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .wiki-section-head {
-    @apply flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4;
+    @apply flex items-center justify-between gap-4 px-5 py-4;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-
-  .wiki-section-head h3 {
-    @apply text-base font-bold text-slate-950;
-  }
-
-  .wiki-section-head p {
-    @apply truncate text-xs text-slate-500;
-  }
-
-  .wiki-section-icon {
-    @apply flex h-10 w-10 items-center justify-center rounded-md;
-  }
+  .wiki-section-head h3 { @apply text-base font-bold; color: hsl(var(--foreground)); }
+  .wiki-section-head p { @apply truncate text-xs; color: hsl(var(--muted-foreground)); }
+  .wiki-section-icon { @apply flex h-10 w-10 items-center justify-center rounded-lg; }
 
   .wiki-article-row {
-    @apply flex cursor-pointer items-start gap-4 rounded-xl border-2 border-slate-200 bg-white px-5 py-4 shadow-sm transition-all;
+    @apply flex cursor-pointer items-start gap-4 rounded-xl px-5 py-4 transition-all;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3px solid hsl(var(--primary));
     margin: 6px 0;
-    border-left: 4px solid #0057b8;
+  }
+  .wiki-article-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: #0057b8;
+    transform: translateX(2px);
   }
 
-  .wiki-article-icon {
-    @apply flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md;
-  }
-
-  .wiki-article-row h4 {
-    @apply text-lg font-bold text-slate-900 transition-colors group-hover:text-[#0057b8];
-  }
-
-  .wiki-article-row p {
-    @apply line-clamp-2 text-base leading-6 text-slate-500;
-  }
+  .wiki-article-icon { @apply flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg; }
+  .wiki-article-row h4 { @apply text-lg font-bold transition-colors; color: hsl(var(--foreground)); }
+  .wiki-article-row h4:hover { color: hsl(var(--primary)); }
+  .wiki-article-row p { @apply line-clamp-2 text-base leading-6; color: hsl(var(--muted-foreground)); }
 
   .wiki-row-category {
-    @apply hidden rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:inline-flex;
+    @apply hidden rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:inline-flex;
+    background: rgba(255, 255, 255, 0.06);
+    color: hsl(var(--muted-foreground));
   }
-
-  .wiki-row-meta {
-    @apply mt-2 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-400;
-  }
-
+  .wiki-row-meta { @apply mt-2 flex flex-wrap items-center gap-2 text-sm font-medium; color: hsl(var(--muted-foreground)); }
   .wiki-row-edit {
-    @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-300 opacity-0 transition-all hover:bg-white hover:text-[#0057b8] group-hover:opacity-100;
+    @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100;
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-row-edit:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--primary)); }
 
-  .wiki-aside-title {
-    @apply mb-3 flex items-center gap-2 text-base font-bold text-slate-900;
-  }
+  .wiki-aside-title { @apply mb-3 flex items-center gap-2 text-base font-bold; color: hsl(var(--foreground)); }
 
   .wiki-recent-item {
-    @apply flex w-full flex-col rounded-md px-2 py-2.5 text-left transition-colors hover:bg-slate-50;
+    @apply flex w-full flex-col rounded-lg px-2 py-2.5 text-left transition-colors;
   }
-
-  .wiki-recent-item span {
-    @apply text-base font-semibold text-slate-700;
-  }
-
-  .wiki-recent-item small {
-    @apply text-xs text-slate-400;
-  }
+  .wiki-recent-item:hover { background: rgba(255, 255, 255, 0.05); }
+  .wiki-recent-item span { @apply text-base font-semibold; color: hsl(var(--foreground) / 0.8); }
+  .wiki-recent-item small { @apply text-xs; color: hsl(var(--muted-foreground)); }
 
   .wiki-governance-item {
-    @apply flex items-start gap-2 rounded-md bg-slate-50 p-3;
+    @apply flex items-start gap-2 rounded-lg p-3;
+    background: rgba(255, 255, 255, 0.03);
   }
-
-  .wiki-governance-item svg {
-    @apply mt-0.5 flex-shrink-0 text-[#0057b8];
-  }
+  .wiki-governance-item svg { @apply mt-0.5 flex-shrink-0; color: hsl(var(--primary)); }
 
   .wiki-empty-state {
-    @apply flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400;
+    @apply flex flex-col items-center justify-center rounded-xl p-12 text-center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-empty-state h3 { @apply mt-4 text-lg font-bold; color: hsl(var(--foreground)); }
+  .wiki-empty-state p { @apply mb-5 mt-2 text-sm; color: hsl(var(--muted-foreground)); }
 
-  .wiki-empty-state h3 {
-    @apply mt-4 text-lg font-bold text-slate-800;
-  }
-
-  .wiki-empty-state p {
-    @apply mb-5 mt-2 text-sm text-slate-500;
-  }
-
-  .wiki-document-layout {
-    @apply grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_260px];
-  }
-
-  .wiki-document-layout--full {
-    @apply xl:grid-cols-1;
-  }
+  .wiki-document-layout { @apply grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_260px]; }
+  .wiki-document-layout--full { @apply xl:grid-cols-1; }
 
   .wiki-document {
-    @apply min-w-0 rounded-xl border-2 border-slate-200 bg-white shadow-md;
+    @apply min-w-0 rounded-xl;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .wiki-breadcrumb {
-    @apply flex items-center gap-2 border-b border-slate-100 px-6 py-3 text-sm text-slate-500;
+    @apply flex items-center gap-2 px-6 py-3 text-sm;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-breadcrumb button { @apply inline-flex items-center gap-1 font-semibold; color: hsl(var(--primary)); }
 
-  .wiki-breadcrumb button {
-    @apply inline-flex items-center gap-1 font-semibold text-[#0057b8] hover:text-[#00499b];
-  }
+  .wiki-document-header { @apply px-8 py-8 md:px-14; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-document-header h2 { @apply text-3xl font-bold leading-tight md:text-4xl; color: hsl(var(--foreground)); }
 
-  .wiki-document-header {
-    @apply border-b border-slate-100 px-8 py-8 md:px-14;
+  .wiki-document-category, .wiki-status-badge {
+    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold;
   }
+  .wiki-status-badge { background: rgba(34, 197, 94, 0.1); color: #3b82f6; }
 
-  .wiki-document-header h2 {
-    @apply text-3xl font-bold leading-tight text-slate-950 md:text-4xl;
-  }
-
-  .wiki-document-category,
-  .wiki-status-badge {
-    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold;
-  }
-
-  .wiki-status-badge {
-    @apply bg-emerald-50 text-emerald-700;
-  }
-
-  .wiki-document-meta {
-    @apply mt-4 flex flex-wrap items-center gap-3 text-xs font-medium text-slate-500;
-  }
-
-  .wiki-document-meta img {
-    @apply h-6 w-6 rounded-full object-cover;
-  }
+  .wiki-document-meta { @apply mt-4 flex flex-wrap items-center gap-3 text-xs font-medium; color: hsl(var(--muted-foreground)); }
+  .wiki-document-meta img { @apply h-6 w-6 rounded-full object-cover; }
 
   .wiki-right-rail {
     @apply hidden space-y-4 xl:block;
-    position: sticky;
-    top: 1rem;
-    align-self: start;
-    max-height: calc(100vh - 5rem);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #e2e8f0 transparent;
+    position: sticky; top: 1rem; align-self: start;
+    max-height: calc(100vh - 5rem); overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent;
   }
 
   .wiki-toc-link {
-    @apply block rounded px-2 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#0057b8];
+    @apply block rounded px-2 py-1.5 text-xs font-medium transition-colors;
+    color: hsl(var(--muted-foreground));
   }
+  .wiki-toc-link:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--primary)); }
 
   .wiki-tag {
-    @apply rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600;
+    @apply rounded-lg px-2 py-1 text-xs font-semibold;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--muted-foreground));
   }
 
-  .wiki-comment-item {
-    @apply flex gap-2 py-2 border-b border-slate-100 last:border-0;
-  }
-
-  .wiki-comment-avatar {
-    @apply h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5;
-  }
-
+  .wiki-comment-item { @apply flex gap-2 py-2 last:border-0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+  .wiki-comment-avatar { @apply h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5; }
   .wiki-comment-input {
-    @apply w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-[#0057b8] focus:bg-white focus:outline-none transition-colors;
+    @apply w-full resize-none rounded-lg px-3 py-2 text-xs placeholder-muted-foreground focus:outline-none transition-colors;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: hsl(var(--foreground));
   }
+  .wiki-comment-input:focus { border-color: hsl(var(--primary) / 0.5); }
 
-  .wiki-stat-row {
-    @apply flex items-center justify-between text-xs text-slate-500 py-1;
-  }
+  .wiki-stat-row { @apply flex items-center justify-between text-xs py-1; color: hsl(var(--muted-foreground)); }
 
-  /* ── Wiki Category Cards (home redesign) ───────────────────────────────── */
-  .wiki-category-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-    gap: 1rem;
-  }
+  /* Wiki Category Cards */
+  .wiki-category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 1rem; }
   .wiki-category-card {
-    @apply relative flex flex-col rounded-xl border-2 border-slate-100 bg-white overflow-hidden cursor-pointer;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    @apply relative flex flex-col rounded-xl overflow-hidden cursor-pointer transition-all duration-300;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
-
-  .wiki-category-card:hover {
-    transform: translateY(-4px);
-    @apply shadow-lg;
-  }
+  .wiki-category-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3); border-color: rgba(255, 255, 255, 0.12); }
 
   .wiki-category-card-header {
     @apply h-36 flex items-center justify-center relative overflow-hidden;
   }
-
   .wiki-category-card-header::before {
-    content: '';
-    @apply absolute inset-0 opacity-10;
+    content: ''; @apply absolute inset-0 opacity-10;
     background: radial-gradient(circle at 80% 20%, white 0%, transparent 70%);
   }
-
   .wiki-category-card-icon {
-    @apply relative z-10 h-20 w-20 rounded-3xl flex items-center justify-center bg-white/25 shadow-sm;
+    @apply relative z-10 h-20 w-20 rounded-3xl flex items-center justify-center bg-white/10 shadow-sm;
+  }
+  .wiki-category-card-body { @apply p-4 flex flex-col flex-1; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-category-card h4 { @apply text-base font-bold; color: hsl(var(--foreground)); overflow-wrap: break-word; word-break: break-word; }
+  .wiki-category-card p { @apply text-sm mt-1.5 leading-5 flex-1; color: hsl(var(--muted-foreground)); }
+  .wiki-category-card-count { @apply mt-4 flex items-center justify-between text-sm font-semibold; color: hsl(var(--muted-foreground)); }
+  .wiki-category-card-count span { @apply rounded-full px-3 py-1; background: rgba(255, 255, 255, 0.06); }
+
+  /* Wiki Content */
+  .wiki-content { @apply px-8 py-6 md:px-14; color: hsl(var(--foreground)); }
+  .wiki-content--html { @apply p-0 overflow-hidden; }
+  .wiki-content h1 { @apply mb-5 text-4xl font-black md:text-5xl; }
+  .wiki-content h2 { @apply mb-2 mt-5 pb-1.5 text-2xl font-black md:text-3xl; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .wiki-content h3 { @apply mb-1.5 mt-4 text-xl font-bold md:text-2xl; }
+  .wiki-content h4 { @apply mb-1 mt-3 text-lg font-bold md:text-xl; }
+  .wiki-content p { @apply mb-2 w-full leading-relaxed; font-size: 1.12rem; }
+  .wiki-content p + p { margin-top: 0; }
+  .wiki-content strong { @apply font-bold; }
+  .wiki-content em { @apply italic; color: hsl(var(--foreground) / 0.8); }
+  .wiki-content hr { @apply my-6; border-color: rgba(255, 255, 255, 0.08); }
+  .wiki-content tr { border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-content td { @apply px-4 py-2 text-base; }
+
+  .wiki-table-wrap { @apply my-5 overflow-x-auto rounded-xl; border: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-table { @apply w-full border-collapse text-sm; min-width: 400px; }
+  .wiki-table th { @apply px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide; background: rgba(255, 255, 255, 0.04); border-bottom: 2px solid rgba(255, 255, 255, 0.08); }
+  .wiki-table td { @apply px-4 py-2.5; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+  .wiki-table tr:last-child td { border-bottom: none; }
+  .wiki-table tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+  .wiki-content table { @apply w-full border-collapse my-5; display: block; overflow-x: auto; max-width: 100%; }
+  .wiki-content a { color: hsl(var(--primary)); @apply underline transition-colors; }
+  .wiki-content a:hover { color: hsl(var(--primary) / 0.8); }
+
+  .wiki-content section, .wiki-content article, .wiki-content > div, .wiki-content > details {
+    width: 100% !important; max-width: 100% !important; box-sizing: border-box;
   }
 
-  .wiki-category-card-body {
-    @apply p-4 flex flex-col flex-1 border-t border-slate-100;
-  }
-
-  .wiki-category-card h4 {
-    @apply text-base font-bold text-slate-900; overflow-wrap: break-word; word-break: break-word;
-  }
-
-  .wiki-category-card p {
-    @apply text-sm text-slate-500 mt-1.5 leading-5 flex-1;
-  }
-
-  .wiki-category-card-count {
-    @apply mt-4 flex items-center justify-between text-sm font-semibold text-slate-400;
-  }
-
-  .wiki-category-card-count span {
-    @apply rounded-full bg-slate-100 px-3 py-1;
-  }
-
-  /* Enhanced hover for article rows */
-  .wiki-article-row:hover {
-    @apply shadow-md bg-blue-50/20;
-    border-left-color: #ff7a00;
-    transform: translateX(2px);
-  }
-
-  /* Sidebar section hover enhancement */
-  .wiki-sidebar-section {
-    transition: background 0.12s ease, color 0.12s ease;
-  }
-
-  /* Category pill hover enhancement */
-  .wiki-category-pill {
-    transition: all 0.15s ease;
-  }
-
-  .wiki-category-pill:hover:not(.wiki-category-pill-active) {
-    transform: translateY(-1px);
-    @apply shadow-sm;
-  }
-
-  /* Compact hero */
-  .wiki-hero-compact {
-    @apply relative flex flex-wrap items-center gap-6 overflow-hidden rounded-xl border border-slate-200 bg-white px-8 py-7 shadow-sm;
-  }
-
-  .wiki-hero-compact::before {
-    content: '';
-    @apply absolute inset-x-0 top-0 h-1;
-    background: linear-gradient(90deg, #0057b8, #ff7a00, #16a34a);
-  }
-
-  .wiki-hero-compact::after {
-    content: '';
-    @apply pointer-events-none absolute right-0 top-0 h-full w-64 opacity-60;
-    background: radial-gradient(circle at 80% 50%, rgba(0,87,184,0.08) 0%, transparent 70%);
-  }
-
-  /* Step badge */
-  .wiki-step-badge {
-    @apply flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white;
-    background: linear-gradient(135deg, #0057b8, #ff7a00);
-  }
-
-  .wiki-content {
-    @apply px-8 py-6 text-slate-900 md:px-14;
-  }
-
-  .wiki-content--html {
-    @apply p-0 overflow-hidden;
-  }
-
-  .wiki-content h1 {
-    @apply mb-5 text-4xl font-black text-slate-950 md:text-5xl;
-  }
-
-  .wiki-content h2 {
-    @apply mb-2 mt-5 border-b border-slate-200 pb-1.5 text-2xl font-black text-slate-950 md:text-3xl;
-  }
-
-  .wiki-content h3 {
-    @apply mb-1.5 mt-4 text-xl font-bold text-slate-900 md:text-2xl;
-  }
-
-  .wiki-content h4 {
-    @apply mb-1 mt-3 text-lg font-bold text-slate-800 md:text-xl;
-  }
-
-  .wiki-content p {
-    @apply mb-2 w-full leading-relaxed text-slate-900;
-    font-size: 1.12rem;
-  }
-
-  /* Consecutive single-sentence paragraphs (Wiki.js export artifact) */
-  .wiki-content p + p {
-    margin-top: 0;
-  }
-
-  .wiki-content strong {
-    @apply font-bold text-slate-950;
-  }
-
-  .wiki-content em {
-    @apply italic text-slate-700;
-  }
-
-  .wiki-content hr {
-    @apply my-6 border-slate-200;
-  }
-
-  .wiki-content tr {
-    @apply border-b border-slate-100;
-  }
-
-  .wiki-content td {
-    @apply px-4 py-2 text-base text-slate-900;
-  }
-
-  /* Markdown-rendered tables */
-  .wiki-table-wrap {
-    @apply my-5 overflow-x-auto rounded-xl border border-slate-200 shadow-sm;
-  }
-
-  .wiki-table {
-    @apply w-full border-collapse text-sm;
-    min-width: 400px;
-  }
-
-  .wiki-table th {
-    @apply bg-slate-50 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600;
-    border-bottom: 2px solid theme('colors.slate.200');
-  }
-
-  .wiki-table td {
-    @apply px-4 py-2.5 text-slate-800;
-    border-bottom: 1px solid theme('colors.slate.100');
-  }
-
-  .wiki-table tr:last-child td {
-    border-bottom: none;
-  }
-
-  .wiki-table tbody tr:hover td {
-    @apply bg-blue-50/30;
-  }
-
-  /* HTML-format tables (raw HTML articles) */
-  .wiki-content table {
-    @apply w-full border-collapse my-5;
-    display: block;
-    overflow-x: auto;
-    max-width: 100%;
-  }
-
-  .wiki-content a {
-    @apply text-blue-600 underline hover:text-blue-800 transition-colors;
-  }
-
-  /* Force HTML-export sections/divs to fill the full column width */
-  .wiki-content section,
-  .wiki-content article,
-  .wiki-content > div,
-  .wiki-content > details {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box;
-  }
-
-  .wiki-ul,
-  .wiki-ol {
-    @apply w-full pl-6 mb-3;
-  }
-
+  .wiki-ul, .wiki-ol { @apply w-full pl-6 mb-3; }
   .wiki-ul { list-style-type: disc; }
   .wiki-ol { list-style-type: decimal; }
-
-  .wiki-bullet,
-  .wiki-ordered {
-    @apply w-full leading-7 text-slate-900;
-    font-size: 1.1rem;
-    margin-bottom: 0.25rem;
-  }
+  .wiki-bullet, .wiki-ordered { @apply w-full leading-7; font-size: 1.1rem; margin-bottom: 0.25rem; }
 
   .wiki-code {
-    @apply my-5 w-full overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-4 text-sm leading-6 text-emerald-300;
+    @apply my-5 w-full overflow-x-auto rounded-xl p-4 text-sm leading-6;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #3b82f6;
   }
-
-  .wiki-code-label {
-    @apply mb-3 border-b border-slate-800 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400;
-  }
+  .wiki-code-label { @apply mb-3 pb-2 text-[10px] font-bold uppercase tracking-wider; border-bottom: 1px solid rgba(255, 255, 255, 0.06); color: hsl(var(--muted-foreground)); }
 
   .wiki-inline-code {
-    @apply rounded border border-blue-100 bg-blue-50 px-1.5 py-0.5 font-mono text-[0.85em] text-[#0057b8];
+    @apply rounded px-1.5 py-0.5 font-mono text-[0.85em];
+    background: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary));
   }
 
-  .wiki-media-image,
-  .wiki-content img {
-    @apply mx-auto my-6 block w-full rounded-lg border border-slate-200 bg-white shadow-sm;
-    max-height: none;
-    object-fit: contain;
-  }
-
-  /* GIFs — full size, natural animation */
-  .wiki-content img[src$=".gif"] {
-    object-fit: unset;
+  .wiki-media-image, .wiki-content img {
+    @apply mx-auto my-6 block rounded-xl;
+    max-width: 100%;
+    width: auto;
     height: auto;
-    max-height: none;
-    width: 100%;
+    max-height: 520px;
+    object-fit: contain;
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
+  .wiki-content img[src$=".gif"] { object-fit: unset; height: auto; max-height: none; width: 100%; }
 
   .wiki-file-card {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 0.5rem;
-    background: #f8fafc;
-    margin: 0.25rem 0;
-    cursor: default;
-    user-select: none;
-    max-width: 100%;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04); margin: 0.25rem 0; cursor: default; user-select: none;
+    max-width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
-  .wiki-file-card-name {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #334155;
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .wiki-file-card-name { font-size: 0.875rem; font-weight: 500; color: hsl(var(--foreground)); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wiki-file-view {
-    padding: 0.2rem 0.55rem;
-    background: #0057b8;
-    color: white;
-    border: none;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
+    padding: 0.2rem 0.55rem; background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+    border: none; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
-  .wiki-file-view:hover { background: #0047a0; }
+  .wiki-file-view:hover { opacity: 0.9; }
 
-  .wiki-content figure.image {
-    @apply mx-auto my-6;
-    width: 100%;
-    max-width: 100%;
+  .wiki-content figure.image { @apply mx-auto my-6; width: 100%; max-width: 100%; }
+  .wiki-content figure.image img { @apply mx-auto block rounded-xl; max-width: 100%; width: auto; height: auto; max-height: 520px; object-fit: contain; border: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-content figcaption { @apply mt-2 text-center text-xs italic; color: hsl(var(--muted-foreground)); }
+
+  .wiki-media-video, .wiki-content video {
+    @apply mx-auto my-6 aspect-video w-full max-w-4xl rounded-xl;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: black;
   }
-
-  .wiki-content figure.image img {
-    @apply mx-auto block w-full rounded-lg border border-slate-200 bg-white shadow-sm;
-    max-height: none;
-    object-fit: contain;
-  }
-
-  .wiki-content figcaption {
-    @apply mt-2 text-center text-xs italic text-slate-500;
-  }
-
-  .wiki-media-video,
-  .wiki-content video {
-    @apply mx-auto my-6 aspect-video w-full max-w-4xl rounded-lg border border-slate-200 bg-slate-950 shadow-sm;
-  }
-
-  .wiki-content iframe {
-    @apply mx-auto my-6 block w-full max-w-5xl rounded-lg border border-slate-200 shadow-sm;
-    min-height: 500px;
-  }
-
+  .wiki-content iframe { @apply mx-auto my-6 block w-full max-w-5xl rounded-xl; border: 1px solid rgba(255, 255, 255, 0.06); min-height: 500px; }
   .wiki-content blockquote {
-    @apply my-5 max-w-3xl rounded-r-lg border-l-4 border-blue-300 bg-blue-50/50 py-3 pl-5 pr-4 italic text-slate-600;
+    @apply my-5 max-w-3xl rounded-r-xl py-3 pl-5 pr-4 italic;
+    border-left: 4px solid hsl(var(--primary) / 0.4);
+    background: hsl(var(--primary) / 0.05);
+    color: hsl(var(--muted-foreground));
+  }
+  .wiki-content ul, .wiki-content ol { @apply my-3 ml-6 max-w-3xl space-y-1; }
+  .wiki-content ul li { @apply list-disc text-base leading-7; }
+  .wiki-content ol li { @apply list-decimal text-base leading-7; }
+  .wiki-content th { @apply px-4 py-2 text-left text-sm font-bold; background: rgba(255, 255, 255, 0.04); }
+  .wiki-content caption { @apply pb-2 text-xs font-semibold; color: hsl(var(--muted-foreground)); }
+
+  .wiki-content .paragrafo { @apply mb-3 text-base leading-7; }
+  .wiki-content .titulo { @apply mb-2 mt-5 text-2xl font-black; }
+  .wiki-content .subtitulo { @apply mb-1 mt-4 text-xl font-bold; }
+  .wiki-content .links a { color: hsl(var(--primary)); @apply underline; }
+  .wiki-content .spanner { display: inline; }
+  .wiki-content details { @apply my-4 max-w-4xl rounded-xl p-4; background: hsl(var(--primary) / 0.05); border: 1px solid hsl(var(--primary) / 0.15); }
+  .wiki-content summary { @apply cursor-pointer font-bold; color: hsl(var(--primary)); }
+
+  /* Wiki Editor */
+  .wiki-editor { @apply mx-auto max-w-6xl space-y-4; }
+  .wiki-editor-toolbar { @apply flex items-center gap-4; }
+  .wiki-editor-toolbar h2 { @apply truncate text-lg font-bold; color: hsl(var(--foreground)); }
+  .wiki-editor-card { @apply overflow-hidden rounded-xl; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-editor-titlebar { @apply p-5; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-editor-titlebar input { @apply w-full bg-transparent text-2xl font-bold placeholder:text-muted-foreground focus:outline-none; color: hsl(var(--foreground)); }
+  .wiki-editor-select { @apply mb-3 rounded-lg px-3 py-2 text-sm focus:outline-none; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: hsl(var(--foreground)); }
+  .wiki-editor-tabs { @apply flex items-center gap-2 px-5 py-2; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-editor-tabs button { @apply inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors; color: hsl(var(--muted-foreground)); }
+  .wiki-editor-tabs button:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .wiki-editor-tabs button.active { background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); }
+  .wiki-editor textarea { @apply min-h-[560px] w-full resize-none p-6 font-mono text-sm leading-7 placeholder:text-muted-foreground focus:outline-none; background: transparent; color: hsl(var(--foreground)); }
+  .wiki-editor-preview { @apply min-h-[560px]; }
+
+  .wiki-mode-editor { @apply -m-4 flex min-h-[calc(100vh-9rem)] flex-col overflow-hidden md:-m-6; background: hsl(var(--background)); }
+  .wiki-mode-topbar { @apply grid h-16 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center px-6; background: rgba(0, 0, 0, 0.4); color: white; }
+  .wiki-mode-brand { @apply text-lg font-semibold tracking-wide; }
+  .wiki-mode-title { @apply text-center text-sm font-bold; }
+  .wiki-mode-actions { @apply flex items-center justify-end gap-6 text-sm font-bold tracking-wide; }
+  .wiki-mode-actions button, .wiki-mode-actions span { @apply inline-flex items-center gap-2 text-white transition-colors hover:text-primary disabled:opacity-50; }
+  .wiki-mode-actions button:first-child svg { color: #3b82f6; }
+  .wiki-mode-actions button:last-child svg { color: #ef4444; }
+  .wiki-mode-pagebar { @apply flex flex-shrink-0 items-center gap-3 px-5 py-2; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-mode-pagebar select, .wiki-mode-pagebar input {
+    @apply rounded-lg px-3 py-2 text-sm focus:outline-none;
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: hsl(var(--foreground));
+  }
+  .wiki-mode-pagebar input { @apply min-w-0 flex-1 font-semibold; }
+
+  .wiki-visual-toolbar, .wiki-source-toolbar {
+    @apply flex h-12 flex-shrink-0 items-center gap-1 overflow-x-auto px-5;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .wiki-visual-toolbar { background: rgba(15, 23, 42, 0.6); }
+  .wiki-source-toolbar { background: hsl(var(--primary) / 0.15); }
+  .wiki-visual-toolbar select { @apply mr-1 h-8 rounded px-2 text-xs focus:outline-none; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); color: hsl(var(--foreground)); }
+  .wiki-visual-toolbar button, .wiki-source-toolbar button { @apply inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-sm font-bold transition-colors; }
+  .wiki-visual-toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
+  .wiki-source-toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
+  .wiki-tb-sep { @apply mx-1 inline-block h-5 w-px flex-shrink-0; background: rgba(255, 255, 255, 0.1); }
+  .wiki-tb-color { @apply relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded; }
+  .wiki-tb-color:hover { background: rgba(255, 255, 255, 0.1); }
+  .wiki-tb-color input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .wiki-img-controls { @apply flex flex-shrink-0 items-center gap-1 px-4 py-1 text-xs font-semibold; background: hsl(var(--primary) / 0.08); border-bottom: 1px solid hsl(var(--primary) / 0.15); color: hsl(var(--primary)); }
+  .wiki-img-controls button { @apply rounded px-2 py-0.5 transition-colors; }
+  .wiki-img-controls button:hover { background: hsl(var(--primary) / 0.15); }
+  .wiki-img-controls .wiki-tb-sep { background: hsl(var(--primary) / 0.2); }
+
+  .wiki-word-stage { @apply flex flex-1 justify-center overflow-auto p-8; background: hsl(var(--background)); }
+  .wiki-word-page {
+    @apply min-h-[900px] w-full max-w-[980px] px-10 py-9 text-base leading-7 outline-none;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    color: hsl(var(--foreground));
+  }
+  .wiki-word-page .wiki-columns { display: flex; gap: 1rem; margin: 0.75rem 0; border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 0.375rem; padding: 0.5rem; }
+  .wiki-word-page .wiki-col { flex: 1; min-width: 0; border: 1px dashed rgba(255, 255, 255, 0.06); border-radius: 0.25rem; padding: 0.5rem; }
+  .wiki-content .wiki-columns { display: flex; gap: 1rem; margin: 1rem 0; }
+  .wiki-content .wiki-col { flex: 1; min-width: 0; }
+  .wiki-word-page:empty::before { content: "Type the page content here"; color: hsl(var(--muted-foreground)); }
+
+  .wiki-code-shell { @apply grid flex-1 grid-cols-[72px_minmax(0,1fr)] overflow-hidden; background: rgba(0, 0, 0, 0.4); }
+  .wiki-code-rail { @apply flex flex-col items-center gap-8 py-10; background: rgba(0, 0, 0, 0.3); color: hsl(var(--muted-foreground)); }
+  .wiki-code-rail svg { @apply cursor-pointer transition-colors hover:text-foreground; }
+  .wiki-code-shell textarea { @apply h-full w-full resize-none px-8 py-4 font-mono text-sm leading-8 outline-none placeholder:text-muted-foreground; background: transparent; color: hsl(var(--foreground)); }
+
+  .wiki-split-editor { @apply grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]; }
+  .wiki-source-pane { @apply grid min-h-[620px] grid-cols-[56px_minmax(0,1fr)] overflow-hidden; background: rgba(0, 0, 0, 0.3); }
+  .wiki-line-number { @apply px-3 py-4 text-right font-mono text-sm; border-right: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.2); color: hsl(var(--muted-foreground)); }
+  .wiki-source-pane textarea { @apply h-full w-full resize-none px-4 py-4 font-mono text-sm leading-7 outline-none placeholder:text-muted-foreground; background: transparent; color: hsl(var(--foreground)); }
+
+  .wiki-preview-pane { @apply min-h-[620px] overflow-auto; }
+  .wiki-preview-pane .wiki-content { @apply px-8 py-8; }
+
+  .wiki-mode-statusbar {
+    @apply grid h-7 flex-shrink-0 grid-cols-[70px_1fr_auto_1fr] items-center text-xs;
+    background: rgba(0, 0, 0, 0.3); color: hsl(var(--muted-foreground));
+  }
+  .wiki-mode-statusbar span, .wiki-mode-statusbar strong { @apply px-3; }
+  .wiki-mode-statusbar strong { @apply text-center font-semibold; }
+  .wiki-mode-statusbar span:last-child { @apply text-right; }
+
+  .wiki-hero-compact {
+    @apply relative flex flex-wrap items-center gap-6 overflow-hidden rounded-xl px-8 py-7;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .wiki-hero-compact::before { content: ''; @apply absolute inset-x-0 top-0 h-1; background: linear-gradient(90deg, #e65b12, #0057b8, #3b82f6); }
+  .wiki-hero-compact::after { content: ''; @apply pointer-events-none absolute right-0 top-0 h-full w-64 opacity-40; background: radial-gradient(circle at 80% 50%, rgba(0, 229, 255, 0.1) 0%, transparent 70%); }
+
+  .wiki-step-badge {
+    @apply flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white;
+    background: linear-gradient(135deg, #e65b12, #0057b8);
   }
 
-  .wiki-content ul,
-  .wiki-content ol {
-    @apply my-3 ml-6 max-w-3xl space-y-1;
-  }
-
-  .wiki-content ul li {
-    @apply list-disc text-base leading-7 text-slate-900;
-  }
-
-  .wiki-content ol li {
-    @apply list-decimal text-base leading-7 text-slate-900;
-  }
-
-  .wiki-content th {
-    @apply bg-slate-50 px-4 py-2 text-left text-sm font-bold text-slate-800;
-  }
-
-  .wiki-content caption {
-    @apply pb-2 text-xs font-semibold text-slate-500;
-  }
-
-  /* Wiki.js imported content classes */
-  .wiki-content .paragrafo {
-    @apply mb-3 text-base leading-7 text-slate-900;
-  }
-
-  .wiki-content .titulo {
-    @apply mb-2 mt-5 text-2xl font-black text-slate-950;
-  }
-
-  .wiki-content .subtitulo {
-    @apply mb-1 mt-4 text-xl font-bold text-slate-900;
-  }
-
-  .wiki-content .links a {
-    @apply text-[#0057b8] underline hover:text-[#003d82];
-  }
-
-  .wiki-content .spanner {
-    display: inline;
-  }
-
-  .wiki-content details {
-    @apply my-4 max-w-4xl rounded-lg border border-blue-200 bg-blue-50/60 p-4;
-  }
-
-  .wiki-content summary {
-    @apply cursor-pointer font-bold text-[#0057b8];
-  }
-
-  /* Gamification toast animations */
-  @keyframes xpSlideIn {
-    from { opacity: 0; transform: translateX(110%); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes xpSlideOut {
-    from { opacity: 1; transform: translateX(0); }
-    to   { opacity: 0; transform: translateX(110%); }
-  }
-
+  /* ── Gamification Toast ────────────────────────────────────────────── */
+  @keyframes xpSlideIn { from { opacity: 0; transform: translateX(110%); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes xpSlideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(110%); } }
   .xp-toast { will-change: transform, opacity; }
   .xp-toast-enter { animation: xpSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-  .xp-toast-exit  { animation: xpSlideOut 0.4s ease-in forwards; }
+  .xp-toast-exit { animation: xpSlideOut 0.4s ease-in forwards; }
 
-  /* ── Global Notifications (calls + messages) ───────────────────────────── */
-  @keyframes notifDropIn {
-    from { opacity: 0; transform: translateY(-16px) scale(0.95); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  @keyframes notifSlideIn {
-    from { opacity: 0; transform: translateX(48px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
+  /* ── Global Notifications ──────────────────────────────────────────── */
+  @keyframes notifDropIn { from { opacity: 0; transform: translateY(-16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes notifSlideIn { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: translateX(0); } }
 
   .global-call-card {
     @apply fixed top-4 right-4 z-[9998] w-72 rounded-2xl p-4 shadow-2xl;
-    background: linear-gradient(145deg, #1e1e3f 0%, #0f0f23 100%);
-    border: 1px solid rgba(255,255,255,0.10);
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(10, 15, 30, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
     animation: notifDropIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
   .global-call-reject {
     @apply flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white transition-colors;
-    background: rgba(239,68,68,0.85);
+    background: rgba(239, 68, 68, 0.8);
   }
-  .global-call-reject:hover { background: rgba(220,38,38,0.95); }
-
+  .global-call-reject:hover { background: rgba(220, 38, 38, 0.95); }
   .global-call-accept {
     @apply flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white transition-colors;
-    background: rgba(34,197,94,0.85);
+    background: rgba(34, 197, 94, 0.8);
   }
-  .global-call-accept:hover { background: rgba(22,163,74,0.95); }
+  .global-call-accept:hover { background: rgba(22, 163, 74, 0.95); }
 
-  .global-msg-stack {
-    @apply fixed bottom-24 right-4 z-[9997] flex flex-col-reverse gap-2;
-    pointer-events: none;
-  }
-
+  .global-msg-stack { @apply fixed bottom-24 right-4 z-[9997] flex flex-col-reverse gap-2; pointer-events: none; }
   .global-msg-card {
-    @apply flex w-72 cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg transition-shadow hover:shadow-xl;
+    @apply flex w-72 cursor-pointer items-center gap-2.5 rounded-xl p-2.5 shadow-lg transition-shadow hover:shadow-xl;
     pointer-events: auto;
+    background: hsl(var(--card));
+    border: 1px solid rgba(255, 255, 255, 0.1);
     animation: notifSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
-  .wiki-editor {
-    @apply mx-auto max-w-6xl space-y-4;
+  /* ── Inputs Dark ───────────────────────────────────────────────────── */
+  .glass-overlay { @apply fixed inset-0 backdrop-blur-sm bg-black/30 z-40; }
+
+  button, a, input, [role="button"] { @apply transition-all duration-200 ease-out; }
+
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  @supports not (backdrop-filter: blur(10px)) {
+    .backdrop-blur-sm { background-color: rgba(15, 20, 25, 0.9); }
+    .backdrop-blur-md { background-color: rgba(15, 20, 25, 0.95); }
+    .backdrop-blur-xl { background-color: rgba(15, 20, 25, 0.98); }
   }
 
-  .wiki-editor-toolbar {
-    @apply flex items-center gap-4;
+  @media print {
+    .no-print { display: none; }
+    * { @apply shadow-none; }
   }
 
-  .wiki-editor-toolbar h2 {
-    @apply truncate text-lg font-bold text-slate-950;
+  /* ── Wiki Tree Item ────────────────────────────────────────────────── */
+  .wiki-tree-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer transition-all duration-150;
+    color: hsl(var(--muted-foreground));
   }
-
-  .wiki-editor-card {
-    @apply overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm;
-  }
-
-  .wiki-editor-titlebar {
-    @apply border-b border-slate-100 p-5;
-  }
-
-  .wiki-editor-titlebar input {
-    @apply w-full bg-transparent text-2xl font-bold text-slate-950 placeholder:text-slate-300 focus:outline-none;
-  }
-
-  .wiki-editor-select {
-    @apply mb-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-200;
-  }
-
-  .wiki-editor-tabs {
-    @apply flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-5 py-2;
-  }
-
-  .wiki-editor-tabs button {
-    @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-900;
-  }
-
-  .wiki-editor-tabs button.active {
-    @apply bg-[#0057b8] text-white shadow-sm;
-  }
-
-  .wiki-editor textarea {
-    @apply min-h-[560px] w-full resize-none bg-white p-6 font-mono text-sm leading-7 text-slate-700 placeholder:text-slate-300 focus:outline-none;
-  }
-
-  .wiki-editor-preview {
-    @apply min-h-[560px];
-  }
-
-  .wiki-mode-editor {
-    @apply -m-4 flex min-h-[calc(100vh-9rem)] flex-col overflow-hidden bg-[#ececec] text-slate-900 md:-m-6;
-  }
-
-  .wiki-mode-topbar {
-    @apply grid h-16 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center bg-black px-6 text-white;
-  }
-
-  .wiki-mode-brand {
-    @apply text-lg font-semibold tracking-wide;
-  }
-
-  .wiki-mode-title {
-    @apply text-center text-sm font-bold;
-  }
-
-  .wiki-mode-actions {
-    @apply flex items-center justify-end gap-6 text-sm font-bold tracking-wide;
-  }
-
-  .wiki-mode-actions button,
-  .wiki-mode-actions span {
-    @apply inline-flex items-center gap-2 text-white transition-colors hover:text-blue-300 disabled:opacity-50;
-  }
-
-  .wiki-mode-actions button:first-child svg {
-    @apply text-green-500;
-  }
-
-  .wiki-mode-actions button:last-child svg {
-    @apply text-red-500;
-  }
-
-  .wiki-mode-pagebar {
-    @apply flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 py-2;
-  }
-
-  .wiki-mode-pagebar select,
-  .wiki-mode-pagebar input {
-    @apply rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#0057b8] focus:outline-none focus:ring-2 focus:ring-blue-100;
-  }
-
-  .wiki-mode-pagebar input {
-    @apply min-w-0 flex-1 font-semibold;
-  }
-
-  .wiki-visual-toolbar,
-  .wiki-source-toolbar {
-    @apply flex h-12 flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-300 bg-[#d9d9d9] px-5;
-  }
-
-  .wiki-source-toolbar {
-    @apply bg-[#1976c9] text-white;
-  }
-
-  .wiki-visual-toolbar select {
-    @apply mr-1 h-8 rounded border border-slate-300 bg-slate-100 px-2 text-xs text-slate-800 focus:outline-none;
-  }
-
-  .wiki-visual-toolbar button,
-  .wiki-source-toolbar button {
-    @apply inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-sm font-bold transition-colors hover:bg-white/40;
-  }
-
-  .wiki-source-toolbar button {
-    @apply hover:bg-white/15;
-  }
-
-  .wiki-tb-sep {
-    @apply mx-1 inline-block h-5 w-px flex-shrink-0 bg-slate-400/40;
-  }
-
-  /* Color picker labels in toolbar */
-  .wiki-tb-color {
-    @apply relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded hover:bg-white/40;
-  }
-  .wiki-tb-color input[type="color"] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-  }
-
-  /* Image float controls bar */
-  .wiki-img-controls {
-    @apply flex flex-shrink-0 items-center gap-1 border-b border-blue-200 bg-blue-50 px-4 py-1 text-xs font-semibold text-blue-700;
-  }
-  .wiki-img-controls button {
-    @apply rounded px-2 py-0.5 hover:bg-blue-200 transition-colors;
-  }
-  .wiki-img-controls .wiki-tb-sep {
-    @apply bg-blue-300/50;
-  }
-
-  .wiki-word-stage {
-    @apply flex flex-1 justify-center overflow-auto bg-[#ededed] p-8;
-  }
-
-  .wiki-word-page {
-    @apply min-h-[900px] w-full max-w-[980px] bg-white px-10 py-9 text-base leading-7 text-slate-700 shadow-sm outline-none;
-  }
-
-  /* Column layouts inside visual editor */
-  .wiki-word-page .wiki-columns {
-    display: flex;
-    gap: 1rem;
-    margin: 0.75rem 0;
-    border: 1px dashed #cbd5e1;
-    border-radius: 0.375rem;
-    padding: 0.5rem;
-  }
-  .wiki-word-page .wiki-col {
-    flex: 1;
-    min-width: 0;
-    border: 1px dashed #e2e8f0;
-    border-radius: 0.25rem;
-    padding: 0.5rem;
-  }
-  /* Also render columns in article view */
-  .wiki-content .wiki-columns {
-    display: flex;
-    gap: 1rem;
-    margin: 1rem 0;
-  }
-  .wiki-content .wiki-col {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .wiki-word-page:empty::before {
-    content: "Type the page content here";
-    @apply text-slate-400;
-  }
-
-  .wiki-code-shell {
-    @apply grid flex-1 grid-cols-[72px_minmax(0,1fr)] overflow-hidden bg-[#191919];
-  }
-
-  .wiki-code-rail {
-    @apply flex flex-col items-center gap-8 bg-[#242424] py-10 text-slate-400;
-  }
-
-  .wiki-code-rail svg {
-    @apply cursor-pointer transition-colors hover:text-white;
-  }
-
-  .wiki-code-shell textarea {
-    @apply h-full w-full resize-none bg-[#191919] px-8 py-4 font-mono text-sm leading-8 text-slate-100 outline-none placeholder:text-slate-500;
-  }
-
-  .wiki-split-editor {
-    @apply grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)];
-  }
-
-  .wiki-source-pane {
-    @apply grid min-h-[620px] grid-cols-[56px_minmax(0,1fr)] overflow-hidden bg-[#1b1b1b];
-  }
-
-  .wiki-line-number {
-    @apply border-r border-black/30 bg-[#202020] px-3 py-4 text-right font-mono text-sm text-slate-500;
-  }
-
-  .wiki-source-pane textarea {
-    @apply h-full w-full resize-none bg-[#1b1b1b] px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none placeholder:text-slate-500;
-  }
-
-  .wiki-preview-pane {
-    @apply min-h-[620px] overflow-auto bg-white;
-  }
-
-  .wiki-preview-pane .wiki-content {
-    @apply px-8 py-8;
-  }
-
-  .wiki-split-asciidoc .wiki-content h2,
-  .wiki-split-asciidoc .wiki-content h3 {
-    @apply border-slate-400 text-slate-700;
-  }
-
-  .wiki-mode-statusbar {
-    @apply grid h-7 flex-shrink-0 grid-cols-[70px_1fr_auto_1fr] items-center bg-[#4a4a4a] text-xs text-white;
-  }
-
-  .wiki-mode-statusbar span,
-  .wiki-mode-statusbar strong {
-    @apply px-3;
-  }
-
-  .wiki-mode-statusbar strong {
-    @apply text-center font-semibold;
-  }
-
-  .wiki-mode-statusbar span:last-child {
-    @apply text-right;
-  }
-
-  /* Reaction button */
-  .reaction-btn {
-    @apply flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium;
-    @apply transition-all duration-150 ease-out active:scale-95;
-    @apply hover:scale-105;
-  }
-
-  /* Section header */
-  .section-header {
-    @apply text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4;
-  }
+  .wiki-tree-item:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--primary)); transform: translateX(4px); }
+  .wiki-tree-item.active { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); @apply font-semibold; }
 }
 
-/* Animate in keyframes */
-@keyframes slideInFromTop {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideInFromBottom {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 0.8; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
+/* ── Keyframes ───────────────────────────────────────────────────────── */
+@keyframes slideInFromTop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInFromBottom { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
+@keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes pageEnter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes navUnderline { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 
 .animate-slide-in { animation: slideInFromTop 0.2s ease-out; }
 .animate-slide-up { animation: slideInFromBottom 0.2s ease-out; }
 .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
-}
-.pulse-overdue  { animation: pulse-slow 7s ease-in-out infinite; }
-.pulse-near     { animation: pulse-slow 10s ease-in-out infinite; }
-
-@keyframes pageEnter {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+.pulse-overdue { animation: pulse-slow 7s ease-in-out infinite; }
+.pulse-near { animation: pulse-slow 10s ease-in-out infinite; }
 .page-enter { animation: pageEnter 0.22s ease-out forwards; }
+@media (min-width: 1024px) { .page-enter { animation: pageEnter 0.3s ease-out forwards; } }
+.nav-underline-enter { animation: navUnderline 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards; transform-origin: left center; }
 
-@media (min-width: 1024px) {
-  .page-enter { animation: pageEnter 0.3s ease-out forwards; }
-}
+/* ── Chat Dark Mode ──────────────────────────────────────────────────── */
+.chat-dark { color-scheme: dark; }
+.chat-dark aside { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark aside .border-b, .chat-dark aside [class*="border-slate"] { border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark aside .bg-white, .chat-dark aside [class*="bg-orange-50"], .chat-dark aside [class*="bg-slate-50"], .chat-dark aside [class*="bg-slate-100"] { background-color: rgba(10, 15, 25, 0.95) !important; }
+.chat-dark aside [class*="hover:bg-slate-50"]:hover, .chat-dark aside [class*="hover:bg-slate-100"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark aside .bg-orange-50 { background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark aside [class*="text-slate-900"], .chat-dark aside [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark aside [class*="text-slate-600"], .chat-dark aside [class*="text-slate-500"], .chat-dark aside [class*="text-slate-400"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark aside input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
+.chat-dark aside input::placeholder { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark aside button[class*="text-slate-500"], .chat-dark aside button[class*="text-slate-600"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark main > div:first-child { background-color: rgba(15, 23, 42, 0.8) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark main > div:first-child [class*="text-slate-900"], .chat-dark main > div:first-child [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark main > div:first-child [class*="text-slate-600"], .chat-dark main > div:first-child [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark main > div:first-child button[class*="text-slate-500"], .chat-dark main > div:first-child button[class*="hover:bg-slate-100"]:hover { color: hsl(var(--muted-foreground)) !important; background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark main > div:first-child [class*="border-slate-100"], .chat-dark main > div:first-child [class*="border-b"] { border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark main [class*="bg-slate-50"] { background-color: rgba(15, 23, 42, 0.6) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark main [class*="bg-slate-50"] input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
+.chat-dark main [class*="bg-slate-50"] input::placeholder { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-input-bar { background-color: rgba(15, 23, 42, 0.8) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-input-bar textarea { background-color: rgba(255, 255, 255, 0.04) !important; color: #e9edef !important; }
+.chat-dark .chat-input-bar textarea::placeholder { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-input-bar button[class*="text-slate-500"], .chat-dark .chat-input-bar button[class*="text-slate-400"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-input-bar button[class*="hover:bg-slate-100"]:hover, .chat-dark .chat-input-bar button[class*="hover:bg-slate-50"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-bubble-other { background-color: rgba(15, 23, 42, 0.6) !important; color: #e9edef !important; }
+.chat-dark .chat-bubble-other [class*="text-slate-"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-emoji-panel, .chat-dark .chat-sticker-panel { background-color: rgba(15, 23, 42, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-emoji-panel button:hover, .chat-dark .chat-sticker-panel button:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark aside:last-of-type { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark aside:last-of-type [class*="text-slate-900"], .chat-dark aside:last-of-type [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark aside:last-of-type [class*="text-slate-600"], .chat-dark aside:last-of-type [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-empty-state { background-color: rgba(5, 10, 18, 0.95) !important; color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-users-drawer { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-users-drawer [class*="text-slate-900"], .chat-dark .chat-users-drawer [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark .chat-users-drawer [class*="text-slate-600"], .chat-dark .chat-users-drawer [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-users-drawer input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
+.chat-dark .chat-users-drawer [class*="hover:bg-slate-50"]:hover, .chat-dark .chat-users-drawer [class*="hover:bg-slate-100"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-group-settings { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-group-settings [class*="text-slate-900"], .chat-dark .chat-group-settings [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark .chat-group-settings [class*="text-slate-600"], .chat-dark .chat-group-settings [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-group-settings [class*="bg-slate-50"], .chat-dark .chat-group-settings [class*="bg-white"] { background-color: rgba(10, 15, 25, 0.95) !important; }
+.chat-dark .chat-group-settings [class*="border-slate"] { border-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-group-settings [class*="hover:bg-slate-50"]:hover, .chat-dark .chat-group-settings [class*="hover:bg-slate-100"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.chat-dark .chat-group-settings input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
 
-@keyframes navUnderline {
-  from { transform: scaleX(0); opacity: 0; }
-  to   { transform: scaleX(1); opacity: 1; }
-}
-.nav-underline-enter {
-  animation: navUnderline 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  transform-origin: left center;
-}
-
-/* ── Chat Dark Mode ─────────────────────────────────────────────────────── */
-.chat-dark {
-  color-scheme: dark;
-}
-
-/* Sidebar */
-.chat-dark aside {
-  background-color: #111b21 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark aside .border-b,
-.chat-dark aside [class*="border-slate"] {
-  border-color: #2a3942 !important;
-}
-.chat-dark aside .bg-white,
-.chat-dark aside [class*="bg-orange-50"],
-.chat-dark aside [class*="bg-slate-50"],
-.chat-dark aside [class*="bg-slate-100"] {
-  background-color: #111b21 !important;
-}
-.chat-dark aside [class*="hover:bg-slate-50"]:hover,
-.chat-dark aside [class*="hover:bg-slate-100"]:hover {
-  background-color: #2a3942 !important;
-}
-/* selected conversation */
-.chat-dark aside .bg-orange-50 {
-  background-color: #2a3942 !important;
-}
-.chat-dark aside [class*="text-slate-900"],
-.chat-dark aside [class*="text-slate-800"] {
-  color: #e9edef !important;
-}
-.chat-dark aside [class*="text-slate-600"],
-.chat-dark aside [class*="text-slate-500"],
-.chat-dark aside [class*="text-slate-400"] {
-  color: #8696a0 !important;
-}
-.chat-dark aside input {
-  background-color: #2a3942 !important;
-  border-color: #3b4a54 !important;
-  color: #e9edef !important;
-}
-.chat-dark aside input::placeholder {
-  color: #8696a0 !important;
-}
-.chat-dark aside button[class*="text-slate-500"],
-.chat-dark aside button[class*="text-slate-600"] {
-  color: #8696a0 !important;
-}
-
-/* Main header */
-.chat-dark main > div:first-child {
-  background-color: #1f2c34 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark main > div:first-child [class*="text-slate-900"],
-.chat-dark main > div:first-child [class*="text-slate-800"] {
-  color: #e9edef !important;
-}
-.chat-dark main > div:first-child [class*="text-slate-600"],
-.chat-dark main > div:first-child [class*="text-slate-500"] {
-  color: #8696a0 !important;
-}
-.chat-dark main > div:first-child button[class*="text-slate-500"],
-.chat-dark main > div:first-child button[class*="hover:bg-slate-100"]:hover {
-  color: #8696a0 !important;
-  background-color: #2a3942 !important;
-}
-.chat-dark main > div:first-child [class*="border-slate-100"],
-.chat-dark main > div:first-child [class*="border-b"] {
-  border-color: #2a3942 !important;
-}
-
-/* Message search bar */
-.chat-dark main [class*="bg-slate-50"] {
-  background-color: #1f2c34 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark main [class*="bg-slate-50"] input {
-  background-color: #2a3942 !important;
-  border-color: #3b4a54 !important;
-  color: #e9edef !important;
-}
-.chat-dark main [class*="bg-slate-50"] input::placeholder {
-  color: #8696a0 !important;
-}
-
-/* Message input area (bottom bar) */
-.chat-dark .chat-input-bar {
-  background-color: #1f2c34 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark .chat-input-bar textarea {
-  background-color: #2a3942 !important;
-  color: #e9edef !important;
-}
-.chat-dark .chat-input-bar textarea::placeholder {
-  color: #8696a0 !important;
-}
-.chat-dark .chat-input-bar button[class*="text-slate-500"],
-.chat-dark .chat-input-bar button[class*="text-slate-400"] {
-  color: #8696a0 !important;
-}
-.chat-dark .chat-input-bar button[class*="hover:bg-slate-100"]:hover,
-.chat-dark .chat-input-bar button[class*="hover:bg-slate-50"]:hover {
-  background-color: #2a3942 !important;
-}
-
-/* Other person's message bubble */
-.chat-dark .chat-bubble-other {
-  background-color: #202c33 !important;
-  color: #e9edef !important;
-}
-.chat-dark .chat-bubble-other [class*="text-slate-"] {
-  color: #8696a0 !important;
-}
-
-/* Emoji/sticker panels */
-.chat-dark .chat-emoji-panel,
-.chat-dark .chat-sticker-panel {
-  background-color: #233138 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark .chat-emoji-panel button:hover,
-.chat-dark .chat-sticker-panel button:hover {
-  background-color: #2a3942 !important;
-}
-
-/* Right panel (users) */
-.chat-dark aside:last-of-type {
-  background-color: #111b21 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark aside:last-of-type [class*="text-slate-900"],
-.chat-dark aside:last-of-type [class*="text-slate-800"] {
-  color: #e9edef !important;
-}
-.chat-dark aside:last-of-type [class*="text-slate-600"],
-.chat-dark aside:last-of-type [class*="text-slate-500"] {
-  color: #8696a0 !important;
-}
-
-/* "No conversation selected" placeholder */
-.chat-dark .chat-empty-state {
-  background-color: #0d1418 !important;
-  color: #8696a0 !important;
-}
-
-/* Mobile users drawer */
-.chat-dark .chat-users-drawer {
-  background-color: #111b21 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark .chat-users-drawer [class*="text-slate-900"],
-.chat-dark .chat-users-drawer [class*="text-slate-800"] {
-  color: #e9edef !important;
-}
-.chat-dark .chat-users-drawer [class*="text-slate-600"],
-.chat-dark .chat-users-drawer [class*="text-slate-500"] {
-  color: #8696a0 !important;
-}
-.chat-dark .chat-users-drawer input {
-  background-color: #2a3942 !important;
-  border-color: #3b4a54 !important;
-  color: #e9edef !important;
-}
-.chat-dark .chat-users-drawer [class*="hover:bg-slate-50"]:hover,
-.chat-dark .chat-users-drawer [class*="hover:bg-slate-100"]:hover {
-  background-color: #2a3942 !important;
-}
-
-/* Group settings panel */
-.chat-dark .chat-group-settings {
-  background-color: #111b21 !important;
-  border-color: #2a3942 !important;
-}
-.chat-dark .chat-group-settings [class*="text-slate-900"],
-.chat-dark .chat-group-settings [class*="text-slate-800"] {
-  color: #e9edef !important;
-}
-.chat-dark .chat-group-settings [class*="text-slate-600"],
-.chat-dark .chat-group-settings [class*="text-slate-500"] {
-  color: #8696a0 !important;
-}
-.chat-dark .chat-group-settings [class*="bg-slate-50"],
-.chat-dark .chat-group-settings [class*="bg-white"] {
-  background-color: #111b21 !important;
-}
-.chat-dark .chat-group-settings [class*="border-slate"] {
-  border-color: #2a3942 !important;
-}
-.chat-dark .chat-group-settings [class*="hover:bg-slate-50"]:hover,
-.chat-dark .chat-group-settings [class*="hover:bg-slate-100"]:hover {
-  background-color: #2a3942 !important;
-}
-.chat-dark .chat-group-settings input {
-  background-color: #2a3942 !important;
-  border-color: #3b4a54 !important;
-  color: #e9edef !important;
-}
-
-/* Chat page — fill viewport, prevent scroll offset */
-html:has(.chat-shell) {
-  overflow: hidden;
-}
-@media (min-width: 1024px) {
-  html:has(.chat-shell) {
-    font-size: 12px;
-  }
-  body:has(.chat-shell) {
-    overflow: hidden;
-  }
-  body:has(.chat-shell) main.pt-14 {
-    height: calc(100dvh / 1.3) !important;
-    min-height: 0 !important;
-    overflow: hidden;
-  }
-  .chat-shell {
-    height: calc(100dvh / 1.3 - 3.5rem) !important;
-  }
-}
-
+/* Chat page — prevent body scroll */
+html:has(.chat-shell) { overflow: hidden; }
+body:has(.chat-shell) { overflow: hidden; }

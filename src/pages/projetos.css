@@ -191,8 +191,8 @@
 .next-action strong { flex: 1; color: #64738a; font-weight: 600; }
 .next-action > svg { color: #2878ee; }
 .error-banner { padding: 12px 16px; margin-top: 20px; color: #a93429; background: #fdeceb; border: 1px solid #f6c9c4; border-radius: 9px; font-size: 12px; font-weight: 600; }
-.modal-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(20,30,50,0.55); backdrop-filter: blur(3px); animation: pop .2s ease-out; }
-.modal { width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; padding: 26px 28px; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px #16254433; }
+.modal-overlay { position: fixed; inset: 0; z-index: 200; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 24px; background: rgba(20,30,50,0.55); backdrop-filter: blur(3px); animation: pop .2s ease-out; }
+.modal { width: 100%; max-width: 540px; flex-shrink: 0; margin: auto; padding: 26px 28px; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px #16254433; }
 .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
 .modal-header h3 { color: #24334c; font: 700 18px Manrope; margin-top: 5px; }
 .accent-picker { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -560,17 +560,17 @@
 .dark .tab:hover { color: #8fa3be; }
 .dark .tab.active { color: #5a9ef5; }
 .dark .tab.active::after { background: #5a9ef5; }
-.dark .metric-card { background: #161e2e; border-color: #1f2d42; }
+.dark .metric-card { background: #161e2e !important; border-color: #1f2d42 !important; }
 .dark .metric-label { color: #4e617d; }
 .dark .metric-value { color: #d0dff0; }
 .dark .metric-caption { color: #3e5170; }
-.dark .panel { background: #161e2e; border-color: #1f2d42; }
+.dark .panel { background: #161e2e !important; border-color: #1f2d42 !important; }
 .dark .panel-title { color: #d0dff0; }
-.dark .project-row { border-color: #1f2d42; }
-.dark .project-row:hover { background: #1a253a; }
-.dark .project-row-title strong { color: #c8d6ea; }
-.dark .project-row-title small { color: #4e617d; }
-.dark .project-card { background: #161e2e; border-color: #1f2d42; }
+.dark .project-row { border-color: #1f2d42 !important; }
+.dark .project-row:hover { background: #1a253a !important; }
+.dark .project-row-title strong { color: #c8d6ea !important; }
+.dark .project-row-title small { color: #4e617d !important; }
+.dark .project-card { background: #161e2e !important; border-color: #1f2d42 !important; }
 .dark .card-category { color: #4e617d; }
 .dark .card-title-row h3 { color: #d0dff0; }
 .dark .card-footer small { color: #4e617d; }
@@ -1062,7 +1062,11 @@
 .dark .timeline-detail span { color: #4e617d; }
 .dark .timeline-item > svg { color: #2a3b52; }
 /* ── Dark Mode — Status pills ────────────────────────────────── */
-.dark .status-progress { background: #2d1a00; color: #f59e0b; }
+html.dark .status-progress,
+html.dark .status-pill.status-progress { background: #2d1800 !important; color: #ffa500 !important; }
+html.dark .status-preset-pill.status-progress { background: #2d1800 !important; color: #ffa500 !important; }
+html.dark .status-preset-pill.status-progress i,
+html.dark .status-pill.status-progress i { background: #ffa500 !important; }
 .dark .status-done { background: #082e1e; color: #34d399; }
 .dark .status-attention { background: #2d1200; color: #fb923c; }
 .dark .status-idle { background: #1a253a; color: #5e7a99; }
@@ -1072,7 +1076,7 @@
 .dark .tv-button { background: #1a253a; border-color: #2a3b52; color: #7d93ad; }
 .dark .tv-button:hover { border-color: #3e6ea0; color: #5a9ef5; background: #162236; }
 /* ── Dark Mode — Visão Geral — highlight banner ─────────────── */
-.dark .highlight-banner { background: #0d1e35; border-color: #1a3356; }
+.dark .highlight-banner { background: #0d1e35 !important; border-color: #1a3356 !important; }
 .dark .highlight-icon { background: #162748; color: #5a9ef5; }
 .dark .highlight-banner h2 { color: #8fa3be; }
 .dark .highlight-banner h2 strong { color: #5a9ef5; }
@@ -1223,3 +1227,120 @@
 .dark .projetos-menu-btn:hover { background: #162236; color: #5a9ef5; }
 .dark .sidebar-mobile-close:hover { background: #1e2d42; color: #5a9ef5; }
 .dark .sidebar-overlay.open { background: rgba(0,10,25,.6); }
+
+/* ── Dark Mode — Critical overrides (end of file for max specificity) ── */
+html.dark .projetos-wrap { background: #0f1623 !important; }
+html.dark .projetos-sidebar { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .projetos-main { background: #0f1623 !important; }
+html.dark .panel { background: #161e2e !important; border-color: #1f2d42 !important; box-shadow: 0 4px 16px rgba(0,0,0,.2) !important; }
+html.dark .metric-card { background: #161e2e !important; border-color: #1f2d42 !important; box-shadow: 0 4px 16px rgba(0,0,0,.2) !important; }
+html.dark .project-card { background: #161e2e !important; border-color: #1f2d42 !important; box-shadow: 0 4px 16px rgba(0,0,0,.2) !important; }
+html.dark .project-row { border-color: #1f2d42 !important; }
+html.dark .project-row:hover { background: #1a253a !important; }
+html.dark .highlight-banner { background: #0d1e35 !important; border-color: #1a3356 !important; }
+html.dark .modal { background: #161e2e !important; }
+html.dark .new-project-layout { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .requests-list { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .request-row { border-color: #1f2d42 !important; }
+html.dark .project-list-view { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .detail-section { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .search-field { background: #1a253a !important; border-color: #2a3b52 !important; }
+html.dark .filter-select { background: #1a253a !important; border-color: #2a3b52 !important; }
+html.dark .filter-icon { background: #1a253a !important; border-color: #2a3b52 !important; }
+html.dark .comment-form { background: #1a253a !important; border-color: #2a3b52 !important; }
+html.dark .comment-body { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .attachment-item { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .cal-day { background: #161e2e !important; border-color: #1f2d42 !important; }
+html.dark .cal-day.empty { background: transparent !important; border-color: transparent !important; }
+html.dark .progress-track { background: #1e2d42 !important; }
+
+/* ── Portfolio rows: dark mode background fixes ── */
+html.dark .project-row.pr-late { background: linear-gradient(90deg,#2a0a0a,#161e2e) !important; }
+html.dark .project-row.pr-attention { background: linear-gradient(90deg,#2a1000,#161e2e) !important; }
+html.dark .project-row.pr-progress { background: linear-gradient(90deg,#0c1e38,#161e2e) !important; }
+html.dark .project-row.pr-done { background: linear-gradient(90deg,#062a1e,#161e2e) !important; }
+html.dark .panel-heading h2, html.dark .view-heading h2 { color: #c8d6ea !important; }
+html.dark .section-kicker { color: #5478a8 !important; }
+
+/* ── Project row hover animation ── */
+.project-row { transition: transform .18s ease, box-shadow .18s ease; }
+.project-row:hover { transform: translateX(4px); box-shadow: 0 2px 14px rgba(40,120,238,.10); cursor: pointer; }
+html.dark .project-row:hover { transform: translateX(4px); box-shadow: 0 2px 14px rgba(40,120,238,.22) !important; }
+
+/* ── Dark Mode — Textos brancos (override cores hardcoded dark/cinza) ─────── */
+html.dark .projetos-wrap .metric-value,
+html.dark .projetos-wrap .panel-heading h2,
+html.dark .projetos-wrap .view-heading h2,
+html.dark .projetos-wrap .project-row-title strong,
+html.dark .projetos-wrap .card-title-row h3,
+html.dark .projetos-wrap .detail-title,
+html.dark .projetos-wrap .step-name-text,
+html.dark .projetos-wrap .timeline-detail strong,
+html.dark .projetos-wrap .request-main strong,
+html.dark .projetos-wrap .empty-state h3,
+html.dark .projetos-wrap .form-intro h2,
+html.dark .projetos-wrap .modal-header h3,
+html.dark .projetos-wrap .modal h3,
+html.dark .projetos-wrap .modal h2,
+html.dark .projetos-wrap .summary-title,
+html.dark .projetos-wrap .project-name,
+html.dark .projetos-wrap .pres-proj-title,
+html.dark .projetos-wrap .cal-month-label,
+html.dark .projetos-wrap .calendar-nav h3,
+html.dark .projetos-wrap .step-group-label,
+html.dark .projetos-wrap .comment-author,
+html.dark .projetos-wrap .attachment-name { color: #fff !important; }
+
+html.dark .projetos-wrap .metric-label,
+html.dark .projetos-wrap .metric-caption,
+html.dark .projetos-wrap .sidebar-section-label,
+html.dark .projetos-wrap .step-desc-cell,
+html.dark .projetos-wrap .step-date-cell,
+html.dark .projetos-wrap .detail-meta,
+html.dark .projetos-wrap .project-progress-line > span,
+html.dark .projetos-wrap .row-deadline,
+html.dark .projetos-wrap .next-action span,
+html.dark .projetos-wrap .next-action strong,
+html.dark .projetos-wrap .owner small,
+html.dark .projetos-wrap .owner strong,
+html.dark .projetos-wrap .deadline small,
+html.dark .projetos-wrap .deadline strong,
+html.dark .projetos-wrap .progress-heading,
+html.dark .projetos-wrap .project-form label,
+html.dark .projetos-wrap .modal label,
+html.dark .projetos-wrap .optional,
+html.dark .projetos-wrap .form-intro > p,
+html.dark .projetos-wrap .timeline-detail span,
+html.dark .projetos-wrap .card-category,
+html.dark .projetos-wrap .step-form-divider,
+html.dark .projetos-wrap .loading-text,
+html.dark .projetos-wrap .empty-state p,
+html.dark .projetos-wrap .request-main span,
+html.dark .projetos-wrap .section-kicker,
+html.dark .projetos-wrap .pres-step-label,
+html.dark .projetos-wrap .pres-log-date,
+html.dark .projetos-wrap .cal-day-num,
+html.dark .projetos-wrap .cal-event-label,
+html.dark .projetos-wrap .comment-date,
+html.dark .projetos-wrap .attachment-size,
+html.dark .projetos-wrap .summary-value,
+html.dark .projetos-wrap .step-status-select-sm,
+html.dark .projetos-wrap .project-form small,
+html.dark .projetos-wrap .form-note { color: rgba(255,255,255,0.75) !important; }
+
+html.dark .projetos-wrap .search-field,
+html.dark .projetos-wrap .filter-select,
+html.dark .projetos-wrap .project-form input,
+html.dark .projetos-wrap .project-form textarea,
+html.dark .projetos-wrap .project-form select,
+html.dark .projetos-wrap .modal input,
+html.dark .projetos-wrap .modal textarea,
+html.dark .projetos-wrap .modal select,
+html.dark .projetos-wrap .comment-input { color: #e8edf5 !important; }
+
+html.dark .projetos-wrap .search-field::placeholder,
+html.dark .projetos-wrap .project-form input::placeholder,
+html.dark .projetos-wrap .project-form textarea::placeholder,
+html.dark .projetos-wrap .modal input::placeholder,
+html.dark .projetos-wrap .modal textarea::placeholder,
+html.dark .projetos-wrap .comment-input::placeholder { color: rgba(255,255,255,0.35) !important; }

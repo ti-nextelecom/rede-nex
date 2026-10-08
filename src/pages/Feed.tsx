@@ -13,6 +13,7 @@ import { Textarea } from '../components/ui/textarea';
 import type { Post } from '../types';
 import { cn } from '../lib/utils';
 import { StoriesBar } from '../components/stories/StoriesBar';
+import { ImageLightbox } from '../components/ui/ImageLightbox';
 
 const REACTIONS = [
   { key: 'like', emoji: '👍', label: 'Curtir' },
@@ -77,7 +78,7 @@ function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: ()
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-base font-black text-slate-900">{author?.name || 'Equipe'}</h2>
+              <h2 className="truncate text-xl font-black text-slate-900">{author?.name || 'Equipe'}</h2>
               <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-indigo-100 text-indigo-700">Wiki</span>
               {item.categories?.name && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: categoryColor, backgroundColor: `${categoryColor}18` }}>
@@ -85,15 +86,15 @@ function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: ()
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-sm text-slate-500">
               {verb} um artigo na Wiki
               <span className="mx-1.5">·</span>
               {smartDate(item.updated_at)}
             </p>
           </div>
         </header>
-        <h3 className="mb-2 text-lg font-black leading-snug text-slate-900">{item.title}</h3>
-        {preview && <p className="text-sm leading-6 text-slate-600 line-clamp-3">{preview}…</p>}
+        <h3 className="mb-2 text-2xl font-black leading-snug text-slate-900">{item.title}</h3>
+        {preview && <p className="text-base leading-7 text-slate-600 line-clamp-3">{preview}…</p>}
         <div className="mt-4 pt-4 border-t border-slate-100">
           <button
             onClick={onNavigate}
@@ -234,26 +235,31 @@ function ReactionBar({
 }
 
 function MediaDisplay({ imageUrl, videoUrl }: { imageUrl?: string; videoUrl?: string }) {
+  const [lightbox, setLightbox] = useState(false);
   if (!imageUrl && !videoUrl) return null;
   return (
-    <div className="mt-4 rounded-xl overflow-hidden border border-slate-100">
-      {imageUrl && (
-        <img
-          src={imageUrl}
-          alt="Mídia"
-          className="w-full max-h-[500px] object-contain bg-slate-50"
-          loading="lazy"
-        />
-      )}
-      {videoUrl && (
-        <video
-          src={videoUrl}
-          controls
-          className="w-full max-h-[400px] bg-black"
-          preload="metadata"
-        />
-      )}
-    </div>
+    <>
+      <div className="mt-4 rounded-xl overflow-hidden border border-slate-100">
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt="Mídia"
+            className="w-full max-h-[680px] object-contain bg-slate-50 cursor-pointer"
+            loading="lazy"
+            onClick={() => setLightbox(true)}
+          />
+        )}
+        {videoUrl && (
+          <video
+            src={videoUrl}
+            controls
+            className="w-full max-h-[540px] bg-black"
+            preload="metadata"
+          />
+        )}
+      </div>
+      {lightbox && imageUrl && <ImageLightbox src={imageUrl} alt="Mídia" onClose={() => setLightbox(false)} />}
+    </>
   );
 }
 
@@ -327,11 +333,11 @@ function CommentItem({
         ) : (
           <>
             <div className="rounded-2xl bg-slate-50 px-3.5 py-2.5">
-              <p className="text-xs font-bold text-slate-800">{author?.name || 'Usuário'}</p>
-              <p className="mt-0.5 text-sm text-slate-700 leading-relaxed">{comment.content}</p>
+              <p className="text-sm font-bold text-slate-800">{author?.name || 'Usuário'}</p>
+              <p className="mt-0.5 text-base text-slate-700 leading-relaxed">{comment.content}</p>
             </div>
             <div className="mt-1 flex items-center gap-3 pl-1">
-              <span className="text-[11px] text-slate-400">{smartDate(comment.created_at)}</span>
+              <span className="text-sm text-slate-400">{smartDate(comment.created_at)}</span>
               <ReactionBar reactions={comment.reactions || []} currentUserId={currentUserId} onReact={handleReact} size="sm" />
               {isOwner && (
                 <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -444,12 +450,12 @@ function SocialPost({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-base font-black text-slate-900">{author?.name || 'Rede Nex'}</h2>
+              <h2 className="truncate text-xl font-black text-slate-900">{author?.name || 'Rede Nex'}</h2>
               <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-bold', config.badgeClass)}>
                 {config.label}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-sm text-slate-500">
               {[author?.position, (author as { departments?: { name: string } } | undefined)?.departments?.name].filter(Boolean).join(' · ') || 'Rede Nex'}
               <span className="mx-1.5">·</span>
               {smartDate(post.created_at)}
@@ -467,7 +473,7 @@ function SocialPost({
           )}
         </header>
 
-        {post.title && <h3 className="mb-2 text-lg font-black leading-snug text-slate-900">{post.title}</h3>}
+        {post.title && <h3 className="mb-2 text-2xl font-black leading-snug text-slate-900">{post.title}</h3>}
         {editMode ? (
           <div className="space-y-2 mb-2">
             <textarea
@@ -508,7 +514,7 @@ function SocialPost({
             <p className="text-xs text-slate-400">{pollVotes.length} {pollVotes.length === 1 ? 'voto' : 'votos'}{votedOption === null ? ' · clique para votar' : ''}</p>
           </div>
         ) : (
-          <p className="whitespace-pre-wrap text-base leading-7 text-slate-700">{post.content}</p>
+          <p className="whitespace-pre-wrap text-xl leading-8 text-slate-700">{post.content}</p>
         )}
 
         <MediaDisplay imageUrl={post.image_url} videoUrl={post.video_url} />

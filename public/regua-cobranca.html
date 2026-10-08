@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Guia interativo da Régua de Cobrança NEX Telecom">
+<title>Régua de Cobrança | NEX Telecom</title>
+<style>
+:root {
+  --blue:#075B9B;
+  --blue-2:#0B74C9;
+  --blue-dark:#0B2740;
+  --orange:#F58220;
+  --orange-soft:#FFF0E2;
+  --ink:#17212B;
+  --muted:#667585;
+  --line:#E4EAF0;
+  --panel:#FFFFFF;
+  --bg:#F4F7FA;
+  --green:#1E9E67;
+  --red:#D94747;
+  --amber:#D99116;
+  --purple:#7557C8;
+  --teal:#0B9A9A;
+  --shadow:0 18px 45px rgba(10,45,73,.10);
+  --shadow-sm:0 8px 22px rgba(10,45,73,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(245,130,32,.10), transparent 28rem),
+    radial-gradient(circle at 90% 10%, rgba(11,116,201,.12), transparent 32rem),
+    var(--bg);
+}
+button,input{font:inherit}
+button{cursor:pointer}
+a{color:inherit}
+.shell{max-width:1280px;margin:auto;padding:0 22px 54px}
+.topbar{
+  position:sticky;top:0;z-index:50;
+  backdrop-filter:saturate(160%) blur(16px);
+  background:rgba(244,247,250,.88);
+  border-bottom:1px solid rgba(222,230,238,.8);
+}
+.topbar-inner{
+  max-width:1280px;margin:auto;padding:12px 22px;
+  display:flex;align-items:center;gap:18px;justify-content:space-between;
+}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.brand img{
+  width:128px;height:48px;object-fit:contain;background:#fff;
+  border-radius:10px;padding:5px 10px;box-shadow:var(--shadow-sm)
+}
+.brand-text{min-width:0}
+.brand-text strong{display:block;color:var(--blue-dark);font-size:14px;letter-spacing:.02em}
+.brand-text span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actions{display:flex;align-items:center;gap:8px}
+.btn{
+  border:1px solid var(--line);background:#fff;color:var(--blue-dark);
+  border-radius:10px;padding:10px 13px;font-weight:700;font-size:13px;
+  box-shadow:0 2px 8px rgba(12,46,72,.05)
+}
+.btn:hover{transform:translateY(-1px);border-color:#cbd7e2}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.hero{padding:48px 0 24px}
+.hero-card{
+  position:relative;overflow:hidden;
+  background:linear-gradient(125deg,#082D49 0%,#075B9B 57%,#0B74C9 100%);
+  color:#fff;border-radius:26px;padding:38px 38px 34px;box-shadow:var(--shadow);
+}
+.hero-card:before{
+  content:"";position:absolute;right:-90px;top:-120px;width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle,rgba(245,130,32,.95) 0 2%,rgba(245,130,32,.18) 40%,transparent 68%);
+}
+.hero-card:after{
+  content:"";position:absolute;left:43%;bottom:-170px;width:330px;height:330px;border-radius:50%;
+  border:56px solid rgba(255,255,255,.05)
+}
+.hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:1.4fr .8fr;gap:26px;align-items:end}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);
+  font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em
+}
+.hero h1{font-size:clamp(34px,5vw,58px);line-height:1.02;margin:15px 0 12px;letter-spacing:-.04em}
+.hero p{margin:0;color:rgba(255,255,255,.78);font-size:16px;line-height:1.7;max-width:760px}
+.hero-meta{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:10px
+}
+.meta-card{
+  padding:14px;border-radius:16px;background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.14)
+}
+.meta-card b{display:block;font-size:19px;margin-bottom:3px}
+.meta-card span{font-size:11px;color:rgba(255,255,255,.72);text-transform:uppercase;letter-spacing:.05em}
+
+.section{margin-top:20px}
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:20px;
+  box-shadow:var(--shadow-sm);padding:22px
+}
+.section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:17px}
+.section-title h2{margin:0;color:var(--blue-dark);font-size:21px}
+.section-title p{margin:5px 0 0;color:var(--muted);font-size:13px}
+.profile-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.profile-card{
+  text-align:left;border:1px solid var(--line);border-radius:18px;background:#fff;padding:19px;
+  position:relative;overflow:hidden;transition:.18s ease;min-height:160px
+}
+.profile-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-sm)}
+.profile-card.active{border-color:var(--profile-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--profile-accent) 12%,transparent)}
+.profile-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--profile-accent)}
+.profile-tag{font-size:11px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:var(--profile-accent)}
+.profile-card h3{margin:8px 0 5px;font-size:21px;color:var(--blue-dark)}
+.profile-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.kpis{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.kpi{background:#F6F8FA;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted)}
+.kpi strong{color:var(--ink)}
+
+.workspace{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}
+.sidebar{position:sticky;top:88px}
+.sidebar .panel{padding:18px}
+.side-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:900;color:var(--muted);margin:0 0 10px}
+.search{
+  display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 12px
+}
+.search svg{width:18px;color:#718092}
+.search input{width:100%;border:0;outline:0;padding:12px 0;background:transparent;color:var(--ink)}
+.filter-group{margin-top:18px}
+.filter-list{display:flex;flex-wrap:wrap;gap:8px}
+.filter{
+  border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 10px;font-size:12px;font-weight:800;color:#536372
+}
+.filter.active{background:var(--blue-dark);color:#fff;border-color:var(--blue-dark)}
+.quickfacts{display:grid;gap:10px;margin-top:18px}
+.fact{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
+.fact span{color:var(--muted)} .fact strong{color:var(--blue-dark)}
+.notice{margin-top:18px;padding:13px;border-radius:13px;background:var(--orange-soft);color:#7D430F;font-size:12px;line-height:1.45;border:1px solid #FFD8B4}
+
+.main-panel{padding:0;overflow:hidden}
+.profile-head{
+  padding:24px 24px 18px;border-bottom:1px solid var(--line);
+  background:linear-gradient(120deg,#fff,#F7FAFC)
+}
+.profile-head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.profile-head h2{margin:0;color:var(--blue-dark);font-size:27px}
+.profile-head p{margin:6px 0 0;color:var(--muted)}
+.profile-stats{display:flex;gap:9px;flex-wrap:wrap}
+.stat-chip{border-radius:999px;padding:8px 11px;font-size:12px;font-weight:850;border:1px solid var(--line);background:#fff}
+.stat-chip.block{color:#9B530D;background:#FFF5EA;border-color:#FFD6AC}
+.stat-chip.cancel{color:#A52626;background:#FFF0F0;border-color:#FFD0D0}
+.stat-chip.count{color:var(--blue);background:#EEF7FF;border-color:#CFE8FC}
+
+.phase-nav{display:flex;gap:8px;overflow:auto;padding:14px 24px;border-bottom:1px solid var(--line);background:#fff}
+.phase-pill{flex:none;border:1px solid var(--line);background:#fff;padding:8px 10px;border-radius:999px;font-size:12px;font-weight:800;color:#536372}
+.phase-pill.active{color:#fff;background:var(--blue);border-color:var(--blue)}
+
+.timeline{padding:22px 24px 28px}
+.phase-section{margin-bottom:26px}
+.phase-label{display:flex;align-items:center;gap:9px;margin:0 0 12px;color:var(--blue-dark);font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+.phase-label:after{content:"";height:1px;background:var(--line);flex:1}
+.event-list{display:grid;gap:10px}
+.event{
+  display:grid;grid-template-columns:74px 12px minmax(0,1fr);gap:12px;align-items:stretch
+}
+.daybox{
+  align-self:start;border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 7px;text-align:center;
+  box-shadow:0 3px 10px rgba(10,45,73,.04)
+}
+.daybox .small{display:block;font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+.daybox strong{font-size:18px;color:var(--blue-dark)}
+.rail{position:relative}
+.rail:before{content:"";position:absolute;top:0;bottom:-10px;left:50%;width:2px;background:#DFE6EC;transform:translateX(-50%)}
+.dot{position:absolute;top:16px;left:50%;width:10px;height:10px;border-radius:50%;transform:translateX(-50%);background:var(--event-color);box-shadow:0 0 0 4px #fff}
+.event-card{
+  border:1px solid var(--line);border-left:4px solid var(--event-color);border-radius:15px;padding:13px 14px;background:#fff;
+  display:flex;justify-content:space-between;gap:16px;align-items:center;transition:.15s
+}
+.event-card:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.event-title{font-weight:850;color:var(--ink);margin-bottom:3px}
+.event-desc{font-size:13px;color:var(--muted);line-height:1.45}
+.badges{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.badge{white-space:nowrap;border-radius:999px;padding:6px 8px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--line);background:#F7F9FB;color:#536372}
+.badge.channel{color:var(--event-color);border-color:color-mix(in srgb,var(--event-color) 25%,#e6edf2);background:color-mix(in srgb,var(--event-color) 7%,#fff)}
+
+.empty{padding:34px;text-align:center;color:var(--muted);border:1px dashed #CCD7E0;border-radius:14px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.legend span{font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.info-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px}
+.info-card .icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#EEF7FF;color:var(--blue);margin-bottom:12px}
+.info-card h3{font-size:15px;margin:0 0 6px;color:var(--blue-dark)}
+.info-card p{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+.faq details{border-top:1px solid var(--line);padding:2px 0}
+.faq details:first-child{border-top:0}
+.faq summary{list-style:none;cursor:pointer;font-weight:800;color:var(--blue-dark);padding:16px 2px}
+.faq summary::-webkit-details-marker{display:none}
+.faq details p{margin:0 2px 17px;color:var(--muted);font-size:13px;line-height:1.6}
+.footer{text-align:center;color:#8492A0;font-size:11px;padding:28px 0 0}
+
+@media(max-width:960px){
+  .hero-grid{grid-template-columns:1fr}
+  .workspace{grid-template-columns:1fr}
+  .sidebar{position:static}
+  .profile-grid,.info-grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .shell,.topbar-inner{padding-left:14px;padding-right:14px}
+  .brand-text{display:none}
+  .actions .btn:not(.primary){display:none}
+  .hero{padding-top:24px}
+  .hero-card{padding:26px 21px;border-radius:20px}
+  .hero-meta{grid-template-columns:1fr 1fr}
+  .profile-head-top{flex-direction:column}
+  .event{grid-template-columns:62px 10px minmax(0,1fr);gap:8px}
+  .event-card{align-items:flex-start;flex-direction:column}
+  .badges{justify-content:flex-start}
+}
+@media print{
+  .topbar,.sidebar,.actions,.phase-nav,.profile-grid{display:none!important}
+  body{background:#fff}
+  .shell{max-width:none;padding:0}
+  .hero{padding:0 0 14px}
+  .hero-card{box-shadow:none;border-radius:0}
+  .workspace{display:block}
+  .main-panel{box-shadow:none}
+  .event-card{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <img src="data:image/jpeg;base64,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" alt="NEX Telecom">
+      <div class="brand-text">
+        <strong>Rede Nex • Guia Operacional</strong>
+        <span>Régua de cobrança e comunicação com clientes</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="copyBtn" type="button">Copiar resumo</button>
+      <button class="btn primary" type="button" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="hero">
+    <div class="hero-card">
+      <div class="hero-grid">
+        <div>
+          <span class="eyebrow">NEX Telecom • Junho 2026</span>
+          <h1>Régua de<br>cobrança</h1>
+          <p>Consulte rapidamente os disparos, canais, bloqueios e prazos de cancelamento de cada perfil. Selecione o perfil do cliente e filtre a linha do tempo por canal ou fase.</p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card"><b>3</b><span>Perfis de cobrança</span></div>
+          <div class="meta-card"><b>5</b><span>Canais principais</span></div>
+          <div class="meta-card"><b>D15 / D10 / D5</b><span>Bloqueio por perfil</span></div>
+          <div class="meta-card"><b>D60 / D55 / D50</b><span>Cancelamento</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section panel">
+    <div class="section-title">
+      <div>
+        <h2>Escolha o perfil do cliente</h2>
+        <p>A linha do tempo abaixo será atualizada automaticamente.</p>
+      </div>
+    </div>
+    <div class="profile-grid" id="profileGrid"></div>
+  </section>
+
+  <section class="section workspace">
+    <aside class="sidebar">
+      <div class="panel">
+        <p class="side-title">Localizar ação</p>
+        <label class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input id="searchInput" type="search" placeholder="Dia, canal ou ação...">
+        </label>
+
+        <div class="filter-group">
+          <p class="side-title">Canal</p>
+          <div class="filter-list" id="channelFilters"></div>
+        </div>
+
+        <div class="filter-group">
+          <p class="side-title">Fase</p>
+          <div class="filter-list" id="phaseFilters"></div>
+        </div>
+
+        <div class="quickfacts" id="quickfacts"></div>
+
+        <div class="notice">
+          <b>Nota operacional</b><br>
+          O documento da régua apresenta os três perfis e seus prazos, mas não detalha o critério de enquadramento. Consulte a classificação configurada no sistema antes de orientar o cliente.
+        </div>
+      </div>
+    </aside>
+
+    <section class="panel main-panel">
+      <div class="profile-head">
+        <div class="profile-head-top">
+          <div>
+            <h2 id="profileTitle"></h2>
+            <p id="profileSubtitle"></p>
+          </div>
+          <div class="profile-stats" id="profileStats"></div>
+        </div>
+      </div>
+
+      <div class="phase-nav" id="phaseNav"></div>
+      <div class="timeline" id="timeline"></div>
+    </section>
+  </section>
+
+  <section class="section panel">
+    <div class="section-title">
+      <div>
+        <h2>Como interpretar a régua</h2>
+        <p>Resumo rápido para uso durante atendimento e orientação interna.</p>
+      </div>
+    </div>
+    <div class="info-grid">
+      <article class="info-card">
+        <div class="icon">
+          <svg width="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg>
+        </div>
+        <h3>Antes do vencimento</h3>
+        <p>Comunicações preventivas para disponibilizar a fatura e lembrar o cliente antes do Dia 0.</p>
+      </article>
+      <article class="info-card">
+        <div class="icon">
+          <svg width="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <h3>Após o vencimento</h3>
+        <p>Os contatos ficam mais frequentes e são combinados entre WhatsApp, SMS, e-mail, URA e Push.</p>
+      </article>
+      <article class="info-card">
+        <div class="icon">
+          <svg width="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        </div>
+        <h3>Após o bloqueio</h3>
+        <p>A régua continua até a regularização ou até o cancelamento previsto para o perfil selecionado.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section panel faq">
+    <div class="section-title">
+      <div>
+        <h2>Dúvidas rápidas</h2>
+        <p>Informações de apoio para quem consulta a página.</p>
+      </div>
+    </div>
+    <details>
+      <summary>O Dia 0 é o quê?</summary>
+      <p>O Dia 0 corresponde ao dia de vencimento da fatura. Dias negativos são ações anteriores ao vencimento; dias positivos são ações posteriores.</p>
+    </details>
+    <details>
+      <summary>O bloqueio ocorre no mesmo dia para todos?</summary>
+      <p>Não. Na régua apresentada, o Bom Pagador possui bloqueio geral no Dia 15, o Recorrente no Dia 10 e o Crônico no Dia 5. Para Bom Pagador e Recorrente, o documento também marca bloqueio específico AllNet no Dia 5.</p>
+    </details>
+    <details>
+      <summary>Quando ocorre o cancelamento?</summary>
+      <p>Bom Pagador: Dia 60. Recorrente: Dia 55. Crônico: Dia 50, sempre considerando a régua de inadimplência apresentada no documento.</p>
+    </details>
+  </section>
+
+  <div class="footer">NEX Telecom • Régua de cobrança • Guia interno de consulta</div>
+</main>
+
+<script>
+const PROFILES = {"bom": {"name": "Bom Pagador", "subtitle": "Maior janela para regularização", "block": 15, "cancel": 60, "accent": "#0B69B7", "allnet": 5, "events": [{"day": -13, "channel": "E-mail + Push", "provider": "Locaweb + Hubsoft", "action": "Envio de e-mail de fatura gerada e Push Hubsoft.", "type": "email"}, {"day": -2, "channel": "Push", "provider": "Hubsoft", "action": "Push Hubsoft lembrando sobre a fatura.", "type": "push"}, {"day": -1, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix para pagamento e informações do app.", "type": "whatsapp"}, {"day": 0, "channel": "SMS", "provider": "Allcance", "action": "SMS informando o vencimento da fatura no dia.", "type": "sms"}, {"day": 2, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail informando que a fatura está em atraso.", "type": "email"}, {"day": 3, "channel": "URA", "provider": "Newave One", "action": "Ligação automática pela URA.", "type": "ura"}, {"day": 4, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix para pagamento e informações do app.", "type": "whatsapp"}, {"day": 5, "channel": "Bloqueio AllNet", "provider": "Hubsoft", "action": "Bloqueio específico para clientes provenientes da migração AllNet.", "type": "special"}, {"day": 10, "channel": "URA", "provider": "Newave One", "action": "Nova ligação de cobrança pela URA.", "type": "ura"}, {"day": 14, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix reforçando a pendência.", "type": "whatsapp"}, {"day": 15, "channel": "Bloqueio geral", "provider": "Hubsoft", "action": "Bloqueio geral do serviço para clientes inadimplentes deste perfil.", "type": "block"}, {"day": 16, "channel": "SMS", "provider": "Allcance", "action": "SMS informando o não recebimento do pagamento.", "type": "sms"}, {"day": 17, "channel": "URA", "provider": "Newave One", "action": "Ligação pela URA após o bloqueio.", "type": "ura"}, {"day": 17, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix após o bloqueio.", "type": "whatsapp"}, {"day": 20, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 24, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 25, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 30, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 31, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 33, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail de regularização.", "type": "email"}, {"day": 36, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 38, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 40, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 45, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança com alerta sobre negativação e cancelamento.", "type": "ura"}, {"day": 46, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail de regularização.", "type": "email"}, {"day": 50, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 55, "channel": "Pré-cancelamento", "provider": "Hubsoft", "action": "E-mail de aviso de pré-cancelamento.", "type": "warning"}, {"day": 57, "channel": "URA", "provider": "Newave One", "action": "Última ligação de cobrança pela URA.", "type": "ura"}, {"day": 60, "channel": "Cancelamento", "provider": "Hubsoft", "action": "Cancelamento do serviço por inadimplência.", "type": "cancel"}]}, "recorrente": {"name": "Recorrente", "subtitle": "Cobrança antecipada e mais frequente", "block": 10, "cancel": 55, "accent": "#F58220", "allnet": 5, "events": [{"day": -13, "channel": "E-mail + Push", "provider": "PLIQ + Hubsoft", "action": "E-mail de fatura gerada e Push Hubsoft.", "type": "email"}, {"day": -5, "channel": "E-mail + Push", "provider": "PLIQ + Hubsoft", "action": "Novo e-mail de fatura gerada e Push Hubsoft.", "type": "email"}, {"day": -2, "channel": "Push", "provider": "Hubsoft", "action": "Push Hubsoft lembrando sobre a fatura.", "type": "push"}, {"day": -1, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix antes do vencimento.", "type": "whatsapp"}, {"day": 0, "channel": "SMS", "provider": "Allcance", "action": "SMS informando o vencimento da fatura no dia.", "type": "sms"}, {"day": 2, "channel": "E-mail + Push", "provider": "Locaweb + Hubsoft", "action": "E-mail de fatura em atraso e Push Hubsoft.", "type": "email"}, {"day": 3, "channel": "URA", "provider": "Newave One", "action": "Ligação automática pela URA.", "type": "ura"}, {"day": 4, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix após o vencimento.", "type": "whatsapp"}, {"day": 5, "channel": "Bloqueio AllNet", "provider": "Hubsoft", "action": "Bloqueio específico para clientes provenientes da migração AllNet.", "type": "special"}, {"day": 7, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 9, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix antes do bloqueio.", "type": "whatsapp"}, {"day": 10, "channel": "Bloqueio geral", "provider": "Hubsoft", "action": "Bloqueio geral do serviço para clientes inadimplentes deste perfil.", "type": "block"}, {"day": 10, "channel": "SMS", "provider": "Allcance", "action": "SMS informando o não recebimento do pagamento.", "type": "sms"}, {"day": 11, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix após o bloqueio.", "type": "whatsapp"}, {"day": 13, "channel": "URA", "provider": "Newave One", "action": "Ligação pela URA.", "type": "ura"}, {"day": 15, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix após o bloqueio.", "type": "whatsapp"}, {"day": 20, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 23, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 25, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 28, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 31, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 33, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail de regularização.", "type": "email"}, {"day": 36, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 38, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 40, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 43, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança com alerta sobre negativação e cancelamento.", "type": "ura"}, {"day": 46, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail de regularização.", "type": "email"}, {"day": 48, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 50, "channel": "Pré-cancelamento", "provider": "E-mail + Hubsoft", "action": "E-mail de aviso de pré-cancelamento.", "type": "warning"}, {"day": 53, "channel": "URA", "provider": "Newave One", "action": "Última ligação de cobrança pela URA.", "type": "ura"}, {"day": 55, "channel": "Cancelamento", "provider": "Hubsoft", "action": "Cancelamento do serviço por inadimplência.", "type": "cancel"}]}, "cronico": {"name": "Crônico", "subtitle": "Ação mais rápida para inadimplência recorrente", "block": 5, "cancel": 50, "accent": "#E84C4C", "allnet": null, "events": [{"day": -13, "channel": "E-mail + Push", "provider": "Locaweb + Hubsoft", "action": "E-mail de fatura gerada e Push Hubsoft.", "type": "email"}, {"day": -5, "channel": "E-mail + Push", "provider": "Locaweb + Hubsoft", "action": "Novo e-mail de fatura gerada e Push Hubsoft.", "type": "email"}, {"day": -3, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix antes do vencimento.", "type": "whatsapp"}, {"day": -2, "channel": "Push", "provider": "Hubsoft", "action": "Push Hubsoft lembrando sobre a fatura.", "type": "push"}, {"day": -1, "channel": "WhatsApp", "provider": "360Dialog", "action": "Novo WhatsApp com BolePix antes do vencimento.", "type": "whatsapp"}, {"day": 0, "channel": "SMS", "provider": "Allcance", "action": "SMS informando o vencimento da fatura no dia.", "type": "sms"}, {"day": 1, "channel": "E-mail + Push", "provider": "Locaweb + Hubsoft", "action": "E-mail de fatura em atraso e Push Hubsoft.", "type": "email"}, {"day": 3, "channel": "URA", "provider": "Newave One", "action": "Ligação automática pela URA.", "type": "ura"}, {"day": 4, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix antes do bloqueio.", "type": "whatsapp"}, {"day": 5, "channel": "Bloqueio geral", "provider": "Hubsoft", "action": "Bloqueio geral do serviço para clientes inadimplentes deste perfil.", "type": "block"}, {"day": 5, "channel": "SMS", "provider": "Allcance", "action": "SMS informando o não recebimento do pagamento.", "type": "sms"}, {"day": 5, "channel": "URA", "provider": "Newave One", "action": "Ligação pela URA no dia do bloqueio.", "type": "ura"}, {"day": 7, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix após o bloqueio.", "type": "whatsapp"}, {"day": 10, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 13, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 15, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix após o bloqueio.", "type": "whatsapp"}, {"day": 17, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 20, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 23, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 25, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 27, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 30, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail de regularização.", "type": "email"}, {"day": 32, "channel": "SMS", "provider": "Allcance", "action": "SMS de cobrança.", "type": "sms"}, {"day": 35, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança pela URA.", "type": "ura"}, {"day": 37, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 40, "channel": "URA", "provider": "Newave One", "action": "Ligação de cobrança com alerta sobre negativação e cancelamento.", "type": "ura"}, {"day": 41, "channel": "URA", "provider": "Newave One", "action": "Nova ligação de cobrança pela URA.", "type": "ura"}, {"day": 43, "channel": "E-mail", "provider": "Locaweb", "action": "E-mail de regularização.", "type": "email"}, {"day": 45, "channel": "WhatsApp", "provider": "360Dialog", "action": "WhatsApp com BolePix.", "type": "whatsapp"}, {"day": 47, "channel": "Pré-cancelamento", "provider": "Locaweb", "action": "E-mail de aviso de pré-cancelamento.", "type": "warning"}, {"day": 49, "channel": "URA", "provider": "Newave One", "action": "Última ligação de cobrança pela URA.", "type": "ura"}, {"day": 50, "channel": "Cancelamento", "provider": "Hubsoft", "action": "Cancelamento do serviço por inadimplência.", "type": "cancel"}]}};
+const COLORS = {
+  email:"#4D91D9", push:"#7557C8", whatsapp:"#27A95F", sms:"#E49327",
+  ura:"#08A39A", block:"#D94A4A", cancel:"#C93434", special:"#E35B5B", warning:"#D99116"
+};
+const CHANNELS = [
+  ["all","Todos"],["email","E-mail"],["push","Push"],["whatsapp","WhatsApp"],
+  ["sms","SMS"],["ura","URA"],["milestone","Bloqueio / Cancelamento"]
+];
+const PHASES = [
+  ["all","Todas"],["pre","Antes do vencimento"],["due","Vencimento"],
+  ["late","Após vencimento"],["blocked","Após bloqueio"]
+];
+
+let state = { profile:"bom", channel:"all", phase:"all", query:"" };
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function dayLabel(d) {
+  if(d===0) return "Dia 0";
+  return d<0 ? `Dia ${d}` : `Dia ${d}`;
+}
+function phaseOf(ev, p) {
+  if(ev.day < 0) return "pre";
+  if(ev.day === 0) return "due";
+  if(ev.day <= p.block) return "late";
+  return "blocked";
+}
+function channelOf(ev) {
+  if(["block","cancel","special","warning"].includes(ev.type)) return "milestone";
+  return ev.type;
+}
+function profileCards() {
+  const grid = document.getElementById("profileGrid");
+  grid.innerHTML = Object.entries(PROFILES).map(([key,p]) => `
+    <button class="profile-card ${state.profile===key?"active":""}" style="--profile-accent:${p.accent}" onclick="selectProfile('${key}')">
+      <span class="profile-tag">${key==="bom"?"Perfil 01":key==="recorrente"?"Perfil 02":"Perfil 03"}</span>
+      <h3>${esc(p.name)}</h3>
+      <p>${esc(p.subtitle)}</p>
+      <div class="kpis">
+        <span class="kpi">Bloqueio <strong>D${p.block}</strong></span>
+        <span class="kpi">Cancelamento <strong>D${p.cancel}</strong></span>
+      </div>
+    </button>`).join("");
+}
+function filters() {
+  document.getElementById("channelFilters").innerHTML = CHANNELS.map(([k,n]) =>
+    `<button class="filter ${state.channel===k?"active":""}" onclick="setChannel('${k}')">${n}</button>`).join("");
+  document.getElementById("phaseFilters").innerHTML = PHASES.map(([k,n]) =>
+    `<button class="filter ${state.phase===k?"active":""}" onclick="setPhase('${k}')">${n}</button>`).join("");
+}
+function header() {
+  const p = PROFILES[state.profile];
+  document.getElementById("profileTitle").textContent = p.name;
+  document.getElementById("profileSubtitle").textContent = p.subtitle;
+  const allnet = p.allnet ? `<span class="stat-chip">AllNet D${p.allnet}</span>` : "";
+  document.getElementById("profileStats").innerHTML = `
+    <span class="stat-chip count">${p.events.length} ações</span>
+    ${allnet}
+    <span class="stat-chip block">Bloqueio D${p.block}</span>
+    <span class="stat-chip cancel">Cancelamento D${p.cancel}</span>`;
+  document.getElementById("quickfacts").innerHTML = `
+    <div class="fact"><span>Perfil atual</span><strong>${esc(p.name)}</strong></div>
+    <div class="fact"><span>Bloqueio geral</span><strong>Dia ${p.block}</strong></div>
+    <div class="fact"><span>Cancelamento</span><strong>Dia ${p.cancel}</strong></div>
+    <div class="fact"><span>Janela total</span><strong>${p.cancel + 13} dias</strong></div>`;
+}
+function phaseNav() {
+  document.getElementById("phaseNav").innerHTML = [
+    ["pre","Antes do vencimento"],["due","Dia 0"],["late","Após vencimento"],["blocked","Após bloqueio"]
+  ].map(([k,n])=>`<button class="phase-pill ${state.phase===k?"active":""}" onclick="setPhase('${k}')">${n}</button>`).join("");
+}
+function renderTimeline() {
+  const p = PROFILES[state.profile];
+  const q = state.query.trim().toLowerCase();
+  const groups = [
+    ["pre","Antes do vencimento"],["due","Vencimento"],["late","Após o vencimento"],["blocked","Após o bloqueio"]
+  ];
+  let html = "";
+  let total = 0;
+
+  groups.forEach(([phase,title]) => {
+    if(state.phase!=="all" && state.phase!==phase) return;
+    const items = p.events.filter(ev => {
+      const evPhase = phaseOf(ev,p);
+      const ch = channelOf(ev);
+      const queryMatch = !q || `${dayLabel(ev.day)} ${ev.channel} ${ev.provider} ${ev.action}`.toLowerCase().includes(q);
+      const channelMatch = state.channel==="all" || state.channel===ch;
+      return evPhase===phase && channelMatch && queryMatch;
+    });
+    if(!items.length) return;
+    total += items.length;
+    html += `<section class="phase-section"><h3 class="phase-label">${title}</h3><div class="event-list">`;
+    items.forEach(ev => {
+      const color = COLORS[ev.type] || "#5B7083";
+      html += `
+      <div class="event" style="--event-color:${color}">
+        <div class="daybox">
+          <span class="small">${ev.day<0?"Pré":ev.day===0?"Vence":"Após"}</span>
+          <strong>${ev.day===0?"D0":ev.day<0?"D"+ev.day:"D+"+ev.day}</strong>
+        </div>
+        <div class="rail"><span class="dot"></span></div>
+        <article class="event-card">
+          <div>
+            <div class="event-title">${esc(ev.channel)}</div>
+            <div class="event-desc">${esc(ev.action)}</div>
+          </div>
+          <div class="badges">
+            <span class="badge channel">${esc(ev.channel)}</span>
+            <span class="badge">${esc(ev.provider)}</span>
+          </div>
+        </article>
+      </div>`;
+    });
+    html += `</div></section>`;
+  });
+  if(!total) html = `<div class="empty">Nenhuma ação encontrada com os filtros atuais.</div>`;
+  document.getElementById("timeline").innerHTML = html;
+}
+function selectProfile(k) {
+  state.profile=k; state.channel="all"; state.phase="all"; state.query="";
+  document.getElementById("searchInput").value="";
+  render();
+}
+function setChannel(k) { state.channel=k; render(); }
+function setPhase(k) { state.phase=k; render(); }
+function render() { profileCards(); filters(); header(); phaseNav(); renderTimeline(); }
+
+document.getElementById("searchInput").addEventListener("input", e => {
+  state.query=e.target.value; renderTimeline();
+});
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  const p=PROFILES[state.profile];
+  const txt=`Régua de Cobrança NEX — ${p.name}\nBloqueio geral: Dia ${p.block}\nCancelamento: Dia ${p.cancel}${p.allnet?`\nBloqueio AllNet: Dia ${p.allnet}`:""}`;
+  try {
+    await navigator.clipboard.writeText(txt);
+    const b=document.getElementById("copyBtn"); const old=b.textContent;
+    b.textContent="Resumo copiado"; setTimeout(()=>b.textContent=old,1500);
+  } catch(e) { alert(txt); }
+});
+render();
+</script>
+</body>
+</html>

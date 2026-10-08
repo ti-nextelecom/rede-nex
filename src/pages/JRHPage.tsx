@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Cake, CalendarHeart, Eye, Film, Heart, Image as ImageIcon,
-  Lightbulb, Megaphone, MessageCircle, PartyPopper, Plus,
-  ThumbsUp, X, BookOpen, ClipboardList,
+  Lightbulb, Megaphone, MessageCircle, PartyPopper, Pencil, Plus,
+  ThumbsUp, Trash2, X, BookOpen, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { ImageLightbox } from '../components/ui/ImageLightbox';
 import { cn } from '../lib/utils';
 import {
-  addComment, checkIsHR, createJRHPost, getMonthBirthdays, getPostViews, listJRHPosts, uploadJRHFile,
+  addComment, checkIsHR, createJRHPost, deleteJRHPost, getMonthBirthdays, getPostViews,
+  listJRHPosts, updateJRHPost, uploadJRHFile,
   recordPostView, toggleReaction,
   type BirthdayUser, type JRHComment, type JRHPost, type JRHViewer,
 } from '../lib/jrhApi';
@@ -157,8 +159,8 @@ function CreatePostModal({ onClose, onCreated }: { onClose: () => void; onCreate
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-center bg-black/50 pt-4 px-4 pb-20 sm:p-4 sm:pt-20" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[calc(100vh-6rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 pt-4 px-4 pb-20 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-slate-100">
           <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
             <Megaphone size={15} className="text-rose-500" />
@@ -169,7 +171,6 @@ function CreatePostModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </button>
         </div>
         <div className="p-4 space-y-3">
-          {/* Category selector */}
           <div>
             <p className="text-xs font-medium text-slate-500 mb-1.5">Categoria</p>
             <div className="grid grid-cols-2 gap-1.5">
@@ -207,7 +208,6 @@ function CreatePostModal({ onClose, onCreated }: { onClose: () => void; onCreate
             className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-400 resize-none transition-all"
           />
 
-          {/* Image upload */}
           <div>
             <p className="text-xs font-medium text-slate-500 mb-1.5">Imagem (opcional)</p>
             <label className="flex items-center gap-2.5 px-3 py-2.5 bg-slate-50 border border-slate-200 border-dashed rounded-xl cursor-pointer hover:bg-rose-50 hover:border-rose-300 transition-colors group">
@@ -231,7 +231,6 @@ function CreatePostModal({ onClose, onCreated }: { onClose: () => void; onCreate
             )}
           </div>
 
-          {/* Video upload */}
           <div>
             <p className="text-xs font-medium text-slate-500 mb-1.5">Vídeo (opcional)</p>
             <label className="flex items-center gap-2.5 px-3 py-2.5 bg-slate-50 border border-slate-200 border-dashed rounded-xl cursor-pointer hover:bg-rose-50 hover:border-rose-300 transition-colors group">
@@ -278,6 +277,118 @@ function CreatePostModal({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
+// ─── Edit post modal ──────────────────────────────────────────────────────────
+function EditPostModal({ post, onClose, onUpdated }: { post: JRHPost; onClose: () => void; onUpdated: () => void }) {
+  const [title, setTitle] = useState(post.title || '');
+  const [content, setContent] = useState(cleanContent(post.content) || '');
+  const [category, setCategory] = useState<CategoryKey | ''>((post.category as CategoryKey) || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit() {
+    if (!content.trim() && !post.image_url && !post.video_url) {
+      setError('O post precisa ter conteúdo ou mídia');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await updateJRHPost(post.id, {
+        title: title.trim() || null,
+        content: content.trim() || null,
+        category: category || null,
+        image_url: post.image_url,
+        video_url: post.video_url,
+      });
+      onUpdated();
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao atualizar');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 pt-4 px-4 pb-20 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
+            <Pencil size={15} className="text-blue-500" />
+            Editar publicação
+          </h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+            <X size={15} className="text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-1.5">Categoria</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => setCategory(prev => prev === cat.key ? '' : cat.key)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all text-left',
+                    category === cat.key
+                      ? `${cat.color} border-transparent ring-2 ${cat.ring}`
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  )}
+                >
+                  <span className="text-base leading-none">{cat.emoji}</span>
+                  <span className="truncate">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Título (opcional)"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 font-medium transition-all"
+          />
+          <textarea
+            placeholder="Conteúdo da publicação..."
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            rows={4}
+            className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none transition-all"
+          />
+
+          {post.image_url && (
+            <div>
+              <p className="text-xs font-medium text-slate-500 mb-1.5">Imagem atual (mantida)</p>
+              <img src={post.image_url} alt="Imagem atual" className="w-full rounded-xl object-contain max-h-40 opacity-80" />
+            </div>
+          )}
+
+          {error && <p className="text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
+        </div>
+        <div className="flex gap-2 p-4 pt-0">
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {submitting ? 'Salvando...' : 'Salvar alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Post card ────────────────────────────────────────────────────────────────
 function JRHPostCard({
   post, isHR, currentUserId, onReload,
@@ -288,7 +399,14 @@ function JRHPostCard({
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const catMeta = getCategoryMeta(post.category);
+
+  const canManage = isHR || post.author_id === currentUserId;
 
   const reactionCounts: Record<string, number> = {};
   for (const like of post.likes) {
@@ -314,6 +432,20 @@ function JRHPostCard({
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteJRHPost(post.id);
+      onReload();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao excluir publicação';
+      setDeleteError(msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const totalReactions = post.likes.length;
 
   return (
@@ -321,7 +453,32 @@ function JRHPostCard({
       'bg-white rounded-2xl shadow-sm border border-slate-100 mb-4 overflow-hidden',
       post.pinned && 'ring-2 ring-orange-400/40'
     )}>
-      {/* Pinned badge */}
+      {confirmDelete && (
+        <div className="border-b border-red-100 bg-red-50 px-4 py-3 flex flex-col gap-2">
+          {deleteError ? (
+            <p className="text-xs text-red-700 font-semibold">Erro: {deleteError}</p>
+          ) : (
+            <p className="text-xs text-red-700 font-medium">Excluir esta publicação? Esta ação não pode ser desfeita.</p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
+              disabled={deleting}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              {deleting ? 'Excluindo...' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {post.pinned && (
         <div className="px-4 pt-3 pb-0">
           <span className="text-[11px] font-semibold text-orange-500 uppercase tracking-wide">📌 Fixado</span>
@@ -336,10 +493,9 @@ function JRHPostCard({
           className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-100 flex-shrink-0"
         />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-slate-900 leading-tight">{post.users?.name || 'Conexão RH'}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{post.users?.department_name || 'Recursos Humanos'} · {timeAgo(post.created_at)}</p>
+          <p className="font-semibold text-base text-slate-900 leading-tight">{post.users?.name || 'Conexão RH'}</p>
+          <p className="text-sm text-slate-400 mt-0.5">{post.users?.department_name || 'Recursos Humanos'} · {timeAgo(post.created_at)}</p>
         </div>
-        {/* View count */}
         <div className="flex items-center gap-1 text-slate-400 flex-shrink-0">
           <Eye size={13} />
           <span className="text-xs">{post.view_count}</span>
@@ -352,9 +508,26 @@ function JRHPostCard({
             </button>
           )}
         </div>
+        {canManage && (
+          <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+            <button
+              onClick={() => setEditing(true)}
+              title="Editar publicação"
+              className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition-colors"
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              title="Excluir publicação"
+              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Category badge */}
       {catMeta && (
         <div className="px-4 pb-2">
           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold', catMeta.color)}>
@@ -364,33 +537,30 @@ function JRHPostCard({
         </div>
       )}
 
-      {/* Content */}
       <div className="px-4 pb-3">
-        {post.title && <h3 className="font-bold text-slate-900 text-base mb-2 leading-snug">{post.title}</h3>}
+        {post.title && <h3 className="font-bold text-slate-900 text-xl mb-2 leading-snug">{post.title}</h3>}
         {cleanContent(post.content) && (
-          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{cleanContent(post.content)}</p>
+          <p className="text-base text-slate-700 whitespace-pre-wrap leading-relaxed">{cleanContent(post.content)}</p>
         )}
       </div>
 
-      {/* Image */}
       {post.image_url && (
         <div className="px-4 pb-3">
           <img
             src={post.image_url}
             alt={post.title || 'Imagem'}
-            className="w-full rounded-xl object-cover max-h-80"
+            className="w-full rounded-xl object-contain max-h-[700px] cursor-pointer"
+            onClick={() => setLightboxImage(post.image_url!)}
           />
         </div>
       )}
 
-      {/* Video */}
       {post.video_url && (
         <div className="px-4 pb-3">
           <video src={post.video_url} controls className="w-full rounded-xl max-h-72" />
         </div>
       )}
 
-      {/* Reaction summary row */}
       {(totalReactions > 0 || post.comments.length > 0) && (
         <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
           {totalReactions > 0 && (
@@ -420,7 +590,6 @@ function JRHPostCard({
         </div>
       )}
 
-      {/* Action bar */}
       <div className="px-3 pb-3 flex items-center gap-0.5 border-t border-slate-50 pt-2 overflow-x-auto">
         {REACTIONS.map(r => {
           const myReaction = post.likes.find(l => l.user_id === currentUserId && l.reaction === r.key);
@@ -448,7 +617,6 @@ function JRHPostCard({
         </button>
       </div>
 
-      {/* Comments section */}
       {showComments && (
         <div className="border-t border-slate-50 px-4 pb-4 pt-3 space-y-3">
           {post.comments.map((c: JRHComment) => (
@@ -459,8 +627,8 @@ function JRHPostCard({
                 className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5"
               />
               <div className="flex-1 bg-slate-50 rounded-xl px-3 py-2">
-                <p className="text-xs font-semibold text-slate-700">{c.users?.name}</p>
-                <p className="text-xs text-slate-600 mt-0.5 whitespace-pre-wrap">{c.content}</p>
+                <p className="text-sm font-semibold text-slate-700">{c.users?.name}</p>
+                <p className="text-sm text-slate-600 mt-0.5 whitespace-pre-wrap">{c.content}</p>
               </div>
             </div>
           ))}
@@ -484,9 +652,15 @@ function JRHPostCard({
         </div>
       )}
 
+
       {showViewers && (
         <ViewersModal postId={post.id} viewCount={post.view_count} onClose={() => setShowViewers(false)} />
       )}
+
+      {editing && (
+        <EditPostModal post={post} onClose={() => setEditing(false)} onUpdated={() => { onReload(); setEditing(false); }} />
+      )}
+      {lightboxImage && <ImageLightbox src={lightboxImage} alt={post.title || 'Imagem'} onClose={() => setLightboxImage(null)} />}
     </div>
   );
 }
@@ -580,7 +754,6 @@ export function JRHPage() {
 
   return (
     <div className="social-feed-shell">
-      {/* Left panel */}
       <aside className="social-left-panel">
         <div className="social-profile-card">
           <div className="social-profile-cover flex items-center justify-center"
@@ -594,7 +767,6 @@ export function JRHPage() {
           </div>
         </div>
 
-        {/* Category nav in left panel */}
         <div className="social-panel mt-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Categorias</h3>
           <div className="space-y-0.5">
@@ -624,9 +796,7 @@ export function JRHPage() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="min-w-0 space-y-5">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 shadow-md shadow-rose-200">
@@ -648,7 +818,6 @@ export function JRHPage() {
           )}
         </div>
 
-        {/* Category filter tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <button
             onClick={() => setActiveFilter('all')}
@@ -677,7 +846,6 @@ export function JRHPage() {
           ))}
         </div>
 
-        {/* Empty state */}
         {filteredPosts.length === 0 && (
           <div className="text-center py-16">
             <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center mx-auto mb-4">
@@ -692,7 +860,6 @@ export function JRHPage() {
           </div>
         )}
 
-        {/* Posts */}
         {filteredPosts.map(post => (
           <JRHPostCard
             key={post.id}
@@ -711,7 +878,6 @@ export function JRHPage() {
         )}
       </main>
 
-      {/* Right panel */}
       <aside className="social-right-panel">
         <div className="social-panel">
           <h3 className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-2">

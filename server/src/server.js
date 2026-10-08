@@ -7,6 +7,7 @@ import { URL } from 'node:url';
 import './env.js';
 import { sendPasswordResetEmail } from './email.js';
 import { getOrgChart } from './orgchart.repository.js';
+import { searchKnowledge } from './copiloto.js';
 import { pool } from './db.js';
 import { changePassword, createPasswordResetToken, getUserByToken, heartbeat, listOnlineUsers, login, logout, resetPasswordByToken, updateMyProfile } from './auth.repository.js';
 import { fetchBitrixUsers } from './bitrix.client.js';
@@ -97,7 +98,7 @@ import {
   listPcPermissoes, createPcPermissao, deletePcPermissao,
   listSetores, createSetor, updateSetor,
   listPeriodos, createPeriodo, closePeriodo,
-  submitPeriodo, validarPeriodo, inconsistenciaPeriodo, corrigirPeriodo,
+  submitPeriodo, validarPeriodo, inconsistenciaPeriodo, corrigirPeriodo, cancelarSubmissaoPeriodo,
   listComentariosPeriodo, createComentarioPeriodo,
   listLancamentos, getLancamento, createLancamento, updateLancamento, deleteLancamento,
   updateLancamentoStatus,
@@ -105,11 +106,14 @@ import {
   listAnexos, saveAnexo, deleteAnexo, streamAnexo,
   getFatura, deleteSetor} from './pc.repository.js';
 import { listProjects, createProject, updateProject, deleteProject, listSteps, createStep, updateStep, deleteStep, addStepAssignee, removeStepAssignee, listStepHistory, addStepHistory, listComments, createComment, updateComment, deleteComment, listAttachments, createAttachment, deleteAttachment, getAttachmentForDownload, listRequests, createRequest } from './projects.repository.js';
-import { listJRHPosts, createJRHPost, recordJRHPostView, listJRHPostViews, toggleJRHReaction, createJRHComment, checkIsHR, getMonthBirthdays, autoPublishTodayBirthdays } from './jrh.repository.js';
+import { listJRHPosts, createJRHPost, recordJRHPostView, listJRHPostViews, toggleJRHReaction, createJRHComment, checkIsHR, getMonthBirthdays, autoPublishTodayBirthdays, updateJRHPost, deleteJRHPost } from './jrh.repository.js';
 import { listStories, createStory, recordStoryView, listStoryViewers } from './stories.repository.js';
+import { initTiTables, listTiProjects, createTiProject, updateTiProject, deleteTiProject, listTiTasks, createTiTask, updateTiTask, deleteTiTask, getTiTaskHistory, getTiSummary, seedTiData } from './ti.repository.js';
 
 const port = Number(process.env.PORT || 3333);
+initTiTables().then(() => seedTiData()).catch(e => console.error('[TI] Init error:', e.message));
 const UPLOADS_JRH_DIR = '/opt/rede-nex/deploy_v2/uploads/jrh';
+let lastBirthdayCheckDate = ''; // run autoPublish once per day
 mkdirSync(UPLOADS_JRH_DIR, { recursive: true });
 const ALLOWED_UPLOAD_MIME = new Set(['image/jpeg','image/jpg','image/png','image/gif','image/webp','video/mp4','video/webm','video/quicktime']);
 const MAX_JSON_BYTES = Number(process.env.MAX_JSON_BYTES || 25 * 1024 * 1024);
@@ -164,11 +168,17 @@ function parseCookies(req) {
 
 function sessionCookieHeader(token) {
   const maxAge = 7 * 24 * 60 * 60;
-  return `session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? 'Secure; ' : '';
+  const sameSite = isProduction ? 'Strict' : 'Lax';
+  return `session=${token}; HttpOnly; ${secure}SameSite=${sameSite}; Path=/; Max-Age=${maxAge}`;
 }
 
 function clearCookieHeader() {
-  return 'session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? 'Secure; ' : '';
+  const sameSite = isProduction ? 'Strict' : 'Lax';
+  return `session=; HttpOnly; ${secure}SameSite=${sameSite}; Path=/; Max-Age=0`;
 }
 
 function sendJson(req, res, status, payload, extraHeaders = {}) {
@@ -1663,6 +1673,8 @@ async function route(req, res) {
       const user = await requireUser(req, res); if (!user) return;
       const { message = '', history = [] } = await readJson(req);
 
+      const firstName = user.name ? user.name.trim().split(' ')[0] : (user.email ? user.email.split('@')[0] : 'você');
+
       const openRouterKey = process.env.OPENROUTER_API_KEY;
       if (openRouterKey) {
         try {
@@ -1677,7 +1689,7 @@ async function route(req, res) {
             body: JSON.stringify({
               model: 'google/gemini-2.5-flash',
               messages: [
-                { role: 'system', content: `Você é o Copiloto da Rede Nex, assistente inteligente da plataforma interna da NexTelecom. Responda sempre em português brasileiro, de forma clara, direta e amigável. Use markdown para formatar respostas longas.
+                { role: 'system', content: `Você é o Copiloto da Rede Nex, assistente pessoal de ${firstName} na plataforma interna da NexTelecom. Responda sempre em português brasileiro, de forma clara, direta e amigável. Use markdown para formatar respostas longas.
 
 ## NAVEGAÇÃO DA PLATAFORMA
 O menu lateral (sidebar) contém todos os módulos. No mobile, a navegação fica na barra inferior.
@@ -1714,7 +1726,83 @@ O menu lateral (sidebar) contém todos os módulos. No mobile, a navegação fic
 - Administrador/Gestor: acesso total, incluindo criar/editar/excluir conteúdo de outros, gerenciar usuários, ver Analytics e Logs.
 - Usuário padrão: criar/editar/excluir apenas o próprio conteúdo.
 
-Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na plataforma, informe claramente. Não invente funcionalidades.` },
+Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na plataforma, informe claramente. Não invente funcionalidades.
+
+## PERFIL DO USUÁRIO
+Você está conversando com **${firstName}** (${user.name || firstName}). Regras de personalização:
+- Chame-o sempre pelo primeiro nome (${firstName}) ao cumprimentar ou personalizar respostas — não em cada frase
+- Observe o estilo de escrita e vocabulário das mensagens: se técnico, responda com termos técnicos; se simples, seja didático e use analogias
+- Ajuste o tamanho das respostas ao comportamento do usuário: respostas longas se ele faz perguntas elaboradas, curtas e diretas se é objetivo
+- Se o histórico mostrar preferência por listas/bullet points, priorize esse formato
+- O objetivo é que cada usuário sinta que o copilot foi feito especificamente para ele
+
+## SERVIÇOS E TECNOLOGIA NEXELECOM
+Você também é especialista nos serviços de telecomunicações da NexTelecom e pode responder dúvidas técnicas e comerciais sobre conectividade.
+
+### FIBRA ÓPTICA E FTTH
+A NexTelecom opera redes FTTH (Fiber To The Home). Caminho do sinal: OLT → fibra → splitter/CTO → cabo drop → ONT/ONU → roteador → dispositivos.
+- OLT: equipamento da NexTelecom que concentra e entrega o serviço óptico
+- CTO: caixa de distribuição óptica no poste/calçada
+- Splitter: divisor passivo — distribui o sinal para vários clientes (não aumenta velocidade)
+- ONT/ONU: equipamento na casa/empresa que converte sinal óptico para Ethernet e Wi-Fi
+- ONT: possui Wi-Fi integrado | ONU: sem Wi-Fi, requer roteador externo
+
+### INTERNET: DOWNLOAD E UPLOAD
+- Download: dados que chegam — streaming, abrir sites, receber arquivos
+- Upload: dados que saem — videochamadas, backup em nuvem, câmeras, envio de arquivos
+- 1 Gbps = 1000 Mbps (notação decimal de rede)
+- Internet lenta: teste por cabo (Ethernet direto na ONT) para separar link do Wi-Fi
+
+### WI-FI
+- Internet ≠ Wi-Fi: o link pode estar ok e o Wi-Fi estar ruim
+- 2,4 GHz: maior alcance, atravessa obstáculos, mais interferência — bom para distâncias maiores
+- 5 GHz: mais canais, maior capacidade próximo ao roteador, menor alcance através de paredes
+- Causas de Wi-Fi ruim: paredes/lajes, roteador em local inadequado, interferência de redes vizinhas, distância excessiva
+- RSSI: -30 a -50 = ótimo | -51 a -67 = bom | -68 a -75 = atenção | abaixo de -75 = fraco
+
+### PLANOS E TIPOS DE LINK
+- Banda Larga: uso residencial e negócios comuns, boa relação custo-benefício
+- Link Semidedicado: empresas com necessidade de previsibilidade
+- Link Dedicado: operação crítica — sistemas, VPN, servidores publicados, filiais. Requer levantamento técnico
+- Pergunta chave: o que acontece com o negócio quando a internet para?
+
+### EQUIPAMENTOS
+- Roteador: distribui Wi-Fi e executa DHCP/NAT/firewall — não cria internet, apenas distribui o recebido da ONT/ONU
+- Repetidor: retransmite Wi-Fi existente — instalar onde ainda há sinal. Não aumenta velocidade
+- Rede Mesh: vários nós coordenados como uma única rede Wi-Fi. Backhaul por cabo quando possível
+
+### IP E ENDEREÇAMENTO
+- IP privado: 192.168.x.x, 10.x.x.x, 172.16-31.x.x — rede local, não roteável na internet
+- IP público dinâmico: pode mudar em reconexões. Suficiente para navegação
+- IP público fixo: permanente. Facilita VPNs, câmeras/NVR, servidores. IP fixo NÃO aumenta velocidade
+- CGNAT: vários clientes compartilham IPs públicos. Navegação funciona. Publicação de servidores e acesso remoto podem exigir IP público. CGNAT NÃO significa internet lenta
+- DHCP: atribui automaticamente IP, máscara, gateway e DNS
+
+### TELEFONIA IP (VoIP)
+- Voz digitalizada e transportada em pacotes pela rede
+- Ramal: extensão interna do PABX
+- Tronco SIP: conexão IP entre PABX e operadora. Ramais ≠ chamadas simultâneas
+- Qualidade da voz: latência (eco), jitter (voz picotada), perda de pacotes (cortes)
+- Boa voz precisa de rede estável, baixa perda e atraso controlado — não depende apenas de muitos Mbps
+
+### PORTABILIDADE NUMÉRICA
+- Permite trocar de operadora mantendo o mesmo número
+- Confirmar titularidade, identificar linhas, validar documentação conforme procedimento vigente
+
+### DIAGNÓSTICO PRÁTICO
+Separe as 5 camadas: meio físico → tipo de acesso → Wi-Fi/rede local → Telefonia IP → endereçamento IP
+- Internet lenta: 1) teste por cabo. 2) por cabo ruim → verificar link com operadora. 3) por cabo ok → investigar Wi-Fi
+- Sinal óptico fraco (potência abaixo de -27 dBm) → problema físico na fibra (dobra, sujeira, conector)
+- Câmeras, backup em nuvem e envio de arquivos grandes: atenção especial ao upload
+
+### ATENDIMENTO COMERCIAL
+- Ouça o cenário completo antes de propor solução
+- Perguntas que orientam: Quantas pessoas usam? Há home office? Câmeras/NVR? VPN? Servidores? Telefonia?
+- Apresentar: situação atual + solução proposta + ganho esperado
+- Objeções comuns: preço (foco no custo da instabilidade), operadora atual (compare com dados reais), prazo (mostre urgência concreta)
+- Nunca inventar preços, prazos ou especificações técnicas — consultar tabela vigente
+
+Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataforma, siga as instruções acima. Para dúvidas de telecom/conectividade, use o conhecimento desta seção.` },
                 ...history.slice(-10).map(m => ({ role: m.role, content: m.content })),
                 { role: 'user', content: message },
               ],
@@ -1756,7 +1844,7 @@ Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na pla
       } else if (q.includes('ajuda') || q.includes('suporte') || q.includes('problema') || q.includes('ti')) {
         reply = 'Para suporte técnico, você pode:\n1. Consultar a **Central de Ajuda** (menu lateral → Ajuda)\n2. Entrar em contato pelo **Bate-papo** com o time de TI\n3. Criar um post no Feed marcando o departamento de TI\n\nO time de TI está disponível em horário comercial.';
       } else if (q.includes('oi') || q.includes('olá') || q.includes('tudo') || q.includes('bom dia') || q.includes('boa tarde') || q.includes('boa noite')) {
-        reply = 'Olá! Sou o Copiloto da Rede Nex 👋\n\nPosso te ajudar com dúvidas sobre a plataforma — Feed, Wiki, Tarefas, Bate-papo, Calendário, Gamificação e muito mais. O que você gostaria de saber?';
+        reply = 'Olá! Sou o Copiloto da Rede Nex 👋\n\nPosso te ajudar com dúvidas sobre a plataforma ��� Feed, Wiki, Tarefas, Bate-papo, Calendário, Gamificação e muito mais. O que você gostaria de saber?';
       } else {
         reply = 'Posso te ajudar com dúvidas sobre a plataforma Rede Nex! Experimente perguntar sobre:\n\n• **Feed** — como publicar, comunicados, eventos\n• **Wiki** — criar e editar artigos\n• **Tarefas** — criar, checklists, minhas listas\n• **Bate-papo** — grupos, menções\n• **Calendário** — eventos, visualizações\n• **Gamificação** — XP, rank, missões\n• **Treinamentos** — cursos disponíveis\n\n_Em breve: IA generativa para respostas ainda mais inteligentes!_';
       }
@@ -1953,6 +2041,17 @@ Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na pla
         const permList = await listPcPermissoes();
         const notifyIds = permList.filter(pm => pm.papel === 'admin' || pm.papel === 'validador').map(pm => pm.user_id).filter(id => id !== user.id);
         if (notifyIds.length) notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null, title: 'Período corrigido e resubmetido', message: `${user.name} corrigiu e resubmeteu "${r.periodo}" para validação`, type: 'info', link: '/prestacao-contas', userIds: notifyIds }).catch(() => {});
+        return sendJson(req, res, 200, { data: r });
+      }
+      if (segments[2] === 'periodos' && segments[3] && segments[4] === 'cancelar-submissao' && req.method === 'PUT') {
+        const { rows: pr } = await pool.query('SELECT responsavel_user_id FROM pc_periodos WHERE id=$1', [segments[3]]);
+        if (!isAdmin && pr[0]?.responsavel_user_id !== user.id)
+          return sendError(req, res, 403, 'FORBIDDEN', 'Apenas o responsável ou administradores podem cancelar o envio');
+        const r = await cancelarSubmissaoPeriodo(segments[3], user.id);
+        if (!r) return sendError(req, res, 409, 'CONFLICT', 'Período não pode ter o envio cancelado no status atual');
+        const permList = await listPcPermissoes();
+        const notifyIds = permList.filter(pm => pm.papel === 'admin' || pm.papel === 'validador').map(pm => pm.user_id).filter(id => id !== user.id);
+        if (notifyIds.length) notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url || null, title: 'Envio cancelado', message: `${user.name} cancelou o envio do período "${r.periodo}"`, type: 'info', link: '/prestacao-contas', userIds: notifyIds }).catch(() => {});
         return sendJson(req, res, 200, { data: r });
       }
       if (segments[2] === 'periodos' && segments[3] && segments[4] === 'comentarios') {
@@ -2228,7 +2327,11 @@ Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na pla
       }
 
       if (!segments[2] && req.method === 'GET') {
-        await autoPublishTodayBirthdays().catch(() => {});
+        const todayDate = new Date().toISOString().slice(0, 10);
+        if (lastBirthdayCheckDate !== todayDate) {
+          lastBirthdayCheckDate = todayDate;
+          await autoPublishTodayBirthdays().catch(() => {});
+        }
         return sendJson(req, res, 200, { data: await listJRHPosts() });
       }
 
@@ -2255,6 +2358,15 @@ Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na pla
           const { content } = await readJson(req);
           return sendJson(req, res, 201, { data: await createJRHComment(postId, user.id, content) });
         }
+        if (!segments[4] && req.method === 'PUT') {
+          const payload = await readJson(req);
+          const updated = await updateJRHPost(postId, user.id, payload);
+          return sendJson(req, res, 200, { data: updated });
+        }
+        if (!segments[4] && req.method === 'DELETE') {
+          await deleteJRHPost(postId, user.id);
+          return sendEmpty(req, res);
+        }
       }
     }
 
@@ -2265,6 +2377,71 @@ Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na pla
       if (segments[2] && segments[3] === 'view' && req.method === 'POST') { await recordStoryView(segments[2], user.id); return sendEmpty(req, res); }
       if (segments[2] && segments[3] === 'viewers' && req.method === 'GET') return sendJson(req, res, 200, { data: await listStoryViewers(segments[2]) });
     }
+
+  // ── TI Dashboard ────────────────────────────────────────────────
+  if (segments[0] === 'api' && segments[1] === 'ti') {
+    if (segments[2] === 'summary') {
+      const sum = await getTiSummary();
+      return sendJson(req, res, 200, sum);
+    }
+    if (segments[2] === 'projects') {
+      if (req.method === 'GET' && !segments[3]) {
+        return sendJson(req, res, 200, await listTiProjects());
+      }
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, await createTiProject(body));
+      }
+      if (segments[3]) {
+        const pid = segments[3];
+        if (req.method === 'PUT') {
+          const body = await readJson(req);
+          return sendJson(req, res, 200, await updateTiProject(pid, body));
+        }
+        if (req.method === 'DELETE') {
+          await deleteTiProject(pid);
+          return sendJson(req, res, 200, { ok: true });
+        }
+      }
+    }
+    if (segments[2] === 'tasks') {
+      if (req.method === 'GET' && !segments[3]) {
+        const filters = {};
+        if (url.searchParams.get('project_id')) filters.project_id = url.searchParams.get('project_id');
+        if (url.searchParams.get('status'))     filters.status     = url.searchParams.get('status');
+        if (url.searchParams.get('date'))        filters.date       = url.searchParams.get('date');
+        if (url.searchParams.get('priority'))    filters.priority   = url.searchParams.get('priority');
+        return sendJson(req, res, 200, await listTiTasks(filters));
+      }
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        return sendJson(req, res, 201, await createTiTask(body));
+      }
+      if (segments[3]) {
+        const tid = segments[3];
+        if (segments[4] === 'history') {
+          return sendJson(req, res, 200, await getTiTaskHistory(tid));
+        }
+        if (req.method === 'PUT') {
+          const body = await readJson(req);
+          const user = req.user;
+          return sendJson(req, res, 200, await updateTiTask(tid, body, user?.name || 'Sistema'));
+        }
+        if (req.method === 'DELETE') {
+          await deleteTiTask(tid);
+          return sendJson(req, res, 200, { ok: true });
+        }
+      }
+    }
+  }
+        // Copiloto IA — NEX Telecom Knowledge Base
+    if (path === '/copiloto' && req.method === 'POST') {
+      const user = await requireUser(req, res); if (!user) return;
+      const { message = '', history = [] } = await readJson(req);
+      const reply = searchKnowledge(message, history);
+      return sendJson(req, res, 200, { reply });
+    }
+
         return sendError(req, res, 404, 'NOT_FOUND', 'Rota não encontrada');
   } catch (error) {
     if (error?.statusCode) {

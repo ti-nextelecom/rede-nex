@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './apiClient';
+import { apiDelete, apiGet, apiPost, apiPut } from './apiClient';
 
 type ApiResponse<T> = { data?: T };
 
@@ -80,6 +80,21 @@ export async function createJRHPost(input: {
 }): Promise<JRHPost> {
   const res = await apiPost<ApiResponse<JRHPost>>('/jrh', input);
   if (!res.data) throw new Error('Post não criado');
+  return res.data;
+}
+
+export async function deleteJRHPost(postId: string): Promise<void> {
+  await apiDelete(`/jrh/posts/${postId}`);
+}
+
+export async function updateJRHPost(postId: string, input: {
+  title?: string | null;
+  content?: string | null;
+  category?: string | null;
+  image_url?: string | null;
+  video_url?: string | null;
+}): Promise<JRHPost> {
+  const res = await apiPut<{ data: JRHPost }>(`/jrh/posts/${postId}`, input);
   return res.data;
 }
 

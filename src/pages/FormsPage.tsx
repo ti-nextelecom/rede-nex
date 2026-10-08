@@ -194,13 +194,13 @@ export function FormsPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-3">
         <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
           placeholder="Título do formulário"
-          className="w-full text-lg font-bold border-b border-slate-200 pb-2 outline-none text-slate-800 focus:border-orange-400" />
+          className="w-full text-lg font-bold border-b border-slate-200 dark:border-slate-600 pb-2 outline-none text-slate-800 dark:text-slate-100 focus:border-orange-400 bg-transparent dark:bg-transparent" />
         <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)}
           placeholder="Descrição (opcional)" rows={2}
-          className="w-full text-sm text-slate-600 border-none outline-none resize-none" />
+          className="w-full text-sm text-slate-600 dark:text-slate-300 border-none outline-none resize-none bg-transparent dark:bg-transparent" />
       </div>
 
       <div className="space-y-3">
@@ -208,7 +208,7 @@ export function FormsPage() {
           <div key={field.id} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2">
               <GripVertical size={16} className="text-slate-300 flex-shrink-0" />
-              <span className="text-xs font-semibold text-slate-400 uppercase flex-1 truncate">
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase flex-1 truncate">
                 {FIELD_TYPES.find(t => t.value === field.type)?.label}
               </span>
               <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer min-h-[36px]">
@@ -224,17 +224,17 @@ export function FormsPage() {
             </div>
             <input value={field.label} onChange={e => updateField(field.id, { label: e.target.value })}
               placeholder="Rótulo da pergunta"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400" />
+              className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100" />
             {(field.type === 'text' || field.type === 'textarea') && (
               <input value={field.placeholder || ''} onChange={e => updateField(field.id, { placeholder: e.target.value })}
                 placeholder="Placeholder (opcional)"
-                className="w-full border border-slate-100 rounded-lg px-3 py-2 text-xs outline-none text-slate-500" />
+                className="w-full border border-slate-100 dark:border-slate-600 rounded-lg px-3 py-2 text-xs outline-none text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900" />
             )}
             {field.options && (
               <div className="space-y-2">
                 {field.options.map((opt, oi) => (
                   <div key={oi} className="flex items-center gap-2">
-                    <div className={cn('w-3.5 h-3.5 flex-shrink-0 border border-slate-300',
+                    <div className={cn('w-3.5 h-3.5 flex-shrink-0 border border-slate-300 dark:border-slate-500',
                       field.type === 'radio' ? 'rounded-full' : 'rounded')} />
                     <input value={opt} onChange={e => updateOption(field.id, oi, e.target.value)}
                       className="flex-1 text-sm border-b border-slate-200 outline-none focus:border-orange-400 bg-transparent pb-0.5" />
@@ -254,14 +254,14 @@ export function FormsPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-dashed border-slate-300 rounded-xl p-4">
-        <p className="text-xs font-semibold text-slate-500 mb-3 text-center uppercase tracking-wide">Adicionar campo</p>
+      <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-4">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 text-center uppercase tracking-wide">Adicionar campo</p>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {FIELD_TYPES.map(t => {
             const Icon = t.icon;
             return (
               <button key={t.value} onClick={() => addField(t.value as FormField['type'])}
-                className="flex flex-col items-center gap-1.5 py-3 border border-slate-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 active:bg-orange-100 transition-colors text-slate-600 hover:text-orange-600 min-h-[64px]">
+                className="flex flex-col items-center gap-1.5 py-3 border border-slate-200 dark:border-slate-600 rounded-lg hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 active:bg-orange-100 dark:active:bg-orange-900/30 transition-colors text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 min-h-[64px]">
                 <Icon size={18} />
                 <span className="text-[10px] font-medium text-center leading-tight">{t.label}</span>
               </button>
@@ -278,13 +278,13 @@ export function FormsPage() {
         className="text-sm text-orange-600 hover:underline font-medium min-h-[44px] flex items-center">
         ← Voltar
       </button>
-      <div className="bg-white border-t-4 border-orange-500 rounded-xl p-4 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-800">{currentForm.title}</h2>
-        {currentForm.description && <p className="text-sm text-slate-500 mt-1">{currentForm.description}</p>}
+      <div className="bg-white dark:bg-slate-800 border-t-4 border-orange-500 rounded-xl p-4 shadow-sm">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{currentForm.title}</h2>
+        {currentForm.description && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{currentForm.description}</p>}
       </div>
       {currentForm.fields.map(field => (
-        <div key={field.id} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-          <label className="text-sm font-semibold text-slate-800">
+        <div key={field.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2">
+          <label className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             {field.label} {field.required && <span className="text-red-500">*</span>}
           </label>
           {field.type === 'text' && (
@@ -295,11 +295,11 @@ export function FormsPage() {
           {field.type === 'textarea' && (
             <textarea value={(answers[field.id] as string) || ''} onChange={e => setAnswer(field.id, e.target.value)}
               placeholder={field.placeholder} rows={3}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+              className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400 resize-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100" />
           )}
           {field.type === 'select' && (
             <select value={(answers[field.id] as string) || ''} onChange={e => setAnswer(field.id, e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+              className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
               <option value="">Selecione...</option>
               {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
@@ -309,7 +309,7 @@ export function FormsPage() {
               <input type="radio" name={field.id} value={o}
                 checked={(answers[field.id] as string) === o}
                 onChange={() => setAnswer(field.id, o)} className="accent-orange-500 w-4 h-4" />
-              <span className="text-sm text-slate-700">{o}</span>
+              <span className="text-sm text-slate-700 dark:text-slate-200">{o}</span>
             </label>
           ))}
           {field.type === 'checkbox' && field.options?.map(o => (
@@ -336,16 +336,16 @@ export function FormsPage() {
           className="text-sm text-orange-600 hover:underline font-medium min-h-[44px] flex items-center">
           ← Voltar
         </button>
-        <span className="text-sm text-slate-500">{responses.length} resposta{responses.length !== 1 ? 's' : ''}</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">{responses.length} resposta{responses.length !== 1 ? 's' : ''}</span>
       </div>
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-4 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-800">{currentForm.title} — Respostas</h2>
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+        <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-700">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{currentForm.title} — Respostas</h2>
         </div>
         {responses.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 text-sm">Nenhuma resposta ainda</div>
+          <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-sm">Nenhuma resposta ainda</div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {responses.map(r => (
               <div key={r.id} className="px-4 py-4">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -353,14 +353,14 @@ export function FormsPage() {
                     <img src={r.user.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.user.name)}&size=28&background=f97316&color=fff`}
                       alt={r.user.name} className="w-6 h-6 rounded-full flex-shrink-0" />
                   )}
-                  <span className="text-sm font-semibold text-slate-800">{r.user?.name || 'Anônimo'}</span>
-                  <span className="text-xs text-slate-400 ml-auto">{new Date(r.submitted_at).toLocaleString('pt-BR')}</span>
+                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{r.user?.name || 'Anônimo'}</span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500 ml-auto">{new Date(r.submitted_at).toLocaleString('pt-BR')}</span>
                 </div>
                 <div className="space-y-2">
                   {currentForm.fields.map(field => (
                     <div key={field.id} className="text-sm">
-                      <span className="font-medium text-slate-600">{field.label}: </span>
-                      <span className="text-slate-800">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">{field.label}: </span>
+                      <span className="text-slate-800 dark:text-slate-100">
                         {Array.isArray(r.answers[field.id])
                           ? (r.answers[field.id] as string[]).join(', ')
                           : String(r.answers[field.id] ?? '—')}
@@ -381,7 +381,7 @@ export function FormsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ClipboardList size={20} className="text-orange-500" />
-          <h1 className="text-lg font-bold text-slate-800">Formulários</h1>
+          <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">Formulários</h1>
         </div>
         {isAdmin && (
           <button onClick={startCreate}
@@ -391,11 +391,11 @@ export function FormsPage() {
         )}
       </div>
       {loading ? (
-        <div className="py-12 text-center text-slate-400 text-sm">Carregando...</div>
+        <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-sm">Carregando...</div>
       ) : forms.length === 0 ? (
-        <div className="py-12 text-center bg-white border border-slate-200 rounded-xl">
+        <div className="py-12 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
           <ClipboardList size={40} className="mx-auto text-slate-300 mb-3" />
-          <p className="text-slate-500 font-medium">Nenhum formulário</p>
+          <p className="text-slate-500 dark:text-slate-400 font-medium">Nenhum formulário</p>
           {isAdmin && (
             <button onClick={startCreate} className="mt-3 text-orange-600 text-sm font-medium hover:underline min-h-[44px] flex items-center mx-auto">
               Criar formulário
@@ -405,18 +405,18 @@ export function FormsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {forms.map(form => (
-            <div key={form.id} className="bg-white border border-slate-200 rounded-xl p-4 active:bg-slate-50 transition-colors">
+            <div key={form.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 active:bg-slate-50 dark:active:bg-slate-700 transition-colors">
               <div className="flex items-start justify-between mb-2 gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-bold text-slate-800 truncate">{form.title}</h3>
-                  {form.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{form.description}</p>}
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{form.title}</h3>
+                  {form.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">{form.description}</p>}
                 </div>
                 <span className={cn('px-1.5 py-0.5 text-[10px] font-semibold rounded-full flex-shrink-0',
-                  form.published ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500')}>
+                  form.published ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400')}>
                   {form.published ? 'Pub.' : 'Rasc.'}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-xs text-slate-400 mb-3">
+              <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500 mb-3">
                 <span><ListChecks size={11} className="inline mr-0.5" />{form.field_count} campo{Number(form.field_count) !== 1 ? 's' : ''}</span>
                 <span>{form.response_count} resp.</span>
               </div>
@@ -430,11 +430,11 @@ export function FormsPage() {
                 {(isAdmin || form.creator?.id === user?.id) && (
                   <>
                     <button onClick={() => startEdit(form)}
-                      className="flex-1 py-2 text-xs font-medium border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[40px]">
+                      className="flex-1 py-2 text-xs font-medium border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 active:bg-slate-100 dark:active:bg-slate-600 transition-colors min-h-[40px]">
                       Editar
                     </button>
                     <button onClick={() => viewResponses(form)}
-                      className="p-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                      className="p-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 active:bg-slate-100 dark:active:bg-slate-600 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
                       title="Ver respostas">
                       <Eye size={14} />
                     </button>

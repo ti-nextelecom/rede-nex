@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { FormEvent, ReactNode } from 'react';
 import {
   ArrowRight,
@@ -61,7 +62,7 @@ const statusStyles: Record<Status, { label: string; className: string; dotClass:
   Concluído: { label: 'Concluído', className: 'status-done', dotClass: 'dot-done' },
   'Concluído Antes do Prazo': { label: 'Concluído antes do prazo', className: 'status-early', dotClass: 'dot-early' },
   Atrasado: { label: 'Atrasado', className: 'status-late', dotClass: 'dot-late' },
-  Atenção: { label: 'Atenção', className: 'status-attention', dotClass: 'dot-attention' },
+  Atenção: { label: 'Andamento', className: 'status-progress', dotClass: 'dot-progress' },
 };
 
 const accentOptions: { value: Accent; label: string; color: string }[] = [
@@ -79,7 +80,7 @@ function getInitials(name: string): string {
 
 function getStatusRowCls(status: Status): string {
   if (status === 'Atrasado') return 'pr-late';
-  if (status === 'Atenção') return 'pr-attention';
+  if (status === 'Atenção') return 'pr-progress';
   if (status === 'Em andamento') return 'pr-progress';
   if (status === 'Concluído' || status === 'Concluído Antes do Prazo') return 'pr-done';
   return '';
@@ -242,7 +243,7 @@ export function ProjetosPage() {
       );
     }
     if (loading) return <div className="empty-state"><p>Carregando projetos…</p></div>;
-    if (activeTab === 'Novo projeto' && isAdmin) {
+    if (activeTab === 'Novo projeto') {
       return <NewProjectView onSubmit={handleAddProject} onCancel={() => onTabChange('Projetos')} users={users} />;
     }
     if (activeTab === 'Solicitações') {
@@ -290,9 +291,7 @@ export function ProjetosPage() {
     );
   };
 
-  const visibleTabs: Tab[] = isAdmin
-    ? ['Visão geral', 'Projetos', 'Apresentação', 'Solicitações', 'Novo projeto']
-    : ['Visão geral', 'Projetos', 'Apresentação', 'Solicitações'];
+  const visibleTabs: Tab[] = ['Visão geral', 'Projetos', 'Apresentação', 'Solicitações', 'Novo projeto'];
 
   const activeTabForSidebar: Tab = selectedProject ? 'Projetos' : activeTab;
 
@@ -341,19 +340,11 @@ export function ProjetosPage() {
           <div className="sidebar-divider" />
           <div className="sidebar-section">
             <span className="sidebar-section-label">ACESSO RÁPIDO</span>
-            {isAdmin && (
-              <button className="sidebar-nav-item" onClick={() => onTabChange('Novo projeto')}>
+            <button className="sidebar-nav-item" onClick={() => onTabChange('Novo projeto')}>
                 <FilePlus2 size={15} />
                 <span>Crie apontamentos</span>
               </button>
-            )}
-            <button
-              className="sidebar-nav-item"
-              onClick={() => { setStatusFilter('Atenção'); onTabChange('Projetos'); }}
-            >
-              <Target size={15} />
-              <span>Revisar atenção</span>
-            </button>
+
           </div>
           {users.length > 0 && (
             <>
@@ -478,11 +469,11 @@ function ProjectsView({ projects, projectsCount, statusFilter, setStatusFilter, 
     <div className="view-fade">
       <div className="view-heading">
         <div><span className="section-kicker">Workspace / Projetos</span><h2>{statusFilter === 'Todos' ? 'Todos os projetos' : statusFilter} <span className="heading-count">{projectsCount}</span></h2></div>
-        {isAdmin && <button className="primary-button" onClick={onNew}><Plus size={17} /> Novo projeto</button>}
+        <button className="primary-button" onClick={onNew}><Plus size={17} /> Novo projeto</button>
       </div>
       <div className="filters">
         <div className="search-field"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar projeto ou responsável" /></div>
-        <div className="filter-select"><Filter size={16} /><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'Todos' | Status)}><option>Todos</option><option>Não iniciado</option><option>Em andamento</option><option>Concluído</option><option>Concluído Antes do Prazo</option><option>Atrasado</option><option>Atenção</option></select></div>
+        <div className="filter-select"><Filter size={16} /><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'Todos' | Status)}><option>Todos</option><option>Não iniciado</option><option>Em andamento</option><option>Concluído</option><option>Concluído Antes do Prazo</option><option>Atrasado</option></select></div>
         <div className="view-mode-btns">
           <button className={viewMode === 'grid' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('grid')} title="Cards"><LayoutGrid size={16} /></button>
           <button className={viewMode === 'list' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('list')} title="Lista"><LayoutList size={16} /></button>
@@ -547,7 +538,7 @@ function ProjectEditModal({ project, onClose, onSave, users }: {
     onSave({ name, responsible_name: responsible, responsible_photo_url: responsiblePhotoUrl, status, progress, phase, category, start_date: startDate || null, deadline: deadline || null, next_action: nextAction, accent, tag: tag.trim() || null, tag_color: tagColor || null });
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -624,8 +615,8 @@ function ProjectEditModal({ project, onClose, onSave, users }: {
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>,
+  document.body);
 }
 
 function NewProjectView({ onSubmit, onCancel, users }: {

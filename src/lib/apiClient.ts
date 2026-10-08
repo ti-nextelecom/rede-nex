@@ -1,4 +1,4 @@
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3333/api').replace(/\/$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 // Auth is handled via HttpOnly session cookie — no localStorage token
 export function getAuthToken() { return null; }
