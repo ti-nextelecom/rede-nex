@@ -27,3 +27,6 @@ server/public/uploads
 build/
 .cache/
 coverage/
+*.tsbuildinfo
+*.bak
+*.bak_*
