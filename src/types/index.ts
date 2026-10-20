@@ -24,6 +24,7 @@ export interface User {
   status: 'active' | 'inactive';
   role_id?: string;
   admission_date?: string;
+  birth_date?: string;
   created_at: string;
   updated_at: string;
   departments?: Department;

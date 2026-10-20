@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Grid2X2, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../lib/auth';
+import { useHrAccess } from '../../lib/hrAccess';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
 import { PRIMARY_NAVIGATION, navigationForRole } from './navigation';
 
@@ -10,7 +11,8 @@ export function MobileBottomNav() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const { user } = useAuth();
-  const items = navigationForRole(user?.roles?.name || user?.role_name || 'Usuário');
+  const { allowed } = useHrAccess();
+  const items = navigationForRole(user?.roles?.name || user?.role_name || 'Usuário', allowed('rh.view'));
   const filtered = items.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')));
 
   return (

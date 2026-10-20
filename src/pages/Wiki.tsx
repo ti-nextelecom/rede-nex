@@ -66,6 +66,7 @@ import {
   Shield,
   Truck,
   Zap,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   createWikiCategory,
@@ -92,7 +93,11 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import type { Category, WikiArticle } from '../types';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
+import { deleteLocalWikiCover, listLocalWikiCovers, saveLocalWikiCover } from '../lib/localWikiCovers';
+import './wiki.css';
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+
+const READ_ONLY_REMOTE = import.meta.env.VITE_REMOTE_READ_ONLY === 'true';
 
 interface CategoryWithArticles extends Category {
   _articles: WikiArticle[];
@@ -108,7 +113,15 @@ type CategoryDraft = {
   description: string;
   color: string;
   icon: string;
+  imageFile: File | null;
 };
+
+function categoryCover(icon?: string | null) {
+  if (!icon) return null;
+  return /^\/uploads\/wiki\/[a-f0-9-]+\.(?:jpe?g|png|webp|gif)$/i.test(icon) || icon.startsWith('blob:')
+    ? icon
+    : null;
+}
 
 interface TocItem {
   id: string;
@@ -129,16 +142,7 @@ interface WikiUserEntry {
   users?: { id: string; name: string; photo_url?: string };
 }
 
-const CATEGORY_ICONS: Record<string, typeof Headphones> = {
-  Atendimento: Headphones,
-  'Suporte Técnico': Wrench,
-  NOC: Network,
-  Financeiro: DollarSign,
-  Comercial: TrendingUp,
-  RH: Users,
-};
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   folder: Folder,
   headphones: Headphones,
   network: Network,
@@ -273,7 +277,7 @@ function sanitizeWikiHtml(value: string) {
 function renderMdTable(block: string): string | null {
   const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2 || !lines.every(l => l.startsWith('|') && l.endsWith('|'))) return null;
-  const isSep = (l: string) => /^\|[-:\| ]+\|$/.test(l);
+  const isSep = (l: string) => /^\|[-:| ]+\|$/.test(l);
   const sepIdx = lines.findIndex(isSep);
   if (sepIdx === -1) return null;
   const parseRow = (row: string) => row.split('|').slice(1, -1).map(c => c.trim());
@@ -442,8 +446,12 @@ export function Wiki() {
     description: '',
     color: '#0057b8',
     icon: 'Folder',
+    imageFile: null,
   });
   const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
+  const [localCovers, setLocalCovers] = useState<Record<string, string | null>>({});
+  const localCoversRef = useRef<Record<string, string | null>>({});
   const [articleRoleRequired, setArticleRoleRequired] = useState<string | null>(null);
   const { user } = useAuth();
   const isAdmin = user?.role_name === 'Administrador';
@@ -462,6 +470,22 @@ export function Wiki() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
+    if (!READ_ONLY_REMOTE) return;
+    let active = true;
+    listLocalWikiCovers().then(records => {
+      if (!active) return;
+      const covers = Object.fromEntries(records.map(record => [record.id, record.file ? URL.createObjectURL(record.file) : null]));
+      localCoversRef.current = covers;
+      setLocalCovers(covers);
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      Object.values(localCoversRef.current).forEach(url => { if (url) URL.revokeObjectURL(url); });
+      localCoversRef.current = {};
+    };
   }, []);
 
   useEffect(() => {
@@ -498,10 +522,16 @@ export function Wiki() {
     }
   }
 
+  const displayedCategories = useMemo(() => categories.map(category =>
+    Object.prototype.hasOwnProperty.call(localCovers, category.id)
+      ? { ...category, icon: localCovers[category.id] || 'Folder' }
+      : category
+  ), [categories, localCovers]);
+
   const visibleCategories = useMemo(() => {
-    if (!selectedCat) return categories;
-    return categories.filter(category => category.name === selectedCat);
-  }, [categories, selectedCat]);
+    if (!selectedCat) return displayedCategories;
+    return displayedCategories.filter(category => category.name === selectedCat);
+  }, [displayedCategories, selectedCat]);
 
   const searchResults = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -675,6 +705,7 @@ content
   }
 
   function startNewCategory(parentId: string | null = null) {
+    setCategoryError('');
     setEditingCategoryId('new');
     setNewCategoryParentId(parentId);
     setCategoryDraft({
@@ -682,20 +713,24 @@ content
       description: '',
       color: '#0057b8',
       icon: 'Folder',
+      imageFile: null,
     });
   }
 
   function startEditCategory(category: CategoryWithArticles) {
+    setCategoryError('');
     setEditingCategoryId(category.id);
     setCategoryDraft({
       name: category.name,
       description: category.description || '',
       color: category.color || '#0057b8',
       icon: category.icon || 'Folder',
+      imageFile: null,
     });
   }
 
   function cancelCategoryEdit() {
+    setCategoryError('');
     setEditingCategoryId(null);
     setNewCategoryParentId(null);
     setCategoryDraft({
@@ -703,6 +738,7 @@ content
       description: '',
       color: '#0057b8',
       icon: 'Folder',
+      imageFile: null,
     });
   }
 
@@ -716,14 +752,16 @@ content
         const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
         const res = await fetch(apiBase + '/users?status=active&pageSize=500', { credentials: 'include' });
         const json = await res.json();
-        setVisibilityUsers((json.data || []).sort((a, b) => a.name.localeCompare(b.name)));
+        setVisibilityUsers((json.data || []).sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)));
         setVisibilitySearch('');
-      } catch {}
+      } catch {
+        // The category form remains available if the user list cannot load.
+      }
     }
   }
 
   async function saveVisibility() {
-    if (!visibilityModal || visibilityLoading) return;
+    if (!visibilityModal || visibilityLoading || READ_ONLY_REMOTE) return;
     setVisibilityLoading(true);
     try {
       await setWikiCategoryVisibility(visibilityModal.id, selectedUserIds.length ? selectedUserIds : null, visibilityCategoryRole);
@@ -745,12 +783,43 @@ content
     if (!name || categorySaving) return;
 
     setCategorySaving(true);
+    setCategoryError('');
     try {
+      if (READ_ONLY_REMOTE) {
+        if (!editingCategoryId || editingCategoryId === 'new') {
+          throw new Error('A criação de áreas está indisponível nesta prévia somente leitura.');
+        }
+        const currentCover = categoryCover(displayedCategories.find(category => category.id === editingCategoryId)?.icon);
+        const removeCover = !categoryDraft.imageFile && categoryDraft.icon === 'Folder' && !!currentCover;
+        if (!categoryDraft.imageFile && !removeCover) {
+          throw new Error('Escolha uma imagem ou remova a capa atual para salvar nesta prévia.');
+        }
+        const remoteCover = categoryCover(categories.find(category => category.id === editingCategoryId)?.icon);
+        if (categoryDraft.imageFile || remoteCover) {
+          await saveLocalWikiCover(editingCategoryId, categoryDraft.imageFile);
+        } else {
+          await deleteLocalWikiCover(editingCategoryId);
+        }
+        const previousUrl = localCoversRef.current[editingCategoryId];
+        const next = { ...localCoversRef.current };
+        if (categoryDraft.imageFile) next[editingCategoryId] = URL.createObjectURL(categoryDraft.imageFile);
+        else if (remoteCover) next[editingCategoryId] = null;
+        else delete next[editingCategoryId];
+        localCoversRef.current = next;
+        setLocalCovers(next);
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+        cancelCategoryEdit();
+        return;
+      }
+
+      const icon = categoryDraft.imageFile
+        ? (await uploadWikiMedia(categoryDraft.imageFile)).public_url
+        : categoryDraft.icon || 'Folder';
       const payload = {
         name,
         description: categoryDraft.description.trim() || undefined,
         color: categoryDraft.color || '#0057b8',
-        icon: categoryDraft.icon || 'Folder',
+        icon,
         parent_id: newCategoryParentId ?? null,
       };
 
@@ -762,6 +831,8 @@ content
 
       cancelCategoryEdit();
       await loadData();
+    } catch (error) {
+      setCategoryError(error instanceof Error ? error.message : 'Não foi possível salvar a área. Tente novamente.');
     } finally {
       setCategorySaving(false);
     }
@@ -778,7 +849,7 @@ content
   }
 
   return (
-    <div className="wiki-shell -mx-2 md:-mx-4">
+    <div className="wiki-shell">
       <WikiHeader
         search={search}
         setSearch={setSearch}
@@ -793,7 +864,7 @@ content
         )}
         <aside className={cn('wiki-sidebar', !sidebarOpen && 'wiki-sidebar-collapsed')}>
           <WikiSidebar
-            categories={categories}
+            categories={displayedCategories}
             loading={loading}
             selectedCat={selectedCat}
             setSelectedCat={(name) => {
@@ -804,6 +875,7 @@ content
             editingCategoryId={editingCategoryId}
             categoryDraft={categoryDraft}
             categorySaving={categorySaving}
+            categoryError={categoryError}
             setCategoryDraft={setCategoryDraft}
             onAddCategory={() => startNewCategory(null)}
             onAddSubcategory={(parentId: string) => startNewCategory(parentId)}
@@ -878,6 +950,7 @@ content
           ) : (
             <WikiHome
               categories={visibleCategories}
+              totalCategories={categories.length}
               allArticles={allArticles}
               loading={loading}
               selectedCat={selectedCat}
@@ -902,6 +975,7 @@ content
                     <p className="mt-1 text-sm text-slate-500">
                       Selecione quem pode ver esta seção. Sem seleção = visível para todos.
                     </p>
+                    {READ_ONLY_REMOTE && <p className="mt-2 text-xs text-amber-700">Prévia local: o acesso pode ser consultado, mas não alterado.</p>}
                   </div>
                   <div className="px-6 pt-3 pb-2 border-b border-slate-100">
                     <div className="mb-3">
@@ -909,6 +983,7 @@ content
                       <select
                         value={visibilityCategoryRole ?? ''}
                         onChange={e => setVisibilityCategoryRole(e.target.value || null)}
+                        disabled={READ_ONLY_REMOTE}
                         className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400"
                       >
                         <option value="">Visível para todos os perfis</option>
@@ -939,6 +1014,7 @@ content
                           type="checkbox"
                           checked={selectedUserIds.includes(u.id)}
                           onChange={e => setSelectedUserIds(cur => e.target.checked ? [...cur, u.id] : cur.filter(id => id !== u.id))}
+                          disabled={READ_ONLY_REMOTE}
                           className="h-4 w-4 rounded border-slate-300 text-blue-600"
                         />
                         {u.photo_url ? (
@@ -953,23 +1029,23 @@ content
                     ))}
                   </div>
                   <div className="border-t border-slate-200 px-6 py-4 flex justify-between items-center">
-                    <button
+                    {!READ_ONLY_REMOTE && <button
                       onClick={() => setSelectedUserIds([])}
                       className="text-sm text-slate-500 hover:text-slate-700 font-medium"
                     >
                       Limpar (todos podem ver)
-                    </button>
+                    </button>}
                     <div className="flex gap-2">
                       <button onClick={() => { setVisibilityModal(null); setVisibilitySearch(''); }} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 font-medium">
-                        Cancelar
+                        {READ_ONLY_REMOTE ? 'Fechar' : 'Cancelar'}
                       </button>
-                      <button
+                      {!READ_ONLY_REMOTE && <button
                         onClick={saveVisibility}
                         disabled={visibilityLoading}
                         className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                       >
                         {visibilityLoading ? 'Salvando...' : 'Salvar'}
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 </div>
@@ -1076,6 +1152,7 @@ function WikiHeader({
         <input
           type="text"
           placeholder="Pesquisar título, conteúdo, tags ou categoria..."
+          aria-label="Pesquisar na Wiki"
           value={search}
           onChange={event => setSearch(event.target.value)}
           className="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
@@ -1102,6 +1179,7 @@ function WikiSidebar({
   editingCategoryId,
   categoryDraft,
   categorySaving,
+  categoryError,
   newCategoryParentId,
   setSelectedCat,
   setCategoryDraft,
@@ -1120,6 +1198,7 @@ function WikiSidebar({
   editingCategoryId: string | null;
   categoryDraft: CategoryDraft;
   categorySaving: boolean;
+  categoryError: string;
   newCategoryParentId: string | null;
   setSelectedCat: (value: string | null) => void;
   setCategoryDraft: (value: CategoryDraft) => void;
@@ -1155,12 +1234,13 @@ function WikiSidebar({
   const renderCategoryRow = (category: CategoryWithArticles, isChild = false) => {
     const Icon = ICON_MAP[(category.icon || 'folder').toLowerCase()] || Folder;
     const activeCategory = selectedCat === category.name;
+    const showAdminActions = isAdmin && (activeCategory || editingCategoryId === category.id);
     const children = childrenByParent[category.id] || [];
     const hasChildren = children.length > 0;
     const isExpanded = expandedParents.has(category.id);
 
     return (
-      <div key={category.id} className="mb-0.5">
+      <div key={category.id} id={`wiki-sidebar-category-${category.id}`} className="mb-0.5">
         <div className={cn('group flex items-center gap-0.5', isChild ? 'pl-5 pr-3' : 'px-3')}>
           {/* Expand/collapse toggle (top-level with children) */}
           {!isChild && (
@@ -1177,48 +1257,38 @@ function WikiSidebar({
           )}
 
           <button
+            type="button"
             onClick={() => setSelectedCat(activeCategory ? null : category.name)}
             className={cn('wiki-sidebar-section', activeCategory && 'wiki-sidebar-section-active')}
             style={{ paddingLeft: isChild ? '2px' : undefined }}
+            aria-expanded={isAdmin ? showAdminActions : undefined}
+            aria-controls={showAdminActions ? `wiki-sidebar-actions-${category.id}` : undefined}
           >
-            {isChild
-              ? <ChevronRight size={11} style={{ color: category.color || '#0057b8', flexShrink: 0, opacity: 0.7 }} />
-              : <Icon size={14} style={{ color: category.color || '#0057b8' }} />}
+            {categoryCover(category.icon)
+              ? <img src={categoryCover(category.icon)!} alt="" className="wiki-sidebar-thumbnail" />
+              : isChild
+                ? <ChevronRight size={11} style={{ color: category.color || '#0057b8', flexShrink: 0, opacity: 0.7 }} />
+                : <Icon size={14} style={{ color: category.color || '#0057b8' }} />}
             <span className="truncate">{category.name}</span>
             <span className="ml-auto text-[10px] text-slate-400">{category._articles.length}</span>
           </button>
-
-          {/* Add subfolder */}
-          <button
-            type="button"
-            onClick={() => onAddSubcategory(category.id)}
-            className="wiki-sidebar-row-action"
-            title={`Adicionar subpasta em ${category.name}`}
-          >
-            <Plus size={12} />
-          </button>
-
-          {/* Edit */}
-          <button
-            type="button"
-            onClick={() => onEditCategory(category)}
-            className="wiki-sidebar-row-action"
-            title={`Editar ${category.name}`}
-          >
-            <Edit3 size={12} />
-          </button>
-
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => onSetVisibility(category)}
-              className="wiki-sidebar-row-action"
-              title="Visibilidade"
-            >
-              {category.allowed_user_ids?.length ? <Lock size={12} className="text-amber-500" /> : <LockOpen size={12} />}
-            </button>
-          )}
         </div>
+
+        {showAdminActions && (
+          <div id={`wiki-sidebar-actions-${category.id}`} className={cn('wiki-sidebar-admin-actions', isChild && 'wiki-sidebar-admin-actions-child')}>
+            {!READ_ONLY_REMOTE && (
+              <button type="button" onClick={() => onAddSubcategory(category.id)} aria-label={`Adicionar subpasta em ${category.name}`}>
+                <Plus size={13} /> Subárea
+              </button>
+            )}
+            <button type="button" onClick={() => onEditCategory(category)} aria-label={`Editar ${category.name}`}>
+              <Edit3 size={13} /> {READ_ONLY_REMOTE ? 'Imagem' : 'Editar'}
+            </button>
+            <button type="button" onClick={() => onSetVisibility(category)} aria-label={`Alterar acesso de ${category.name}`}>
+              {category.allowed_user_ids?.length ? <Lock size={13} /> : <LockOpen size={13} />} Acesso
+            </button>
+          </div>
+        )}
 
         {/* Inline form for editing this category */}
         {editingCategoryId === category.id && (
@@ -1226,10 +1296,11 @@ function WikiSidebar({
             <CategoryInlineForm
               draft={categoryDraft}
               saving={categorySaving}
+              error={categoryError}
               setDraft={setCategoryDraft}
               onCancel={onCancelCategory}
               onSave={onSaveCategory}
-              onDelete={() => onDeleteCategory(category)}
+              onDelete={READ_ONLY_REMOTE ? undefined : () => onDeleteCategory(category)}
             />
           </div>
         )}
@@ -1240,6 +1311,7 @@ function WikiSidebar({
             <CategoryInlineForm
               draft={categoryDraft}
               saving={categorySaving}
+              error={categoryError}
               setDraft={setCategoryDraft}
               onCancel={onCancelCategory}
               onSave={onSaveCategory}
@@ -1264,14 +1336,9 @@ function WikiSidebar({
             <BookOpen size={16} />
             Todos os artigos
           </button>
-          <button
-            onClick={onAddCategory}
-            className="wiki-sidebar-add"
-            title="Adicionar setor"
-            type="button"
-          >
+          {isAdmin && !READ_ONLY_REMOTE && <button onClick={onAddCategory} className="wiki-sidebar-add" title="Adicionar área" aria-label="Adicionar área" type="button">
             <Plus size={15} />
-          </button>
+          </button>}
         </div>
 
         {/* New top-level category form */}
@@ -1279,6 +1346,7 @@ function WikiSidebar({
           <CategoryInlineForm
             draft={categoryDraft}
             saving={categorySaving}
+            error={categoryError}
             setDraft={setCategoryDraft}
             onCancel={onCancelCategory}
             onSave={onSaveCategory}
@@ -1304,6 +1372,7 @@ function WikiSidebar({
 function CategoryInlineForm({
   draft,
   saving,
+  error,
   setDraft,
   onCancel,
   onSave,
@@ -1311,42 +1380,113 @@ function CategoryInlineForm({
 }: {
   draft: CategoryDraft;
   saving: boolean;
+  error: string;
   setDraft: (value: CategoryDraft) => void;
   onCancel: () => void;
   onSave: () => void;
   onDelete?: () => void;
 }) {
+  const [imageError, setImageError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showIcons, setShowIcons] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!draft.imageFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(draft.imageFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [draft.imageFile]);
+
+  const cover = previewUrl || categoryCover(draft.icon);
+  const PreviewIcon = ICON_MAP[(draft.icon || 'folder').toLowerCase()] || Folder;
+
   return (
     <div className="wiki-category-form">
+      <div className="wiki-category-form-title">{READ_ONLY_REMOTE ? 'Imagem do card' : 'Configurar área de conhecimento'}</div>
+      {READ_ONLY_REMOTE && <p className="wiki-category-local-note">Prévia local: a capa fica salva somente neste navegador, sem alterar a Rede NEX.</p>}
       <input
         value={draft.name}
         onChange={event => setDraft({ ...draft, name: event.target.value })}
         placeholder="Nome do setor"
+        disabled={READ_ONLY_REMOTE}
       />
       <textarea
         value={draft.description}
         onChange={event => setDraft({ ...draft, description: event.target.value })}
         placeholder="Descrição curta"
         rows={2}
+        disabled={READ_ONLY_REMOTE}
       />
-      <div className="flex items-center gap-2">
+      <div className="wiki-category-cover-picker">
+        <div className="wiki-category-cover-preview" style={{ background: `linear-gradient(135deg, ${draft.color}, #14243a)` }}>
+          {cover ? <>
+            <img src={cover} alt="" aria-hidden="true" className="wiki-category-cover-preview-backdrop" />
+            <img src={cover} alt="Prévia da capa da área" className="wiki-category-cover-preview-image" />
+          </> : <PreviewIcon size={28} aria-hidden="true" />}
+        </div>
+        <div className="wiki-category-cover-controls">
+          <button type="button" className="wiki-category-cover-button" onClick={() => imageInputRef.current?.click()}>
+            <ImageIcon size={14} aria-hidden="true" /> {cover ? 'Trocar imagem' : 'Adicionar imagem'}
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="wiki-category-file-input"
+            onChange={event => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (!file) return;
+              if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+                setImageError('Use JPG, PNG, WebP ou GIF.');
+                return;
+              }
+              if (file.size > 5 * 1024 * 1024) {
+                setImageError('A imagem deve ter até 5 MB.');
+                return;
+              }
+              setImageError('');
+              setDraft({ ...draft, imageFile: file });
+            }}
+          />
+          {cover && (
+            <button type="button" className="wiki-category-cover-remove" onClick={() => setDraft({ ...draft, icon: 'Folder', imageFile: null })}>
+              Remover imagem
+            </button>
+          )}
+          <small>Proporção 16:9 · recomendado 1200 × 675 px · até 5 MB</small>
+        </div>
+      </div>
+      {(imageError || error) && <p className="wiki-category-error" role="alert">{imageError || error}</p>}
+      {!READ_ONLY_REMOTE && <div className="wiki-category-appearance">
+        <span>Aparência</span>
         <input
           type="color"
           value={draft.color}
           onChange={event => setDraft({ ...draft, color: event.target.value })}
           className="wiki-category-color"
-          title="Cor do setor"
+          title="Cor da área"
+          aria-label="Cor da área"
         />
-        <div className="flex-1">
+        <button type="button" className="wiki-category-icon-toggle" onClick={() => setShowIcons(value => !value)} aria-expanded={showIcons}>
+          Ícone <ChevronDown size={13} aria-hidden="true" />
+        </button>
+      </div>}
+      {!READ_ONLY_REMOTE && showIcons && (
+        <div className="wiki-category-icons">
           <div className="grid grid-cols-8 gap-0.5 p-1.5 border border-slate-200 rounded max-h-24 overflow-y-auto bg-white">
-            {(Object.entries(ICON_MAP) as [string, React.ComponentType<{ size?: number }>][]).map(([name, IconComp]) => (
+            {Object.entries(ICON_MAP).map(([name, IconComp]) => (
               <button
                 key={name}
                 type="button"
-                onClick={() => setDraft({ ...draft, icon: name })}
+                onClick={() => setDraft({ ...draft, icon: name, imageFile: null })}
                 className={cn(
                   'p-1 rounded flex items-center justify-center transition-colors',
-                  draft.icon === name ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
+                  draft.icon === name && !draft.imageFile ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
                 )}
                 title={name}
               >
@@ -1355,11 +1495,11 @@ function CategoryInlineForm({
             ))}
           </div>
         </div>
-      </div>
+      )}
       <div className="flex items-center gap-2">
         <button type="button" onClick={onSave} disabled={!draft.name.trim() || saving} className="wiki-category-save">
           <Save size={13} />
-          {saving ? 'Salvando...' : 'Salvar'}
+          {saving ? 'Salvando...' : READ_ONLY_REMOTE ? 'Salvar capa' : 'Salvar'}
         </button>
         <button type="button" onClick={onCancel} className="wiki-category-cancel">
           Cancelar
@@ -1376,6 +1516,7 @@ function CategoryInlineForm({
 
 function WikiHome({
   categories,
+  totalCategories,
   allArticles,
   loading,
   selectedCat,
@@ -1386,6 +1527,7 @@ function WikiHome({
   onNew,
 }: {
   categories: CategoryWithArticles[];
+  totalCategories: number;
   allArticles: WikiArticle[];
   loading: boolean;
   selectedCat: string | null;
@@ -1401,19 +1543,19 @@ function WikiHome({
       <section className="wiki-hero-compact">
         <div className="flex-1 min-w-0 relative z-10">
           <p className="wiki-eyebrow">Rede Nex · Wiki</p>
-          <h2 className="mt-1 text-3xl font-bold text-slate-950 md:text-4xl">Base de processos e conhecimento</h2>
-          <p className="mt-2 text-base text-slate-500">Documentação viva da equipe — procedimentos, padrões e guias passo a passo.</p>
+          <h2>Conhecimento que move a operação</h2>
+          <p>Encontre processos, padrões e guias da equipe em um só lugar.</p>
         </div>
-        <div className="relative z-10 flex items-center gap-4 flex-shrink-0">
-          <div className="text-center px-5 py-3 rounded-xl bg-slate-50 border border-slate-200">
-            <p className="text-4xl font-bold text-[#0057b8]">{allArticles.length}</p>
-            <p className="text-sm text-slate-500 font-medium">Artigos</p>
+        <div className="wiki-hero-actions">
+          <div className="wiki-hero-stat">
+            <strong>{allArticles.length}</strong>
+            <span>artigos</span>
           </div>
-          <div className="text-center px-5 py-3 rounded-xl bg-slate-50 border border-slate-200">
-            <p className="text-4xl font-bold text-orange-500">{categories.length}</p>
-            <p className="text-sm text-slate-500 font-medium">Áreas</p>
+          <div className="wiki-hero-stat">
+            <strong>{totalCategories}</strong>
+            <span>áreas</span>
           </div>
-          <button onClick={onNew} className="wiki-primary-button text-base py-3 px-5">
+          <button onClick={onNew} className="wiki-primary-button" type="button">
             <Plus size={18} />
             Novo artigo
           </button>
@@ -1435,10 +1577,13 @@ function WikiHome({
           return (
             <button
               key={category.id}
+              type="button"
               onClick={() => setSelectedCat(active ? null : category.name)}
               className={cn('wiki-category-pill', active && 'wiki-category-pill-active')}
             >
-              <Icon size={18} />
+              {categoryCover(category.icon)
+                ? <img src={categoryCover(category.icon)!} alt="" className="wiki-pill-thumbnail" />
+                : <Icon size={18} aria-hidden="true" />}
               {category.name}
               <span>{category._articles.length}</span>
             </button>
@@ -1454,36 +1599,40 @@ function WikiHome({
               <div className="wiki-panel p-6 text-sm text-slate-500">Carregando categorias...</div>
             ) : categories.length > 0 ? (
               <>
-                <p className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-400">Áreas de conhecimento</p>
+                <div className="wiki-section-label"><h3>Áreas de conhecimento</h3><span>Explore por assunto</span></div>
                 <div className="wiki-category-grid">
                   {categories.filter(c => !c.parent_id).map(category => {
                     const Icon = ICON_MAP[(category.icon || 'folder').toLowerCase()] || Folder;
                     const color = category.color || '#0057b8';
+                    const cover = categoryCover(category.icon);
                     return (
                       <div
                         key={category.id}
                         className="wiki-category-card"
                         style={{ borderColor: `${color}30` }}
-                        onClick={() => setSelectedCat(category.name)}
                       >
-                        <div
-                          className="wiki-category-card-header"
-                          style={{ background: `linear-gradient(135deg, ${color}cc, ${color}88)` }}
-                        >
-                          <div className="wiki-category-card-icon">
-                            <Icon size={42} className="text-white drop-shadow-sm" />
+                        <button type="button" className="wiki-category-card-open" onClick={() => setSelectedCat(category.name)}>
+                          <div
+                            className="wiki-category-card-header"
+                            style={{ background: `linear-gradient(135deg, ${color}cc, ${color}88)` }}
+                          >
+                            {cover
+                              ? <>
+                                <img src={cover} alt="" aria-hidden="true" className="wiki-category-card-backdrop" loading="lazy" />
+                                <img src={cover} alt="" className="wiki-category-card-image" loading="lazy" />
+                              </>
+                              : <div className="wiki-category-card-icon"><Icon size={38} className="text-white drop-shadow-sm" /></div>}
+                            <span className="wiki-category-card-overlay" aria-hidden="true" />
                           </div>
-                        </div>
-                        <div className="wiki-category-card-body">
-                          <h4>{category.name}</h4>
-                          <p>{category.description || 'Processos e procedimentos da área'}</p>
-                          <div className="wiki-category-card-count">
-                            <span style={{ color, backgroundColor: `${color}12` }}>{category._articles.length} artigo{category._articles.length !== 1 ? 's' : ''}</span>
-                            <span className="text-xs font-semibold hover:underline" style={{ color }}>
-                              Ver tudo →
-                            </span>
+                          <div className="wiki-category-card-body">
+                            <h4>{category.name}</h4>
+                            <p>{category.description || 'Processos e procedimentos da área'}</p>
+                            <div className="wiki-category-card-count">
+                              <span style={{ color, backgroundColor: `${color}12` }}>{category._articles.length} artigo{category._articles.length !== 1 ? 's' : ''}</span>
+                              <span className="text-xs font-semibold hover:underline" style={{ color }}>Ver tudo →</span>
+                            </div>
                           </div>
-                        </div>
+                        </button>
                       </div>
                     );
                   })}
@@ -1568,7 +1717,9 @@ function WikiHome({
                     <div className="wiki-section-head">
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="wiki-section-icon" style={{ backgroundColor: `${category.color || '#0057b8'}18` }}>
-                          <Icon size={18} style={{ color: category.color || '#0057b8' }} />
+                          {categoryCover(category.icon)
+                            ? <img src={categoryCover(category.icon)!} alt="" className="wiki-section-thumbnail" />
+                            : <Icon size={18} style={{ color: category.color || '#0057b8' }} />}
                         </div>
                         <div className="min-w-0">
                           <h3>{category.name}</h3>
@@ -2227,7 +2378,7 @@ function EditorChoiceView({
   ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="wiki-editor-choice mx-auto max-w-5xl space-y-5">
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="wiki-muted-button">
           <ArrowLeft size={15} />
@@ -2244,7 +2395,7 @@ function EditorChoiceView({
           <button
             key={choice.id}
             onClick={() => onSelect(choice.id)}
-            className="group rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+            className="wiki-editor-choice-card group rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
           >
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-[#0057b8] transition-colors group-hover:bg-[#0057b8] group-hover:text-white">
               <choice.icon size={20} />
@@ -2268,6 +2419,7 @@ function EditorView({
   newArticleCat,
   setEditContent,
   setEditTitle,
+  setEditTab,
   setNewArticleTitle,
   setNewArticleCat,
   onSave,
@@ -2288,7 +2440,7 @@ function EditorView({
   editTab: EditorTab;
   newArticleTitle: string;
   newArticleCat: string;
-  setEditContent: (value: string) => void;
+  setEditContent: React.Dispatch<React.SetStateAction<string>>;
   setEditTitle: (value: string) => void;
   setEditTab: (value: EditorTab) => void;
   setNewArticleTitle: (value: string) => void;

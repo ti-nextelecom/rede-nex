@@ -30,3 +30,4 @@ coverage/
 *.tsbuildinfo
 *.bak
 *.bak_*
+server/_debug_ical.js

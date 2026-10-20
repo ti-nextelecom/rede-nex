@@ -1,8 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, BookOpen, ChevronRight, GraduationCap, MessageCircle, Newspaper, Sparkles, TrendingUp, Users, Zap } from 'lucide-react';
+import {
+  Activity,
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FolderKanban,
+  FolderOpen,
+  ListTodo,
+  MessageCircle,
+  Newspaper,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import { getDashboardData } from '../lib/appApi';
+import { apiGet } from '../lib/apiClient';
 import { useAuth } from '../lib/auth';
+import { fetchPersonalProjects } from '../lib/personalProjects';
+import { buildWorkBriefing, dayKey, isFinished, isTaskMine, type PersonalProject } from '../../shared/personalWork.mjs';
+import { DailyBriefing } from '../components/DailyBriefing';
+import './dashboard.css';
 
 interface Stats {
   users: number;
@@ -20,48 +41,120 @@ interface RecentPost {
   users?: { name: string; photo_url?: string; position?: string };
 }
 
-const statCards = [
-  { label: 'Colaboradores', key: 'users' as const, icon: Users, accent: '#3b82f6', bg: 'rgba(59,130,246,0.08)', to: '/colaboradores' },
-  { label: 'Treinamentos', key: 'trainings' as const, icon: GraduationCap, accent: '#e65b12', bg: 'rgba(230,91,18,0.08)', to: '/treinamentos' },
-  { label: 'Artigos Wiki', key: 'articles' as const, icon: BookOpen, accent: '#10b981', bg: 'rgba(16,185,129,0.08)', to: '/wiki' },
-  { label: 'Postagens', key: 'posts' as const, icon: Newspaper, accent: '#8b5cf6', bg: 'rgba(139,92,246,0.08)', to: '/feed' },
+interface DashboardTask {
+  id: string;
+  title: string;
+  status: 'todo' | 'in_progress' | 'done' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  deadline?: string | null;
+  protocol?: string | null;
+  owner_id?: string;
+  created_by?: string;
+  owner?: { id: string };
+  assignees?: Array<{ id: string; name: string; photo_url?: string }>;
+}
+
+type TaskLaneId = 'overdue' | 'today' | 'week' | 'later';
+
+const modules = [
+  { label: 'Tarefas', description: 'Prioridades e entregas', icon: ListTodo, to: '/tarefas', tone: 'blue' },
+  { label: 'Projetos', description: 'Planos em andamento', icon: FolderKanban, to: '/projetos', tone: 'violet' },
+  { label: 'Chat', description: 'Conversas da equipe', icon: MessageCircle, to: '/bate-papo', tone: 'cyan' },
+  { label: 'Feed', description: 'Comunicados internos', icon: Newspaper, to: '/feed', tone: 'orange' },
+  { label: 'Calendário', description: 'Agenda compartilhada', icon: CalendarDays, to: '/calendario', tone: 'emerald' },
+  { label: 'Drive', description: 'Arquivos e documentos', icon: FolderOpen, to: '/drive', tone: 'amber' },
 ];
 
-const quickLinks = [
-  { label: 'Feed', icon: Newspaper, to: '/feed', color: '#e65b12' },
-  { label: 'Chat', icon: MessageCircle, to: '/bate-papo', color: '#3b82f6' },
-  { label: 'Wiki', icon: BookOpen, to: '/wiki', color: '#10b981' },
-  { label: 'Treinamentos', icon: GraduationCap, to: '/treinamentos', color: '#8b5cf6' },
-];
+const laneMeta: Record<TaskLaneId, { label: string; hint: string; tone: string }> = {
+  overdue: { label: 'Vencidas', hint: 'Precisam de atenção', tone: 'red' },
+  today: { label: 'Hoje', hint: 'Prazo até o fim do dia', tone: 'orange' },
+  week: { label: 'Esta semana', hint: 'Próximos 7 dias', tone: 'blue' },
+  later: { label: 'Sem prazo', hint: 'Ainda não planejadas', tone: 'slate' },
+};
+
+const projectLanes = [
+  { id: 'attention', label: 'Precisam de atenção', hint: 'Prazos vencidos ou riscos sinalizados', tone: 'red' },
+  { id: 'active', label: 'Em andamento', hint: 'Projetos em que você está envolvido', tone: 'blue' },
+  { id: 'waiting', label: 'Não iniciados', hint: 'Organize os próximos passos', tone: 'slate' },
+  { id: 'done', label: 'Concluídos', hint: 'Entregas finalizadas pela equipe', tone: 'green' },
+] as const;
+
+function projectLane(project: PersonalProject) {
+  if (isFinished(project.status)) return 'done';
+  if (project.overdue_count || ['Atrasado', 'Atenção'].includes(project.status)
+    || (project.deadline && project.deadline.slice(0, 10) < dayKey()!)) return 'attention';
+  return project.status === 'Não iniciado' ? 'waiting' : 'active';
+}
+
+function startOfToday() {
+  const value = new Date();
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function taskLane(task: DashboardTask): TaskLaneId | 'done' | 'future' {
+  if (isFinished(task.status)) return 'done';
+  if (!task.deadline) return 'later';
+  const today = startOfToday();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 8);
+  const deadline = new Date(`${dayKey(task.deadline)}T12:00:00`);
+  if (deadline < today) return 'overdue';
+  if (deadline < tomorrow) return 'today';
+  if (deadline < nextWeek) return 'week';
+  return 'future';
+}
+
+function formatDate(value?: string | null, includeYear = false) {
+  if (!value) return 'Sem prazo';
+  return new Date(value.includes('T') ? value : `${value}T12:00:00`).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    ...(includeYear ? { year: 'numeric' } : {}),
+  });
+}
 
 function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Math.max(0, Date.now() - new Date(dateStr).getTime());
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'agora';
-  if (mins < 60) return `${mins}m atrás`;
+  if (mins < 60) return `${mins} min`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h atrás`;
-  return `${Math.floor(hours / 24)}d atrás`;
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Bom dia';
-  if (h < 18) return 'Boa tarde';
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
   return 'Boa noite';
 }
 
-function StatSkeleton() {
+function initials(name?: string) {
+  return (name || 'Rede Nex')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+function TaskAvatar({ name, photo }: { name: string; photo?: string }) {
+  return photo
+    ? <img src={photo} alt={name} className="dashboard-avatar" />
+    : <span className="dashboard-avatar dashboard-avatar-fallback" title={name}>{initials(name)}</span>;
+}
+
+function DashboardSkeleton() {
   return (
-    <div className="rounded-2xl p-5 animate-pulse" style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-3">
-          <div className="h-3 w-20 rounded" style={{ background: 'hsl(var(--muted))' }} />
-          <div className="h-9 w-14 rounded" style={{ background: 'hsl(var(--muted))' }} />
-          <div className="h-3 w-24 rounded" style={{ background: 'hsl(var(--muted))' }} />
-        </div>
-        <div className="h-12 w-12 rounded-xl" style={{ background: 'hsl(var(--muted))' }} />
-      </div>
+    <div className="dashboard-skeleton" aria-label="Carregando central de trabalho" role="status">
+      <div className="dashboard-skeleton-hero" />
+      <div className="dashboard-skeleton-row">{Array.from({ length: 4 }).map((_, index) => <span key={index} />)}</div>
+      <div className="dashboard-skeleton-grid"><span /><span /></div>
     </div>
   );
 }
@@ -70,165 +163,236 @@ export function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Stats>({ users: 0, trainings: 0, articles: 0, posts: 0 });
   const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
+  const [tasks, setTasks] = useState<DashboardTask[]>([]);
+  const [projects, setProjects] = useState<PersonalProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const firstName = user?.name?.split(' ')[0] || 'Usuário';
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const firstName = user?.name?.split(' ')[0] || 'Colaborador';
+
+  const loadData = useCallback(async (background = false) => {
+    if (!user) return;
+    if (background) setRefreshing(true);
+    else setLoading(true);
+    setLoadError('');
+
+    const [dashboardResult, taskResult, projectResult] = await Promise.allSettled([
+      getDashboardData(),
+      apiGet<{ data: DashboardTask[] }>('/tasks'),
+      fetchPersonalProjects(user),
+    ]);
+
+    if (dashboardResult.status === 'fulfilled') {
+      setStats(dashboardResult.value.stats);
+      setRecentPosts(dashboardResult.value.recentPosts as unknown as RecentPost[]);
+    }
+    if (taskResult.status === 'fulfilled') setTasks((taskResult.value.data ?? []).filter(task => isTaskMine(task, user.id)));
+    if (projectResult.status === 'fulfilled') {
+      setProjects(projectResult.value.projects);
+      if (projectResult.value.incomplete) setLoadError('Algumas etapas não puderam ser consultadas; sua participação e pendências podem estar incompletas.');
+    }
+
+    const failed = [dashboardResult, taskResult, projectResult].filter(result => result.status === 'rejected').length;
+    if (failed === 3) setLoadError('Não foi possível atualizar a central de trabalho.');
+    else if (failed > 0) setLoadError('Alguns indicadores não puderam ser atualizados.');
+    setLastUpdated(new Date());
+    setLoading(false);
+    setRefreshing(false);
+  }, [user]);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const result = await getDashboardData();
-        setStats(result.stats);
-        setRecentPosts(result.recentPosts as unknown as RecentPost[]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, []);
+    void loadData();
+    const refresh = () => { if (!document.hidden) void loadData(true); };
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener('focus', refresh); };
+  }, [loadData]);
+
+  const briefing = useMemo(() => buildWorkBriefing(tasks, projects, user?.id), [tasks, projects, user?.id]);
+
+  const taskLanes = useMemo(() => {
+    const lanes: Record<TaskLaneId, DashboardTask[]> = { overdue: [], today: [], week: [], later: [] };
+    tasks.forEach(task => {
+      const lane = taskLane(task);
+      if (lane in lanes) lanes[lane as TaskLaneId].push(task);
+    });
+    Object.values(lanes).forEach(items => items.sort((a, b) => {
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    }));
+    return lanes;
+  }, [tasks]);
+
+  const activeTasks = tasks.filter(task => !isFinished(task.status)).length;
+  const completedTasks = tasks.filter(task => task.status === 'done').length;
+  const activeProjects = projects.filter(project => !project.status.toLocaleLowerCase('pt-BR').includes('conclu')).length;
+  const projectPulse = projects;
+  const todayLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date());
+
+  if (loading) return <DashboardSkeleton />;
 
   return (
-    <div className="space-y-6 page-enter">
-      {/* Hero Welcome */}
-      <div className="relative overflow-hidden rounded-2xl p-6 md:p-8"
-        style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}>
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles size={14} className="text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'hsl(var(--muted-foreground))' }}>Painel de Controle</span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
-              {getGreeting()}, <span className="text-primary">{firstName}</span>
-            </h1>
-            <p className="mt-1 text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-              Acompanhe tudo o que acontece na sua rede corporativa
-            </p>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl"
-            style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
-            <Activity size={14} className="text-emerald-500" />
-            <span className="text-xs font-semibold text-emerald-500">Sistema Online</span>
-          </div>
+    <div className="work-hub page-enter">
+      <header className="work-hub-hero">
+        <div className="work-hub-hero-copy">
+          <span className="work-hub-kicker"><Sparkles size={14} /> Central de trabalho</span>
+          <h1>{getGreeting()}, <strong>{firstName}</strong></h1>
+          <p>Suas prioridades, projetos e conversas reunidos em um só lugar.</p>
+          <div className="work-hub-date"><CalendarDays size={15} /><span>{todayLabel}</span></div>
         </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)
-        ) : (
-          statCards.map((card) => (
-            <Link to={card.to} key={card.key}>
-              <div className="group rounded-2xl p-5 transition-all duration-200 hover:-translate-y-1 cursor-pointer"
-                style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>{card.label}</p>
-                    <p className="text-3xl font-bold mt-2 tabular-nums" style={{ color: 'hsl(var(--foreground))' }}>{stats[card.key]}</p>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <TrendingUp size={11} style={{ color: card.accent }} />
-                      <span className="text-[11px] font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>Atualizado</span>
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-xl transition-all duration-200 group-hover:scale-110" style={{ background: card.bg }}>
-                    <card.icon size={22} style={{ color: card.accent }} />
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))
-        )}
-      </div>
-
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6">
-        {/* Recent Posts */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'rgba(230, 91, 18, 0.08)' }}>
-                <Zap size={16} className="text-primary" />
-              </div>
-              <h2 className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }}>Atividade Recente</h2>
-            </div>
-            <Link to="/feed" className="text-xs font-medium text-primary flex items-center gap-1 hover:opacity-80">
-              Ver feed <ChevronRight size={13} />
-            </Link>
-          </div>
-          <div>
-            {loading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="flex items-start gap-3 px-5 py-4 animate-pulse" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-                  <div className="w-9 h-9 rounded-full flex-shrink-0" style={{ background: 'hsl(var(--muted))' }} />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3.5 w-3/4 rounded" style={{ background: 'hsl(var(--muted))' }} />
-                    <div className="h-3 w-full rounded" style={{ background: 'hsl(var(--muted))' }} />
-                  </div>
-                </div>
-              ))
-            ) : recentPosts.length ? (
-              recentPosts.map(post => (
-                <div key={post.id} className="flex items-start gap-3 px-5 py-4 transition-colors hover:bg-muted/30 cursor-pointer"
-                  style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-                  <img
-                    src={post.users?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.users?.name || 'Rede Nex')}&size=40&background=e65b12&color=fff`}
-                    alt={post.users?.name || 'Rede Nex'}
-                    className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }}>{post.users?.name || 'Rede Nex'}</p>
-                    <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'hsl(var(--muted-foreground))' }}>{post.title || post.content}</p>
-                    <p className="text-[11px] mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>{timeAgo(post.created_at)}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="px-5 py-12 text-center">
-                <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(230, 91, 18, 0.08)' }}>
-                  <Newspaper size={24} className="text-primary opacity-50" />
-                </div>
-                <p className="font-semibold" style={{ color: 'hsl(var(--foreground))' }}>Nenhuma postagem</p>
-                <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>As publicações do Feed aparecerão aqui.</p>
-              </div>
-            )}
-          </div>
+        <div className="work-hub-hero-actions">
+          <button type="button" onClick={() => void loadData(true)} disabled={refreshing} className="work-hub-refresh">
+            <RefreshCw size={16} className={refreshing ? 'is-spinning' : ''} />
+            {refreshing ? 'Atualizando' : 'Atualizar'}
+          </button>
+          <Link to="/tarefas" className="work-hub-primary-action"><ListTodo size={17} /> Abrir tarefas</Link>
+          <span className="work-hub-online"><i /> Operação online</span>
         </div>
+      </header>
 
-        {/* Quick Access */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'rgba(59, 130, 246, 0.08)' }}>
-                <Zap size={16} className="text-blue-500" />
-              </div>
-              <h2 className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }}>Acesso Rápido</h2>
+      {loadError && <div className="work-hub-warning" role="status">{loadError} Os demais dados continuam disponíveis.</div>}
+
+      {user && <DailyBriefing key={user.id} userId={user.id} briefing={briefing} />}
+
+      <section className="work-hub-modules" aria-label="Módulos principais">
+        {modules.map(item => (
+          <Link key={item.to} to={item.to} className={`work-hub-module is-${item.tone}`}>
+            <span className="work-hub-module-icon"><item.icon size={19} /></span>
+            <span><strong>{item.label}</strong><small>{item.description}</small></span>
+            <ArrowRight size={15} className="work-hub-module-arrow" />
+          </Link>
+        ))}
+      </section>
+
+      <section className="work-hub-metrics" aria-label="Resumo da operação">
+        <Link to="/tarefas" className="work-hub-metric">
+          <span className="work-hub-metric-icon is-blue"><ListTodo size={18} /></span>
+          <span><small>Minhas tarefas ativas</small><strong>{activeTasks}</strong></span>
+          <em>{completedTasks} concluídas</em>
+        </Link>
+        <Link to="/projetos" className="work-hub-metric">
+          <span className="work-hub-metric-icon is-violet"><FolderKanban size={18} /></span>
+          <span><small>Meus projetos ativos</small><strong>{activeProjects}</strong></span>
+          <em>{projects.length} no total</em>
+        </Link>
+        <Link to="/colaboradores" className="work-hub-metric">
+          <span className="work-hub-metric-icon is-emerald"><Users size={18} /></span>
+          <span><small>Colaboradores</small><strong>{stats.users}</strong></span>
+          <em>na rede</em>
+        </Link>
+        <Link to="/wiki" className="work-hub-metric">
+          <span className="work-hub-metric-icon is-orange"><BookOpen size={18} /></span>
+          <span><small>Base de conhecimento</small><strong>{stats.articles}</strong></span>
+          <em>artigos publicados</em>
+        </Link>
+      </section>
+
+      <div className="work-hub-grid">
+        <section className="work-hub-panel work-hub-tasks">
+          <div className="work-hub-panel-heading">
+            <div>
+              <span className="work-hub-section-kicker">Meu trabalho</span>
+              <h2>Prazos e prioridades</h2>
             </div>
+            <Link to="/tarefas">Ver todas <ArrowRight size={14} /></Link>
           </div>
-          <div className="p-4 space-y-1">
-            {quickLinks.map(item => (
-              <Link key={item.to} to={item.to}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl group transition-all duration-200 hover:bg-muted/40">
-                <div className="p-2 rounded-lg transition-all duration-200 group-hover:scale-110" style={{ background: `${item.color}12` }}>
-                  <item.icon size={16} style={{ color: item.color }} />
-                </div>
-                <span className="text-sm font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>{item.label}</span>
-                <ChevronRight size={13} className="ml-auto" style={{ color: 'hsl(var(--border))' }} />
+          <div className="work-hub-task-lanes">
+            {(Object.keys(laneMeta) as TaskLaneId[]).map(laneId => {
+              const lane = laneMeta[laneId];
+              const laneTasks = taskLanes[laneId];
+              return (
+                <article key={laneId} className={`work-hub-task-lane is-${lane.tone}`}>
+                  <header>
+                    <span><i />{lane.label}</span>
+                    <strong>{laneTasks.length}</strong>
+                  </header>
+                  <p>{lane.hint}</p>
+                  <div className="work-hub-task-list">
+                    {laneTasks.slice(0, 3).map(task => (
+                      <Link key={task.id} to={`/tarefas?tarefa=${encodeURIComponent(task.id)}`} className="work-hub-task-card">
+                        <span className={`work-hub-priority is-${task.priority}`} />
+                        <strong>{task.title}</strong>
+                        <div>
+                          <span><Clock3 size={12} />{formatDate(task.deadline)}</span>
+                          <span className="work-hub-avatars">
+                            {(task.assignees || []).slice(0, 3).map(assignee => <TaskAvatar key={assignee.id} name={assignee.name} photo={assignee.photo_url} />)}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                    {!laneTasks.length && <div className="work-hub-empty-lane"><CheckCircle2 size={18} /><span>Nada por aqui</span></div>}
+                    {laneTasks.length > 3 && <Link to="/tarefas" className="work-hub-lane-more">+ {laneTasks.length - 3} tarefas</Link>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+          <section className="work-hub-panel work-hub-projects" aria-labelledby="my-projects-title">
+            <div className="work-hub-panel-heading">
+              <div><span className="work-hub-section-kicker">Responsável ou participante</span><h2 id="my-projects-title">Meus projetos</h2></div>
+              <Link to="/projetos">Ver todos <ArrowRight size={14} /></Link>
+            </div>
+            <div className="work-hub-task-lanes work-hub-project-board" aria-label="Meus projetos agrupados por situação">
+              {projectLanes.map(lane => {
+                const items = projectPulse.filter(project => projectLane(project) === lane.id);
+                return <article key={lane.id} className={`work-hub-task-lane is-${lane.tone}`}>
+                  <header><span><i />{lane.label}</span><strong>{items.length}</strong></header>
+                  <p>{lane.hint}</p>
+                  <div className="work-hub-task-list">
+                    {items.map(project => <Link key={project.id} to={`/projetos?projeto=${encodeURIComponent(project.id)}`} className="work-hub-task-card work-hub-project-card">
+                      <strong>{project.name}</strong>
+                      <span className="work-hub-project-role">{project.involvement === 'responsible' ? 'Responsável' : 'Participante'}</span>
+                      <div className="work-hub-project-card-progress"><span>{project.phase || project.status}</span><strong>{project.progress}%</strong></div>
+                      <div className="work-hub-progress"><span style={{ width: `${Math.min(100, Math.max(0, project.progress))}%` }} /></div>
+                      <p className={project.overdue_count ? 'has-overdue' : ''}>{project.pending_count === null ? 'Pendências indisponíveis' : `${project.pending_count} etapa(s) pendente(s)`}{project.overdue_count ? ` • ${project.overdue_count} vencida(s)` : ''}</p>
+                      <div><span><Clock3 size={12} />{formatDate(project.deadline?.slice(0, 10), true)}</span><TaskAvatar name={project.responsible_name} photo={project.responsible_photo_url || undefined} /></div>
+                    </Link>)}
+                    {!items.length && <div className="work-hub-empty-lane"><CheckCircle2 size={18} /><span>Nenhum projeto nesta situação</span></div>}
+                  </div>
+                </article>;
+              })}
+            </div>
+          </section>
+
+        <section className="work-hub-panel work-hub-activity">
+          <div className="work-hub-panel-heading">
+            <div><span className="work-hub-section-kicker">Colaboração</span><h2>Atividade recente</h2></div>
+            <Link to="/feed">Abrir feed <ArrowRight size={14} /></Link>
+          </div>
+          <div className="work-hub-activity-list">
+            {recentPosts.slice(0, 5).map(post => (
+              <Link to="/feed" key={post.id} className="work-hub-activity-item">
+                {post.users?.photo_url
+                  ? <img src={post.users.photo_url} alt={post.users.name} />
+                  : <span className="work-hub-activity-avatar">{initials(post.users?.name)}</span>}
+                <span className="work-hub-activity-copy">
+                  <strong>{post.users?.name || 'Rede Nex'}</strong>
+                  <span>{post.title || post.content}</span>
+                </span>
+                <time>{timeAgo(post.created_at)}</time>
               </Link>
             ))}
+            {!recentPosts.length && <div className="work-hub-empty"><Newspaper size={24} /><p>As novas publicações aparecerão aqui.</p></div>}
           </div>
+        </section>
 
-          {/* Mini pulse */}
-          <div className="px-5 py-4" style={{ borderTop: '1px solid hsl(var(--border))' }}>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-60" />
-              </div>
-              <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>{stats.users} colaboradores na rede</span>
-            </div>
-          </div>
-        </div>
+        <aside className="work-hub-panel work-hub-discover">
+          <div className="work-hub-discover-icon"><Search size={22} /></div>
+          <span className="work-hub-section-kicker">Encontre rápido</span>
+          <h2>Todos os recursos, sem se perder</h2>
+          <p>Use a busca do topo ou pressione <kbd>Ctrl</kbd> + <kbd>K</kbd> para abrir qualquer módulo.</p>
+          <Link to="/ajuda">Conhecer a central <ArrowRight size={14} /></Link>
+        </aside>
       </div>
+
+      <footer className="work-hub-footer">
+        <span><Activity size={14} /> Dados da operação REDE NEX</span>
+        {lastUpdated && <span>Atualizado às {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
+      </footer>
     </div>
   );
 }

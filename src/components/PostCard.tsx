@@ -36,7 +36,6 @@ export const PostCard = React.forwardRef<HTMLDivElement, PostCardProps>(
       timestamp,
       likes = 0,
       comments = 0,
-      shares = 0,
       liked = false,
       onLike,
       onComment,

@@ -145,8 +145,11 @@
   .nex-app button:has(> svg:only-child) { min-width: 44px; }
   .nex-app .group :where([class*="group-hover:opacity-100"]) { opacity: 1; }
   .nex-app .group [class*="group-hover:opacity-100"] { position: static; transform: none; }
+  .nex-app .chat-conversation-actions { display: none; }
+  .nex-app .chat-conversation-more { display: flex; }
   .tasks-sidebar .group { display: flex; align-items: center; }
 }
+.chat-users-drawer-mobile { width: min(320px, calc(100vw - 24px)); }
 .group:focus-within [class*="group-hover:opacity-100"] { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {

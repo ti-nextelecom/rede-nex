@@ -1,8 +1,11 @@
 import { Resend } from 'resend';
+import './env.js';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Email is optional; missing credentials must not prevent the API from booting.
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export async function sendPasswordResetEmail({ to, name, resetUrl }) {
+  if (!resend) throw new Error('Envio de e-mail não configurado: defina RESEND_API_KEY no servidor');
   const { data, error } = await resend.emails.send({
     from: 'Rede Nex <noreply@nextelecom.net.br>',
     to,

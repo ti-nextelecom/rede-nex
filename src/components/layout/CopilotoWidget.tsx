@@ -7,6 +7,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  internalOnly?: boolean;
 }
 
 const WELCOME: Message = {
@@ -49,15 +50,14 @@ export function CopilotoWidget() {
   const [unread, setUnread] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  if (location.pathname === '/copiloto') return null;
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (open) {
       setUnread(0);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     }
   }, [open, messages]);
+
+  if (location.pathname === '/copiloto') return null;
 
   async function send(text: string) {
     const trimmed = text.trim();
@@ -69,12 +69,12 @@ export function CopilotoWidget() {
     setLoading(true);
 
     try {
-      const res = await apiPost<{ reply: string }>('/copiloto', {
+      const res = await apiPost<{ reply: string; internalOnly?: boolean }>('/copiloto', {
         message: trimmed,
-        history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+        history: messages.filter(m => !m.internalOnly).slice(-6).map(m => ({ role: m.role, content: m.content })),
       });
       const reply = res.reply || 'Não consegui processar sua mensagem.';
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply, internalOnly: res.internalOnly }]);
       if (!open) setUnread(n => n + 1);
     } catch {
       setMessages(prev => [...prev, {

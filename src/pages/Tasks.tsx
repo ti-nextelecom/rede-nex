@@ -9,6 +9,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { clearAssistantIntent, readAssistantIntent } from '../lib/assistantIntent';
 import { apiDelete, apiDeleteJson, apiGet, apiPatch, apiPost, apiPut } from '../lib/apiClient';
 import { getUsers } from '../lib/appApi';
 import { useAuth } from '../lib/auth';
@@ -16,6 +17,8 @@ import { dispatchXPEvent } from '../lib/xpEvents';
 import { cn } from '../lib/utils';
 import type { User as UserType } from '../types';
 import { AccessibleModal } from '../components/AccessibleModal';
+import { dayKey, isFinished, isTaskMine } from '../../shared/personalWork.mjs';
+import './tasks.css';
 
 /* ── types ─────────────────────────────────────────────────────────────── */
 interface ChecklistItem { id: string; content: string; completed: boolean; assignee_id?: string; assignee?: TaskUser; sort_order: number; }
@@ -25,7 +28,7 @@ interface TaskFile { id: string; name: string; file_url: string; file_type?: str
 interface TaskUser { id: string; name: string; photo_url?: string; }
 interface Task {
   id: string; title: string; description?: string;
-  status: 'todo' | 'in_progress' | 'done';
+  status: 'todo' | 'in_progress' | 'done' | 'cancelled';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   created_by?: string; owner_id?: string; deadline?: string;
   created_at: string; updated_at: string;
@@ -39,7 +42,7 @@ interface Task {
 }
 
 interface CustomList { id: string; name: string; position: number; created_at: string; }
-interface TaskTemplate { id: string; title: string; description: string; priority: string; category: string; created_by?: string; created_at: string; assigned_to?: string | null; is_shared: boolean; assigned_user?: { id: string; name: string; photo_url?: string } | null; }
+interface TaskTemplate { id: string; title: string; description: string; priority: string; category: string; created_by?: string; created_at: string; assigned_to?: string | null; assignee_ids?: string[]; checklist_items?: Array<{ title: string; items: string[] }>; is_shared: boolean; assigned_user?: { id: string; name: string; photo_url?: string } | null; }
 const templateApi = {
   list: () => apiGet<{ data: TaskTemplate[] }>('/tasks/templates').then(r => r.data ?? []),
   create: (input: object) => apiPost<{ data: TaskTemplate }>('/tasks/templates', input).then(r => r.data!),
@@ -87,11 +90,12 @@ const api = {
 };
 
 /* ── constants ─────────────────────────────────────────────────────────── */
-const STATUS_LABELS: Record<string, string> = { todo: 'A Fazer', in_progress: 'Em Andamento', done: 'Concluída' };
+const STATUS_LABELS: Record<string, string> = { todo: 'A Fazer', in_progress: 'Em Andamento', done: 'Concluída', cancelled: 'Cancelada' };
 const STATUS_COLORS: Record<string, string> = {
   todo: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
   in_progress: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
   done: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+  cancelled: 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
 };
 const PRIORITY_LABELS: Record<string, string> = { low: 'Baixa', normal: 'Normal', high: 'Alta', urgent: 'Urgente' };
 const PRIORITY_COLORS: Record<string, string> = {
@@ -105,6 +109,7 @@ const KANBAN_COLS = [
   { id: 'later', label: 'Próximas semanas', color: 'border-t-blue-400' },
   { id: 'none', label: 'Sem prazo', color: 'border-t-slate-300' },
   { id: 'done', label: 'Concluída', color: 'border-t-emerald-500' },
+  { id: 'cancelled', label: 'Canceladas', color: 'border-t-slate-400' },
 ];
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
@@ -119,22 +124,23 @@ function fmtDateTime(dateStr?: string) {
     d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 function deadlineColumn(task: Task): string {
+  if (task.status === 'cancelled') return 'cancelled';
   if (task.status === 'done') return 'done';
   if (!task.deadline) return 'none';
   const now = new Date();
-  const dl = new Date(task.deadline);
+  const dl = new Date(`${dayKey(task.deadline)}T12:00:00`);
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
   const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7); weekEnd.setHours(23, 59, 59, 999);
-  if (dl < now) return 'overdue';
+  if (dayKey(task.deadline)! < dayKey()!) return 'overdue';
   if (dl <= todayEnd) return 'today';
   if (dl <= weekEnd) return 'week';
   return 'later';
 }
 function isOverdue(task: Task) {
-  return task.status !== 'done' && !!task.deadline && new Date(task.deadline) < new Date();
+  return !isFinished(task.status) && !!dayKey(task.deadline) && dayKey(task.deadline)! < dayKey()!;
 }
 function isNearDeadline(task: Task) {
-  if (task.status === 'done' || !task.deadline) return false;
+  if (isFinished(task.status) || !task.deadline) return false;
   const dl = new Date(task.deadline);
   const now = new Date();
   if (dl < now) return false;
@@ -411,7 +417,7 @@ function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
     <button
       onClick={onClick}
       className={cn(
-        'w-full rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 p-3 text-left shadow-sm relative',
+        'task-card w-full rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 p-3 text-left shadow-sm relative',
         'hover:shadow-lg transition-all duration-200 space-y-2.5 group active:scale-[0.98]',
         style.border, style.bg, style.pulse
       )}
@@ -425,7 +431,7 @@ function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
 
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', STATUS_COLORS[task.status])}>
-          {STATUS_LABELS[task.status]}
+          {STATUS_LABELS[task.status] || task.status || 'Não informado'}
         </span>
         <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold flex items-center gap-0.5', PRIORITY_BADGE[task.priority])}>
           <Flag size={9} /> {PRIORITY_LABELS[task.priority]}
@@ -591,6 +597,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
           title: cl.title,
           items: cl.items.map(i => i.content),
         })),
+        assignee_ids: task.assignees?.map((a) => a.id) ?? [],
       });
       setShowSaveModal(false);
       setSaveModalTitle('');
@@ -619,7 +626,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
   const totalItems = task.checklists.reduce((s, cl) => s + cl.items.length, 0);
   const doneItems = task.checklists.reduce((s, cl) => s + cl.items.filter(i => i.completed).length, 0);
 
-  const PropertiesPanel = () => (
+  const propertiesPanel = (
     <div className="p-5 space-y-5">
       <div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">Status</p>
@@ -628,6 +635,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
           <option value="todo">A Fazer</option>
           <option value="in_progress">Em Andamento</option>
           <option value="done">Concluída</option>
+          <option value="cancelled">Cancelada</option>
         </select>
       </div>
       <div>
@@ -732,7 +740,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                     status: task.status || 'todo',
                     deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '',
                     owner_id: task.owner_id || '',
-                    assignee_ids: task.assignees.map((a: any) => a.id),
+                    assignee_ids: task.assignees.map(a => a.id),
                   });
                   setShowEditModal(true);
                 }}
@@ -771,7 +779,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
           {/* Mobile properties panel (toggled) */}
           {showProps && (
             <div className="sm:hidden overflow-y-auto border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900">
-              <PropertiesPanel />
+              {propertiesPanel}
             </div>
           )}
 
@@ -818,9 +826,9 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                         {copiedChecklist && (
                           <button
                             onClick={async () => {
-                              const before = new Set(task.checklists.map((c: any) => c.id));
+                              const before = new Set(task.checklists.map(c => c.id));
                               const newTask = await api.addChecklist(task.id, copiedChecklist.title);
-                              const addedCl = newTask.checklists.find((c: any) => !before.has(c.id));
+                              const addedCl = newTask.checklists.find(c => !before.has(c.id));
                               if (addedCl) {
                                 let t = newTask;
                                 for (const item of copiedChecklist.items) {
@@ -1037,7 +1045,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
 
         {/* Right: properties — desktop only */}
         <div className="hidden sm:block w-64 flex-shrink-0 overflow-y-auto pt-1 bg-white dark:bg-slate-900 border-t-0 border-l border-slate-100 dark:border-slate-700">
-          <PropertiesPanel />
+          {propertiesPanel}
         </div>
       </div>
       {showSaveModal && (
@@ -1104,6 +1112,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                   <option value="todo">A Fazer</option>
                   <option value="in_progress">Em Andamento</option>
                   <option value="done">Concluída</option>
+                  <option value="cancelled">Cancelada</option>
                 </select>
               </div>
               <div>
@@ -1157,16 +1166,18 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
 }
 
 /* ── CreateTaskModal ────────────────────────────────────────────────────── */
-function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultListId = null, initialTitle = '', initialDescription = '', initialAssigneeIds, initialPriority = 'normal' }: { users: UserType[]; onCreate: (t: Task) => void; onClose: () => void; customLists?: CustomList[]; defaultListId?: string | null; initialTitle?: string; initialDescription?: string; initialAssigneeIds?: string[]; initialPriority?: string }) {
+function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultListId = null, initialTitle = '', initialDescription = '', initialAssigneeIds, initialPriority = 'normal', initialDeadline = '', initialChecklists = [] }: { users: UserType[]; onCreate: (t: Task) => void; onClose: () => void; customLists?: CustomList[]; defaultListId?: string | null; initialTitle?: string; initialDescription?: string; initialAssigneeIds?: string[]; initialPriority?: string; initialDeadline?: string; initialChecklists?: Array<{ title: string; items: string[] }> }) {
   const { user: me } = useAuth();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState(initialDeadline);
+  const [createError,setCreateError]=useState('');
   const [priority, setPriority] = useState(initialPriority || 'normal');
   const [ownerId, setOwnerId] = useState(initialAssigneeIds?.[0] || me?.id || '');
   const [assigneeIds, setAssigneeIds] = useState<string[]>(initialAssigneeIds ?? (me ? [me.id] : []));
   const [saving, setSaving] = useState(false);
   const [customListId, setCustomListId] = useState<string | null>(defaultListId);
+  const [checklists, setChecklists] = useState<Array<{ title: string; items: string[] }>>(initialChecklists);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -1174,8 +1185,15 @@ function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultLi
     setSaving(true);
     try {
       const task = await api.create({ title: title.trim(), description, deadline: deadline || null, priority, owner_id: ownerId, assignee_ids: assigneeIds, custom_list_id: customListId || null });
+      for (const cl of checklists) {
+        if (!cl.title.trim() && !cl.items.some(i => i.trim())) continue;
+        const updated = await api.addChecklist(task.id, cl.title || 'Checklist');
+        const newCl = updated?.checklists?.[updated.checklists.length - 1];
+        if (newCl) { for (const item of cl.items) { if (item.trim()) await api.addItem(task.id, newCl.id, item); } }
+      }
       onCreate(task);
-    } finally { setSaving(false); }
+    } catch(error) {setCreateError(error instanceof Error?error.message:'Não foi possível criar a tarefa.');}
+    finally { setSaving(false); }
   }
 
   return (
@@ -1188,6 +1206,7 @@ function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultLi
             <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200"><X size={16} /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {createError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{createError}</p>}
             <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Título da tarefa *" aria-label="Título da tarefa" required
               className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-4 text-sm outline-none focus:border-orange-400 font-semibold transition-colors hover:border-slate-300" />
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Descrição (opcional)"
@@ -1227,6 +1246,34 @@ function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultLi
                 </select>
               </div>
             )}
+            <div>
+              <label className="block text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Checklists</label>
+              <div className="space-y-2">
+                {checklists.map((cl, ci) => (
+                  <div key={ci} className="rounded-lg border border-slate-200 dark:border-slate-600 p-3 space-y-1.5">
+                    <div className="flex gap-2">
+                      <input value={cl.title} onChange={e => setChecklists(prev => prev.map((c,i2) => i2===ci ? {...c, title: e.target.value} : c))}
+                        placeholder="Título do grupo..." className="flex-1 h-8 rounded border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 px-2 text-xs outline-none focus:border-orange-400" />
+                      <button type="button" onClick={() => setChecklists(prev => prev.filter((_,i2) => i2!==ci))}
+                        className="h-8 w-8 flex items-center justify-center text-slate-400 hover:text-red-500 rounded"><X size={12} /></button>
+                    </div>
+                    {cl.items.map((item, ii) => (
+                      <div key={ii} className="flex gap-1 pl-2">
+                        <span className="text-slate-400 mt-1.5 text-[10px]">•</span>
+                        <input value={item} onChange={e => setChecklists(prev => prev.map((c,ci2) => ci2===ci ? {...c, items: c.items.map((it,i2) => i2===ii ? e.target.value : it)} : c))}
+                          placeholder="Item..." className="flex-1 h-7 rounded border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 px-2 text-xs outline-none focus:border-orange-400" />
+                        <button type="button" onClick={() => setChecklists(prev => prev.map((c,ci2) => ci2===ci ? {...c, items: c.items.filter((_,i2) => i2!==ii)} : c))}
+                          className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 rounded"><X size={12} /></button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setChecklists(prev => prev.map((c,ci2) => ci2===ci ? {...c, items: [...c.items, '']} : c))}
+                      className="text-[11px] text-orange-500 hover:text-orange-600 flex items-center gap-1 pl-2 mt-1"><Plus size={10} /> Adicionar item</button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={() => setChecklists(prev => [...prev, {title: '', items: ['']}])}
+                className="mt-2 text-xs text-slate-400 hover:text-orange-500 flex items-center gap-1 transition-colors"><Plus size={12} /> Adicionar grupo de checklist</button>
+            </div>
             <button type="submit" disabled={!title.trim() || saving}
               className="w-full h-11 rounded-xl bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 disabled:opacity-40 active:scale-[0.98] transition-all duration-200">
               {saving ? 'Criando...' : 'Criar Tarefa'}
@@ -1302,7 +1349,7 @@ function ListView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => v
               </td>
               <td className="px-4 py-3 whitespace-nowrap">
                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', STATUS_COLORS[t.status])}>
-                  {STATUS_LABELS[t.status]}
+                  {STATUS_LABELS[t.status] || t.status || 'Não informado'}
                 </span>
               </td>
               <td className="px-4 py-3 whitespace-nowrap">
@@ -1564,13 +1611,14 @@ function CalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) 
 
 /* ── GanttView ───────────────────────────────────────────────────────────── */
 function GanttView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => void }) {
-  const today = new Date();
+  const todayKey = dayKey()!;
+  const today = useMemo(() => new Date(`${todayKey}T12:00:00`), [todayKey]);
   const startDate = useMemo(() => {
     const dates = tasks.map(t => new Date(t.created_at)).concat([today]);
     const min = new Date(Math.min(...dates.map(d => d.getTime())));
     min.setDate(1);
     return min;
-  }, [tasks]);
+  }, [tasks, today]);
 
   const endDate = useMemo(() => {
     const dates = tasks.filter(t => t.deadline).map(t => new Date(t.deadline!));
@@ -1578,7 +1626,7 @@ function GanttView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => 
     const max = new Date(Math.max(...dates.map(d => d.getTime())));
     max.setDate(max.getDate() + 7);
     return max;
-  }, [tasks]);
+  }, [tasks, today]);
 
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000);
   const DAY_W = 24;
@@ -1586,7 +1634,7 @@ function GanttView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => 
   function dayOffset(d: Date) { return Math.ceil((d.getTime() - startDate.getTime()) / 86400000); }
 
   const weeks: Date[] = [];
-  let cur = new Date(startDate);
+  const cur = new Date(startDate);
   while (cur <= endDate) { weeks.push(new Date(cur)); cur.setDate(cur.getDate() + 7); }
 
   const todayOffset = dayOffset(today);
@@ -1654,6 +1702,124 @@ type View = 'lista' | 'prazo' | 'planejador' | 'calendario' | 'gantt' | 'modelos
 
 
 /* ── TemplatesView ───────────────────────────────────────���──────────���────── */
+function TemplateFormModal({ users, onSave, onClose }: {
+  users: UserType[];
+  onSave: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState('normal');
+  const [category, setCategory] = useState('Geral');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [isShared, setIsShared] = useState(false);
+  const [checklists, setChecklists] = useState<Array<{ title: string; items: string[] }>>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await templateApi.create({
+        title: title.trim(),
+        description,
+        priority,
+        category: category.trim() || 'Geral',
+        assignee_ids: assigneeIds,
+        is_shared: isShared,
+        checklist_items: checklists
+          .filter(cl => cl.title.trim() || cl.items.some(i => i.trim()))
+          .map(cl => ({ title: cl.title, items: cl.items.filter(i => i.trim()) })),
+      });
+      await onSave();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar modelo');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AccessibleModal title="Novo modelo" onClose={onClose} className="nex-task-create fixed left-1/2 top-1/2 z-50 w-[calc(100%-24px)] max-w-lg -translate-x-1/2 -translate-y-1/2 outline-none">
+      <div className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div className="h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-orange-400" />
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Novo Modelo</h3>
+            <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200"><X size={16} /></button>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Título do modelo *" required
+              className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-4 text-sm outline-none focus:border-orange-400 font-semibold transition-colors hover:border-slate-300" />
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Descrição (opcional)"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-4 py-3 text-sm outline-none focus:border-orange-400 resize-none transition-colors hover:border-slate-300" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Categoria</label>
+                <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Ex: Suporte, Geral..."
+                  className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Prioridade</label>
+                <select value={priority} onChange={e => setPriority(e.target.value)}
+                  className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400 transition-colors cursor-pointer">
+                  <option value="low">Baixa</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">Alta</option>
+                  <option value="urgent">Urgente</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Participantes padrão</label>
+              <MultiUserPicker users={users} value={assigneeIds} onChange={setAssigneeIds} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Checklists</label>
+              <div className="space-y-2">
+                {checklists.map((cl, ci) => (
+                  <div key={ci} className="rounded-lg border border-slate-200 dark:border-slate-600 p-3 space-y-1.5">
+                    <div className="flex gap-2">
+                      <input value={cl.title} onChange={e => setChecklists(prev => prev.map((c,i2) => i2===ci ? {...c, title: e.target.value} : c))}
+                        placeholder="Título do grupo..." className="flex-1 h-8 rounded border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 px-2 text-xs outline-none focus:border-orange-400" />
+                      <button type="button" onClick={() => setChecklists(prev => prev.filter((_,i2) => i2!==ci))}
+                        className="h-8 w-8 flex items-center justify-center text-slate-400 hover:text-red-500 rounded"><X size={12} /></button>
+                    </div>
+                    {cl.items.map((item, ii) => (
+                      <div key={ii} className="flex gap-1 pl-2">
+                        <span className="text-slate-400 mt-1.5 text-[10px]">•</span>
+                        <input value={item} onChange={e => setChecklists(prev => prev.map((c,ci2) => ci2===ci ? {...c, items: c.items.map((it,i2) => i2===ii ? e.target.value : it)} : c))}
+                          placeholder="Item..." className="flex-1 h-7 rounded border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 px-2 text-xs outline-none focus:border-orange-400" />
+                        <button type="button" onClick={() => setChecklists(prev => prev.map((c,ci2) => ci2===ci ? {...c, items: c.items.filter((_,i2) => i2!==ii)} : c))}
+                          className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 rounded"><X size={12} /></button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setChecklists(prev => prev.map((c,ci2) => ci2===ci ? {...c, items: [...c.items, '']} : c))}
+                      className="text-[11px] text-orange-500 hover:text-orange-600 flex items-center gap-1 pl-2 mt-1"><Plus size={10} /> Adicionar item</button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={() => setChecklists(prev => [...prev, {title: '', items: ['']}])}
+                className="mt-2 text-xs text-slate-400 hover:text-orange-500 flex items-center gap-1 transition-colors"><Plus size={12} /> Adicionar grupo</button>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-600 dark:text-slate-400">
+              <input type="checkbox" checked={isShared} onChange={e => setIsShared(e.target.checked)}
+                className="w-4 h-4 rounded accent-orange-500 cursor-pointer" />
+              Compartilhar com todos
+            </label>
+            <button type="submit" disabled={!title.trim() || saving}
+              className="w-full h-11 rounded-xl bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 disabled:opacity-40 active:scale-[0.98] transition-all duration-200">
+              {saving ? 'Salvando...' : 'Salvar Modelo'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </AccessibleModal>
+  );
+}
+
 function TemplatesView({ templates, users, onUseTemplate, onDelete, onRefresh }: {
   templates: TaskTemplate[];
   users: UserType[];
@@ -1661,25 +1827,8 @@ function TemplatesView({ templates, users, onUseTemplate, onDelete, onRefresh }:
   onDelete: (id: string) => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
-  const { user: me } = useAuth();
-  const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState('Suporte');
-  const [newAssignedTo, setNewAssignedTo] = useState('');
-  const [newIsShared, setNewIsShared] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const categories = [...new Set(templates.map(t => t.category))].sort();
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-    setSaving(true);
-    try {
-      await templateApi.create({ title: newTitle.trim(), category: newCategory, assigned_to: newAssignedTo || null, is_shared: newIsShared });
-      setNewTitle(''); setNewAssignedTo(''); setNewIsShared(false); setAdding(false);
-      await onRefresh();
-    } finally { setSaving(false); }
-  }
 
   return (
     <div className="max-w-4xl mx-auto py-2">
@@ -1688,41 +1837,18 @@ function TemplatesView({ templates, users, onUseTemplate, onDelete, onRefresh }:
           <h2 className="text-base font-bold text-slate-700 dark:text-slate-200">Modelos de Tarefa</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Clique em "Usar" para criar uma tarefa com este modelo</p>
         </div>
-        <button onClick={() => setAdding(o => !o)}
+        <button onClick={() => setShowForm(true)}
           className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 active:scale-95 transition-all">
           <Plus size={13} /> Novo modelo
         </button>
       </div>
 
-      {adding && (
-        <form onSubmit={handleCreate} className="mb-5 p-4 bg-white dark:bg-slate-800 rounded-xl border border-orange-200 dark:border-orange-800 shadow-sm flex flex-col gap-3">
-          <input value={newTitle} onChange={e => setNewTitle(e.target.value)} autoFocus
-            placeholder="Título do modelo..."
-            className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400" />
-          <div className="grid grid-cols-2 gap-2">
-            <input value={newCategory} onChange={e => setNewCategory(e.target.value)}
-              placeholder="Categoria (ex: Suporte, Geral)"
-              className="h-9 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400" />
-            <UserPicker users={users} value={newAssignedTo} onChange={setNewAssignedTo} placeholder="Responsável padrão..." />
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-600 dark:text-slate-400">
-              <input type="checkbox" checked={newIsShared} onChange={e => setNewIsShared(e.target.checked)}
-                className="w-4 h-4 rounded accent-orange-500 cursor-pointer" />
-              Compartilhar com todos
-            </label>
-            <div className="ml-auto flex gap-2">
-              <button type="submit" disabled={saving || !newTitle.trim()}
-                className="h-9 px-4 rounded-lg bg-orange-500 text-white text-sm font-semibold disabled:opacity-50 hover:bg-orange-600 transition-colors">
-                {saving ? '...' : 'Salvar'}
-              </button>
-              <button type="button" onClick={() => setAdding(false)}
-                className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </form>
+      {showForm && (
+        <TemplateFormModal
+          users={users}
+          onSave={async () => { setShowForm(false); await onRefresh(); }}
+          onClose={() => setShowForm(false)}
+        />
       )}
 
       {templates.length === 0 ? (
@@ -1777,9 +1903,12 @@ function TemplatesView({ templates, users, onUseTemplate, onDelete, onRefresh }:
 }
 
 export function Tasks() {
+  const { user } = useAuth();
+  const [scope, setScope] = useState<'mine' | 'all' | 'overdue' | 'today' | 'done'>('mine');
+  const [sortBy, setSortBy] = useState('deadline');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
-  const [view, setView] = useState<View>(() => window.matchMedia('(max-width: 639px)').matches ? 'lista' : 'prazo');
+  const [view, setView] = useState<View>('lista');
   const [loadError, setLoadError] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [creating, setCreating] = useState(false);
@@ -1794,9 +1923,11 @@ export function Tasks() {
   const [renameText, setRenameText] = useState('');
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [templateForCreate, setTemplateForCreate] = useState<TaskTemplate | null>(null);
+  const [assistantDraft,setAssistantDraft]=useState<{title:string;deadline:string}|null>(null);
 
-  const [searchParams] = useSearchParams();
-  const initialUrlRef = useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTask = searchParams.get('tarefa');
+  const requestedProtocol = searchParams.get('protocolo');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1811,23 +1942,41 @@ export function Tasks() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!loading && !initialUrlRef.current) {
-      initialUrlRef.current = true;
-      const p = searchParams.get('protocolo');
-      if (p && tasks.length > 0) {
-        const found = tasks.find(t => t.protocol === p.toUpperCase());
-        if (found) setSelectedTask(found);
-      }
+    if (!loading && (requestedTask || requestedProtocol)) {
+      const found = tasks.find(t => t.id === requestedTask || (!!requestedProtocol && t.protocol === requestedProtocol.toUpperCase()));
+      if (found) setSelectedTask(found);
+      setSearchParams(params => { const next=new URLSearchParams(params);next.delete('tarefa');next.delete('protocolo');return next; }, { replace: true });
     }
-  }, [loading]);
+  }, [loading, tasks, requestedTask, requestedProtocol, setSearchParams]);
+  useEffect(()=>{
+    if(loading)return;
+    const intent=readAssistantIntent(searchParams);
+    if(intent.create){setAssistantDraft({title:intent.title,deadline:intent.day?`${intent.day}T${intent.time || '23:59'}`:''});setTemplateForCreate(null);setSelectedTask(null);setCreating(true);}
+    if(intent.search)setSearch(intent.search);
+    if(intent.scope)setScope(intent.scope);
+    if(intent.create||intent.search||intent.scope)setSearchParams(clearAssistantIntent,{replace:true});
+  },[loading,searchParams,setSearchParams]);
+
+  const today = dayKey();
+  const mine = tasks.filter(task => isTaskMine(task, user?.id));
+  const overdueCount = mine.filter(task => !isFinished(task.status) && dayKey(task.deadline) && dayKey(task.deadline)! < today!).length;
+  const todayCount = mine.filter(task => !isFinished(task.status) && dayKey(task.deadline) === today).length;
 
   const filtered = useMemo(() => {
     let t = tasks;
+    if (scope !== 'all') t = t.filter(task => isTaskMine(task, user?.id));
+    if (scope === 'mine' && !filterStatus) t = t.filter(task => !isFinished(task.status));
+    if (scope === 'overdue') t = t.filter(task => !isFinished(task.status) && dayKey(task.deadline) && dayKey(task.deadline)! < today!);
+    if (scope === 'today') t = t.filter(task => !isFinished(task.status) && dayKey(task.deadline) === today);
+    if (scope === 'done') t = t.filter(task => task.status === 'done');
     if (selectedListId) t = t.filter(x => x.custom_list_id === selectedListId);
     if (search) t = t.filter(x => x.title.toLowerCase().includes(search.toLowerCase()) || (x.protocol && x.protocol.toUpperCase().includes(search.toUpperCase())));
     if (filterStatus) t = t.filter(x => x.status === filterStatus);
-    return t;
-  }, [tasks, search, filterStatus, selectedListId]);
+    const priorities = { urgent: 0, high: 1, normal: 2, low: 3 };
+    return [...t].sort((a, b) => sortBy === 'priority' ? priorities[a.priority] - priorities[b.priority]
+      : sortBy === 'title' ? a.title.localeCompare(b.title, 'pt-BR')
+      : Number(isFinished(a.status)) - Number(isFinished(b.status)) || (a.deadline || '9999').localeCompare(b.deadline || '9999'));
+  }, [tasks, search, filterStatus, selectedListId, scope, user?.id, today, sortBy]);
 
   function handleUpdate(updated: Task) {
     setTasks(prev => prev.map(t => t.id === updated.id ? updated : t));
@@ -1870,21 +2019,33 @@ export function Tasks() {
 
   return (
     <div className="tasks-workspace">
+      <header className="tasks-hero">
+        <div><span className="tasks-kicker">MEU ESPAÇO DE TRABALHO</span><h1>Tarefas e entregas</h1><p>Organize o dia, acompanhe os prazos e avance com sua equipe.</p></div>
+        <button type="button" onClick={() => setCreating(true)}><Plus size={20} /> Nova tarefa</button>
+      </header>
+      <section className="tasks-summary" aria-label="Resumo das minhas tarefas">
+        <button aria-pressed={scope === 'mine'} onClick={() => { setScope('mine'); setFilterStatus(''); }}><ListTodo size={21} /><span><strong>{mine.filter(t => !isFinished(t.status)).length}</strong><small>Minhas pendências</small></span></button>
+        <button className="is-overdue" aria-pressed={scope === 'overdue'} onClick={() => { setScope('overdue'); setFilterStatus(''); }}><Clock size={21} /><span><strong>{overdueCount}</strong><small>Prazo vencido</small></span></button>
+        <button aria-pressed={scope === 'today'} onClick={() => { setScope('today'); setFilterStatus(''); }}><CalendarDays size={21} /><span><strong>{todayCount}</strong><small>Para hoje</small></span></button>
+        <button aria-pressed={scope === 'done'} onClick={() => { setScope('done'); setFilterStatus(''); }}><CheckSquare size={21} /><span><strong>{mine.filter(t => t.status === 'done').length}</strong><small>Concluídas</small></span></button>
+      </section>
       {/* Header */}
       <div className="tasks-header flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <ListTodo size={20} className="text-orange-500" />
-          <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Tarefas</h1>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{selectedListId ? customLists.find(l => l.id === selectedListId)?.name : 'Todas as listas'}</h2>
           <span className="rounded-full bg-blue-50 dark:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-2 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-300">{tasks.length}</span>
         </div>
         <button
           onClick={() => setCreating(true)}
-          className="flex items-center gap-2 h-9 px-4 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md"
+          className="tasks-inline-create flex items-center gap-2 h-9 px-4 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md"
         >
           <Plus size={15} /> Nova tarefa
         </button>
 
         <div className="tasks-search flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+          <select aria-label="Envolvimento nas tarefas" value={scope} onChange={e => setScope(e.target.value as typeof scope)}><option value="mine">Minhas tarefas</option><option value="all">Todas em que estou envolvido</option><option value="overdue">Minhas vencidas</option><option value="today">Minhas para hoje</option><option value="done">Minhas concluídas</option></select>
+          <select aria-label="Ordenar tarefas" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="deadline">Por prazo</option><option value="priority">Por prioridade</option><option value="title">Por título</option></select>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Título ou protocolo…" aria-label="Buscar tarefas por título ou protocolo"
             className="h-9 flex-1 sm:w-40 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors" />
           <select aria-label="Filtrar tarefas por status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
@@ -1893,6 +2054,7 @@ export function Tasks() {
             <option value="todo">A Fazer</option>
             <option value="in_progress">Andamento</option>
             <option value="done">Concluída</option>
+            <option value="cancelled">Cancelada</option>
           </select>
         </div>
       </div>
@@ -1907,7 +2069,7 @@ export function Tasks() {
         </>}
       </div>
       {/* Body: sidebar + main */}
-      <div className="flex flex-1 min-h-0">
+      <div className="tasks-body flex flex-1 min-h-0">
         {/* Left sidebar — Custom Lists */}
         <aside aria-label="Listas de tarefas" className="tasks-sidebar w-44 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-y-auto hidden sm:flex">
           <div className="p-3 flex-shrink-0">
@@ -1973,6 +2135,7 @@ export function Tasks() {
             <v.icon size={14} /> {v.label}
           </button>
         ))}
+        <span className="tasks-result-count">{filtered.length} resultado(s)</span>
       </div>
 
       {/* Content */}
@@ -2011,7 +2174,7 @@ export function Tasks() {
         <TaskDetail task={selectedTask} users={users} onClose={() => setSelectedTask(null)} onUpdate={handleUpdate} onDelete={handleDelete} customLists={customLists} />
       )}
       {creating && (
-        <CreateTaskModal users={users} onCreate={(task) => { handleCreate(task); setTemplateForCreate(null); }} onClose={() => { setCreating(false); setTemplateForCreate(null); }} customLists={customLists} defaultListId={selectedListId} initialTitle={templateForCreate?.title || ''} initialDescription={templateForCreate?.description || ''} initialAssigneeIds={templateForCreate?.assigned_to ? [templateForCreate.assigned_to] : undefined} initialPriority={templateForCreate?.priority || 'normal'} />
+        <CreateTaskModal users={users} onCreate={(task) => { handleCreate(task); setTemplateForCreate(null);setAssistantDraft(null); }} onClose={() => { setCreating(false); setTemplateForCreate(null);setAssistantDraft(null); }} customLists={customLists} defaultListId={selectedListId} initialTitle={templateForCreate?.title || assistantDraft?.title || ''} initialDeadline={assistantDraft?.deadline || ''} initialDescription={templateForCreate?.description || ''} initialAssigneeIds={templateForCreate?.assignee_ids?.length ? templateForCreate.assignee_ids : (templateForCreate?.assigned_to ? [templateForCreate.assigned_to] : undefined)} initialPriority={templateForCreate?.priority || 'normal'} initialChecklists={templateForCreate?.checklist_items ?? []} />
       )}
     </div>
   );

@@ -3,8 +3,10 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { PasswordChangeGate } from './PasswordChangeGate';
 import { MobileBottomNav } from './MobileBottomNav';
-import { CopilotoWidget } from './CopilotoWidget';
+
 import { pageTitle } from './navigation';
+
+import { JarvesWidget } from './JarvesWidget';
 import './responsive.css';
 
 const WORKSPACES = new Set(['/tarefas', '/projetos', '/bate-papo', '/copiloto', '/notas', '/wiki']);
@@ -23,13 +25,15 @@ export function Layout() {
   return (
     <div className="nex-app">
       <a href="#conteudo-principal" className="nex-skip-link">Pular para o conteúdo</a>
+      
+      <JarvesWidget />
       <Navbar />
       <PasswordChangeGate />
       <main id="conteudo-principal" tabIndex={-1} className={workspace ? 'nex-main nex-main-workspace' : 'nex-main'}>
         <div ref={contentRef} className="nex-page" data-page={pathname.slice(1) || 'dashboard'}><Outlet /></div>
       </main>
       <MobileBottomNav />
-      <CopilotoWidget />
+      
     </div>
   );
 }

@@ -4,8 +4,9 @@ import { dirname, extname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { query } from './db.js';
 import { logAudit } from './auth.repository.js';
+import { mediaUploadsDir } from './runtimePaths.js';
 
-const uploadRoot = '/opt/rede-nex/uploads';
+const uploadRoot = mediaUploadsDir;
 const allowedTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']);
 
 // Magic bytes signatures per MIME type
@@ -195,6 +196,13 @@ export async function getMediaContent(id) {
   return { file_data, file_type };
 }
 
+// Same authenticated delivery as /api/media/:id/content, for stored /uploads URLs.
+export async function getMediaByPath(path) {
+  if (!/^(avatars|covers|wiki|chat|chat-avatars)\/[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,250}$/.test(path)) return null;
+  const { rows } = await query('SELECT id FROM media_assets WHERE path=$1 LIMIT 1', [path]);
+  return rows[0] ? getMediaContent(rows[0].id) : null;
+}
+
 export async function saveUserCover(user, input) {
   if (!input?.data || !input?.file_name || !input?.file_type) throw new Error('Arquivo inválido');
   if (!allowedTypes.has(input.file_type)) throw new Error('Formato de imagem não permitido');
@@ -276,4 +284,24 @@ export async function saveChatAvatar(userId, conversationId, input) {
   );
   await query('update chat_conversations set avatar_url = $2 where id = $1', [conversationId, publicUrl]);
   return rows[0];
+}
+
+export async function saveProjectCover(projectId, input) {
+  if (!input?.data || !input?.file_name || !input?.file_type) throw new Error('Arquivo inválido');
+  if (!allowedTypes.has(input.file_type)) throw new Error('Formato de imagem não permitido');
+  const base64 = String(input.data).includes(',') ? String(input.data).split(',').pop() : String(input.data);
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) throw new Error('Arquivo vazio');
+  if (buffer.length > 5 * 1024 * 1024) throw new Error('Imagem maior que 5MB');
+  validateMagicBytes(buffer, input.file_type);
+  const bucket = 'project-covers';
+  const fileName = projectId + '-' + randomUUID() + extensionFor(input.file_name, input.file_type);
+  const relativePath = bucket + '/' + fileName;
+  const targetDir = join(uploadRoot, bucket);
+  const targetPath = join(targetDir, fileName);
+  await mkdir(targetDir, { recursive: true });
+  await writeFile(targetPath, buffer);
+  const publicUrl = '/uploads/' + relativePath;
+  await query('UPDATE projects SET cover_image = $2 WHERE id = $1', [projectId, publicUrl]);
+  return { url: publicUrl };
 }

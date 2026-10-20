@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { AuthProvider, useAuth } from './lib/auth';
+import { HrAccessProvider } from './lib/hrAccess';
 import { GamificationToast } from './components/GamificationToast';
 import { GlobalNotifications } from './components/GlobalNotifications';
 import { GlobalCallOverlay } from './components/GlobalCallOverlay';
@@ -35,9 +36,12 @@ const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage').then(m 
 const ProjetosPage      = lazy(() => import('./pages/ProjetosPage').then(m => ({ default: m.ProjetosPage })));
 const PrestacaoContasPage = lazy(() => import('./pages/PrestacaoContasPage').then(m => ({ default: m.PrestacaoContasPage })));
 const JRHPage          = lazy(() => import('./pages/JRHPage').then(m => ({ default: m.JRHPage })));
+const HrPage = lazy(() => import('./pages/HrPage').then(m => ({ default: m.HrPage })));
 const ForgotPassword   = lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
 const ResetPassword    = lazy(() => import('./pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
 const PainelTIPage = lazy(() => import('./pages/PainelTIPage').then(m => ({ default: m.PainelTIPage })));
+const NocPage = lazy(() => import('./pages/NocPage').then(m => ({ default: m.NocPage })));
+const ImplementacaoPage = lazy(() => import('./pages/ImplementacaoPage').then(m => ({ default: m.ImplementacaoPage })));
 
 
 class RouteErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -95,6 +99,7 @@ function GlobalNotificationsMount() {
 function App() {
   return (
     <AuthProvider>
+      <HrAccessProvider>
       <GamificationToast />
       <BrowserRouter>
         <WsManager />
@@ -109,6 +114,7 @@ function App() {
               <Route path="/" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
               <Route path="/feed" element={<Suspense fallback={<PageFallback />}><Feed /></Suspense>} />
               <Route path="/jrh" element={<Suspense fallback={<PageFallback />}><JRHPage /></Suspense>} />
+              <Route path="/rh" element={<Suspense fallback={<PageFallback />}><HrPage /></Suspense>} />
               <Route path="/treinamentos" element={<Suspense fallback={<PageFallback />}><Training /></Suspense>} />
               <Route path="/wiki" element={<Suspense fallback={<PageFallback />}><Wiki /></Suspense>} />
               <Route path="/colaboradores" element={<Suspense fallback={<PageFallback />}><Users /></Suspense>} />
@@ -133,10 +139,13 @@ function App() {
               <Route path="/projetos" element={<Suspense fallback={<PageFallback />}><ProjetosPage /></Suspense>} />
               <Route path="/prestacao-contas" element={<Suspense fallback={<PageFallback />}><PrestacaoContasPage /></Suspense>} />
               <Route path="/gestao-ti" element={<Suspense fallback={<PageFallback />}><PainelTIPage /></Suspense>} />
+              <Route path="/noc" element={<Suspense fallback={<PageFallback />}><NocPage /></Suspense>} />
+              <Route path="/implementacao" element={<Suspense fallback={<PageFallback />}><ImplementacaoPage /></Suspense>} />
             </Route>
           </Routes>
         </Suspense>
       </BrowserRouter>
+      </HrAccessProvider>
     </AuthProvider>
   );
 }

@@ -2,8 +2,9 @@ import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { query } from './db.js';
+import { pcUploadsDir } from './runtimePaths.js';
 
-const uploadRoot = join(process.cwd(), 'public', 'uploads', 'pc-anexos');
+const uploadRoot = pcUploadsDir;
 
 export async function isPcAdmin(userId) {
   const r = await query('SELECT 1 FROM pc_admins WHERE user_id = $1', [userId]);
@@ -214,7 +215,7 @@ export async function deleteLancamento(id) {
   const anexos = await query('SELECT caminho FROM pc_anexos WHERE lancamento_id=$1', [id]);
   await query('DELETE FROM pc_lancamentos WHERE id=$1', [id]);
   for (const a of anexos.rows) {
-    try { await unlink(join(process.cwd(), 'public', a.caminho)); } catch {}
+    try { await unlink(join(uploadRoot, a.caminho.split('/').pop())); } catch {}
   }
 }
 
@@ -283,14 +284,14 @@ export async function deleteAnexo(id) {
   const r = await query('SELECT caminho FROM pc_anexos WHERE id=$1', [id]);
   if (!r.rows[0]) return;
   await query('DELETE FROM pc_anexos WHERE id=$1', [id]);
-  try { await unlink(join(process.cwd(), 'public', 'uploads', 'pc-anexos', r.rows[0].caminho.split('/').pop())); } catch {}
+  try { await unlink(join(uploadRoot, r.rows[0].caminho.split('/').pop())); } catch {}
 }
 
 export async function streamAnexo(id) {
   const r = await query('SELECT * FROM pc_anexos WHERE id=$1', [id]);
   if (!r.rows[0]) return null;
   const a = r.rows[0];
-  const filePath = join(process.cwd(), 'public', 'uploads', 'pc-anexos', a.caminho.split('/').pop());
+  const filePath = join(uploadRoot, a.caminho.split('/').pop());
   const buffer = await readFile(filePath);
   return { buffer, mime_type: a.mime_type || 'application/octet-stream', nome_original: a.nome_original };
 }

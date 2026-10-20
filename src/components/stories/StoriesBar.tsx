@@ -690,7 +690,8 @@ export function StoriesBar() {
     <>
       <div className="flex gap-3 px-4 py-3 overflow-x-auto border-b border-slate-100 flex-shrink-0 bg-white">
         {/* My bubble */}
-        <button onClick={handleMyClick} className="flex flex-col items-center gap-1.5 flex-shrink-0">
+        <div className="relative flex-shrink-0">
+        <button onClick={handleMyClick} className="flex flex-col items-center gap-1.5">
           <div className="relative">
             <div className={cn(
               'h-14 w-14 rounded-full p-0.5',
@@ -704,14 +705,15 @@ export function StoriesBar() {
                 />
               </div>
             </div>
-            <button onClick={e => { e.stopPropagation(); setCreating(true); }} className="absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full bg-orange-500 border-2 border-white flex items-center justify-center">
-              <Plus size={11} className="text-white" />
-            </button>
           </div>
           <span className="text-[11px] text-slate-600 font-medium w-14 text-center truncate leading-tight">
             Minha story
           </span>
         </button>
+        <button type="button" aria-label="Criar story" onClick={() => setCreating(true)} className="story-add-button absolute top-6 -right-3 h-11 w-11 flex items-center justify-center">
+          <span className="h-6 w-6 rounded-full bg-orange-500 border-2 border-white flex items-center justify-center"><Plus size={14} className="text-white" /></span>
+        </button>
+        </div>
 
         {/* Others */}
         {others.map(g => {

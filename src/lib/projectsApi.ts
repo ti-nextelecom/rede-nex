@@ -20,6 +20,7 @@ export type Project = {
   accent: Accent;
   tag: string | null;
   tag_color: string | null;
+  cover_image?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -249,4 +250,11 @@ export async function createRequest(payload: {
   project_id?: string | null; title: string; requester_name: string; request_type?: string;
 }): Promise<ProjectRequest> {
   return unwrap(apiPost<{ data: ProjectRequest }>('/project-requests', payload));
+}
+
+export async function uploadProjectCover(
+  projectId: string,
+  payload: { data: string; file_name: string; file_type: string }
+): Promise<{ url: string }> {
+  return unwrap(apiPost<{ data: { url: string } }>(`/projects/${projectId}/cover`, payload));
 }

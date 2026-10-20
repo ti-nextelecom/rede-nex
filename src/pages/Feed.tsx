@@ -1,9 +1,9 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, Bell, BookOpen, Building2, Calendar, ExternalLink, Heart,
+  AlertTriangle, BookOpen, Building2, Calendar, ChevronDown, ExternalLink, Heart,
   Image as ImageIcon, Megaphone, MessageCircle, Newspaper,
-  Pencil, Plus, Send, Sparkles, Trash2, TrendingUp, Users, Video, X,
+  Pencil, Plus, Search, Send, Sparkles, Trash2, TrendingUp, Users, Video, X,
 } from 'lucide-react';
 import { commentPost, createPost, deleteComment, deletePost, getFeedPosts, reactToComment, reactToPost, updateComment, updatePost, voteOnPoll } from '../lib/appApi';
 import { apiGet } from '../lib/apiClient';
@@ -14,6 +14,8 @@ import type { Post } from '../types';
 import { cn } from '../lib/utils';
 import { StoriesBar } from '../components/stories/StoriesBar';
 import { ImageLightbox } from '../components/ui/ImageLightbox';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import './feed.css';
 
 const REACTIONS = [
   { key: 'like', emoji: '👍', label: 'Curtir' },
@@ -24,7 +26,7 @@ const REACTIONS = [
 
 type ReactionKey = typeof REACTIONS[number]['key'];
 
-const TYPE_CONFIG: Record<string, { label: string; badgeClass: string; icon: typeof Bell; bar: string }> = {
+const TYPE_CONFIG: Record<string, { label: string; badgeClass: string; icon: typeof Megaphone; bar: string }> = {
   announcement: { label: 'Comunicado', badgeClass: 'bg-blue-100 text-blue-700', icon: Megaphone, bar: '#0057b8' },
   alert: { label: 'Aviso importante', badgeClass: 'bg-red-100 text-red-700', icon: AlertTriangle, bar: '#dc2626' },
   update: { label: 'Atualização', badgeClass: 'bg-emerald-100 text-emerald-700', icon: TrendingUp, bar: '#16a34a' },
@@ -55,6 +57,27 @@ async function getWikiActivity(): Promise<WikiFeedItem[]> {
   }
 }
 
+function wikiPlainText(content: string): string {
+  const source = content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<\/(p|div|li|h[1-6])>|<br\s*\/?\s*>/gi, ' ');
+  const plain = new DOMParser().parseFromString(source, 'text/html').body.textContent || '';
+  return plain
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[#$*_~`>]/g, ' ')
+    .replace(/\[|\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function wikiExcerpt(content: string): string {
+  const normalized = wikiPlainText(content);
+  if (/^(Header Your content here|Title Some text here)$/i.test(normalized)) return '';
+  return normalized.length > 175 ? `${normalized.slice(0, 175).trimEnd()}…` : normalized;
+}
+
 function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: () => void }) {
   const author = item.users;
   const categoryColor = item.categories?.color || '#4f46e5';
@@ -63,22 +86,22 @@ function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: ()
     : `https://ui-avatars.com/api/?name=W&size=56&background=4f46e5&color=fff`
   );
   const verb = item.was_edited ? 'atualizou' : 'publicou';
-  const preview = (item.content || '').replace(/[#*_~`>[\]]/g, '').slice(0, 180).trim();
+  const preview = wikiExcerpt(item.content || '');
 
   return (
-    <article className="social-post">
+    <article className="social-post feed-card feed-wiki-card">
       <div className="social-post-bar" style={{ backgroundColor: '#4f46e5' }} />
-      <div className="p-5 md:p-6">
-        <header className="mb-4 flex items-start gap-4">
+      <div className="feed-card-body">
+        <header className="feed-card-header mb-4 flex items-start gap-4">
           <div className="relative flex-shrink-0">
-            <img src={avatarUrl} alt={author?.name || 'Wiki'} className="h-14 w-14 rounded-full object-cover ring-2 ring-white" />
+            <img src={avatarUrl} alt={author?.name || 'Wiki'} className="feed-avatar rounded-full object-cover" />
             <span className="social-author-type" style={{ color: '#4f46e5' }}>
               <BookOpen size={12} />
             </span>
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-xl font-black text-slate-900">{author?.name || 'Equipe'}</h2>
+              <h2 className="feed-author-name truncate text-slate-900">{author?.name || 'Equipe'}</h2>
               <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-indigo-100 text-indigo-700">Wiki</span>
               {item.categories?.name && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: categoryColor, backgroundColor: `${categoryColor}18` }}>
@@ -86,19 +109,19 @@ function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: ()
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="feed-post-meta mt-0.5 text-sm text-slate-500">
               {verb} um artigo na Wiki
               <span className="mx-1.5">·</span>
               {smartDate(item.updated_at)}
             </p>
           </div>
         </header>
-        <h3 className="mb-2 text-2xl font-black leading-snug text-slate-900">{item.title}</h3>
-        {preview && <p className="text-base leading-7 text-slate-600 line-clamp-3">{preview}…</p>}
+        <h3 className="feed-post-title mb-2 text-slate-900">{item.title}</h3>
+        {preview && <p className="feed-post-content text-slate-600 line-clamp-3">{preview}</p>}
         <div className="mt-4 pt-4 border-t border-slate-100">
           <button
             onClick={onNavigate}
-            className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 h-8 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+            className="feed-wiki-link inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 h-8 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
           >
             <ExternalLink size={12} />
             Ver na Wiki
@@ -118,7 +141,10 @@ const COMPOSE_TYPES = [
 
 const FILTERS = [
   { key: 'all', label: 'Todos', icon: Sparkles },
+  { key: 'message', label: 'Publicações', icon: MessageCircle },
   { key: 'announcement', label: 'Comunicados', icon: Megaphone },
+  { key: 'alert', label: 'Avisos', icon: AlertTriangle },
+  { key: 'update', label: 'Atualizações', icon: TrendingUp },
   { key: 'poll', label: 'Enquetes', icon: Users },
   { key: 'event', label: 'Eventos', icon: Calendar },
   { key: 'wiki_update', label: 'Wiki', icon: BookOpen },
@@ -162,15 +188,17 @@ function reactionSummary(reactions: { reaction: string; user_id?: string; id?: s
 
 function ReactionPicker({ onPick }: { onPick: (key: ReactionKey) => void }) {
   return (
-    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-full shadow-lg px-2 py-1.5 absolute bottom-full left-0 mb-2 z-20">
+    <div className="feed-reaction-options">
       {REACTIONS.map(r => (
         <button
           key={r.key}
+          type="button"
           title={r.label}
           onClick={() => onPick(r.key)}
-          className="text-xl hover:scale-125 transition-transform p-0.5 rounded-full hover:bg-slate-100"
+          className="feed-reaction-option"
         >
-          {r.emoji}
+          <span aria-hidden="true">{r.emoji}</span>
+          <span>{r.label}</span>
         </button>
       ))}
     </div>
@@ -189,47 +217,32 @@ function ReactionBar({
   size?: 'sm' | 'md';
 }) {
   const [showPicker, setShowPicker] = useState(false);
-  const { counts, myReaction, total } = reactionSummary(reactions, currentUserId);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseEnter = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setShowPicker(true);
-  };
-  const handleMouseLeave = () => {
-    timerRef.current = setTimeout(() => setShowPicker(false), 200);
-  };
-
-  const topReactions = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const { myReaction, total } = reactionSummary(reactions, currentUserId);
+  const selectedReaction = REACTIONS.find(reaction => reaction.key === myReaction);
 
   return (
-    <div className="relative" ref={wrapRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-      {showPicker && <ReactionPicker onPick={(key) => { onReact(key); setShowPicker(false); }} />}
+    <div className={cn('feed-reaction-control', size === 'sm' && 'feed-reaction-control-sm', myReaction && 'is-active')}>
       <button
-        onClick={() => { onReact((myReaction as ReactionKey) || 'like'); setShowPicker(false); }}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors select-none',
-          size === 'sm' ? 'h-7' : 'h-8',
-          myReaction
-            ? 'border-orange-200 bg-orange-50 text-orange-700'
-            : 'border-slate-200 text-slate-500 hover:border-orange-200 hover:text-orange-600 bg-white'
-        )}
+        type="button"
+        onClick={() => onReact((myReaction as ReactionKey) || 'like')}
+        className="feed-reaction-main"
+        aria-pressed={!!myReaction}
       >
-        {myReaction
-          ? REACTIONS.find(r => r.key === myReaction)?.emoji || '👍'
-          : <Heart size={size === 'sm' ? 12 : 14} />
-        }
-        {topReactions.length > 0 && (
-          <span className="flex items-center gap-0.5">
-            {topReactions.map(([key]) => (
-              <span key={key}>{REACTIONS.find(r => r.key === key)?.emoji}</span>
-            ))}
-            <span className="ml-0.5">{total}</span>
-          </span>
-        )}
-        {total === 0 && <span>Reagir</span>}
+        {selectedReaction ? <span aria-hidden="true">{selectedReaction.emoji}</span> : <Heart size={size === 'sm' ? 13 : 16} aria-hidden="true" />}
+        <span>{selectedReaction?.label || 'Curtir'}</span>
+        {total > 0 && <span className="feed-reaction-count">{total}</span>}
       </button>
+      <Popover open={showPicker} onOpenChange={setShowPicker}>
+        <PopoverTrigger asChild>
+          <button type="button" className="feed-reaction-trigger" aria-label="Escolher reação" title="Escolher reação">
+            <ChevronDown size={size === 'sm' ? 13 : 15} aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" sideOffset={8} className="feed-reaction-popover">
+          <p>Escolha sua reação</p>
+          <ReactionPicker onPick={key => { onReact(key); setShowPicker(false); }} />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -239,7 +252,7 @@ function MediaDisplay({ imageUrl, videoUrl }: { imageUrl?: string; videoUrl?: st
   if (!imageUrl && !videoUrl) return null;
   return (
     <>
-      <div className="mt-4 rounded-xl overflow-hidden border border-slate-100">
+      <div className="feed-media mt-4 rounded-xl overflow-hidden border border-slate-100">
         {imageUrl && (
           <img
             src={imageUrl}
@@ -283,39 +296,44 @@ function CommentItem({
   const [editMode, setEditMode] = useState(false);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   async function handleReact(reaction: ReactionKey) {
+    setActionError('');
     try {
       const result = await reactToComment(postId, comment.id, reaction);
       if (result.post) onReacted(result.post);
-    } catch {}
+    } catch { setActionError('Não foi possível reagir ao comentário.'); }
   }
 
   async function handleEditSave() {
     if (!editText.trim() || saving) return;
     setSaving(true);
+    setActionError('');
     try {
       const updated = await updateComment(postId, comment.id, editText.trim());
       onCommentUpdated(updated);
       setEditMode(false);
-    } catch {} finally { setSaving(false); }
+    } catch { setActionError('Não foi possível salvar o comentário.'); } finally { setSaving(false); }
   }
 
   async function handleDelete() {
+    setActionError('');
     try {
       await deleteComment(postId, comment.id);
       onCommentDeleted(comment.id, postId);
-    } catch {}
+    } catch { setActionError('Não foi possível apagar o comentário.'); }
   }
 
   return (
-    <div className="flex items-start gap-2.5 group">
+    <div className="feed-comment-item flex items-start gap-2.5 group">
       <img
         src={userAvatar(author?.name, author?.photo_url, 32)}
         alt={author?.name || 'Usuário'}
         className="h-8 w-8 rounded-full object-cover ring-1 ring-white flex-shrink-0 mt-0.5"
       />
       <div className="flex-1 min-w-0">
+        {actionError && <p role="alert" className="feed-action-error">{actionError}</p>}
         {editMode ? (
           <div className="space-y-1.5">
             <input
@@ -332,7 +350,7 @@ function CommentItem({
           </div>
         ) : (
           <>
-            <div className="rounded-2xl bg-slate-50 px-3.5 py-2.5">
+            <div className="feed-comment-bubble rounded-2xl bg-slate-50 px-3.5 py-2.5">
               <p className="text-sm font-bold text-slate-800">{author?.name || 'Usuário'}</p>
               <p className="mt-0.5 text-base text-slate-700 leading-relaxed">{comment.content}</p>
             </div>
@@ -389,60 +407,67 @@ function SocialPost({
   const [editMode, setEditMode] = useState(false);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const commentInputRef = useRef<HTMLInputElement>(null);
   const pollVotes: { user_id: string; option_index: number }[] = ((post as unknown) as Record<string, { user_id: string; option_index: number }[]>).poll_votes || [];
   const myVoteInit = pollVotes.find(v => v.user_id === currentUserId)?.option_index ?? null;
   const [votedOption, setVotedOption] = useState<number | null>(myVoteInit);
   let pollData: { question: string; options: string[] } | null = null;
-  if (post.type === 'poll') { try { pollData = JSON.parse(post.content) as { question: string; options: string[] }; } catch {} }
+  if (post.type === 'poll') { try { pollData = JSON.parse(post.content) as { question: string; options: string[] }; } catch { pollData = null; } }
 
   async function handlePostReact(reaction: ReactionKey) {
+    setActionError('');
     try {
       const result = await reactToPost(post.id, reaction);
       if (result.post) onReacted(result.post);
-    } catch {}
+    } catch { setActionError('Não foi possível registrar sua reação.'); }
   }
 
   async function handlePostEditSave() {
     if (!editText.trim() || saving) return;
     setSaving(true);
+    setActionError('');
     try {
       const updated = await updatePost(post.id, editText.trim());
       onPostUpdated(updated);
       setEditMode(false);
-    } catch {} finally { setSaving(false); }
+    } catch { setActionError('Não foi possível salvar a publicação.'); } finally { setSaving(false); }
   }
 
   async function handleVote(optionIndex: number) {
     if (votedOption === optionIndex) return;
+    setActionError('');
     try {
       const updated = await voteOnPoll(post.id, optionIndex);
       setVotedOption(optionIndex);
       if (updated) onReacted(updated);
-    } catch {}
+    } catch { setActionError('Não foi possível registrar seu voto.'); }
   }
 
   async function handlePostDelete() {
+    setActionError('');
     try {
       await deletePost(post.id);
       onPostDeleted(post.id);
-    } catch {}
+    } catch { setActionError('Não foi possível apagar a publicação.'); }
   }
 
   function handleCommentUpdated(updated: Post) { onPostUpdated(updated); }
-  function handleCommentDeleted(_commentId: string, _postId: string) {
-    onPostUpdated({ ...post, comments: (post.comments || []).filter(c => c.id !== _commentId) });
+  function handleCommentDeleted(commentId: string) {
+    onPostUpdated({ ...post, comments: (post.comments || []).filter(c => c.id !== commentId) });
   }
 
   return (
-    <article className="social-post">
+    <article className="social-post feed-card">
       <div className="social-post-bar" style={{ backgroundColor: config.bar }} />
-      <div className="p-5 md:p-6">
-        <header className="mb-4 flex items-start gap-4">
+      <div className="feed-card-body">
+        {actionError && <p role="alert" className="feed-action-error">{actionError}</p>}
+        <header className="feed-card-header mb-4 flex items-start gap-4">
           <div className="relative flex-shrink-0">
             <img
               src={userAvatar(author?.name, author?.photo_url, 56)}
               alt={author?.name || 'Rede Nex'}
-              className="h-14 w-14 rounded-full object-cover ring-2 ring-white"
+              className="feed-avatar rounded-full object-cover"
             />
             <span className="social-author-type" style={{ color: config.bar }}>
               <TypeIcon size={12} />
@@ -450,12 +475,12 @@ function SocialPost({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-xl font-black text-slate-900">{author?.name || 'Rede Nex'}</h2>
+              <h2 className="feed-author-name truncate text-slate-900">{author?.name || 'Rede Nex'}</h2>
               <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-bold', config.badgeClass)}>
                 {config.label}
               </span>
             </div>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="feed-post-meta mt-0.5 text-sm text-slate-500">
               {[author?.position, (author as { departments?: { name: string } } | undefined)?.departments?.name].filter(Boolean).join(' · ') || 'Rede Nex'}
               <span className="mx-1.5">·</span>
               {smartDate(post.created_at)}
@@ -463,17 +488,18 @@ function SocialPost({
           </div>
           {isOwner && (
             <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={() => { setEditText(post.content); setEditMode(v => !v); }} className={cn('h-8 w-8 flex items-center justify-center rounded-lg transition-colors', editMode ? 'bg-orange-50 text-orange-600' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600')} title="Editar">
+              <button onClick={() => { setEditText(post.content); setEditMode(v => !v); }} className={cn('feed-icon-button h-8 w-8 flex items-center justify-center rounded-lg transition-colors', editMode ? 'bg-orange-50 text-orange-600' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600')} title="Editar" aria-label="Editar publicação">
                 <Pencil size={14} />
               </button>
-              <button onClick={handlePostDelete} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Apagar publicação">
+              <button onClick={handlePostDelete} className="feed-icon-button h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Apagar publicação" aria-label="Apagar publicação">
                 <Trash2 size={14} />
               </button>
             </div>
           )}
         </header>
 
-        {post.title && <h3 className="mb-2 text-2xl font-black leading-snug text-slate-900">{post.title}</h3>}
+        {post.pinned && <span className="feed-pinned-label">Fixada</span>}
+        {post.title && <h3 className="feed-post-title mb-2 text-slate-900">{post.title}</h3>}
         {editMode ? (
           <div className="space-y-2 mb-2">
             <textarea
@@ -514,24 +540,24 @@ function SocialPost({
             <p className="text-xs text-slate-400">{pollVotes.length} {pollVotes.length === 1 ? 'voto' : 'votos'}{votedOption === null ? ' · clique para votar' : ''}</p>
           </div>
         ) : (
-          <p className="whitespace-pre-wrap text-xl leading-8 text-slate-700">{post.content}</p>
+          <p className="feed-post-content whitespace-pre-wrap text-slate-700">{post.content}</p>
         )}
 
         <MediaDisplay imageUrl={post.image_url} videoUrl={post.video_url} />
 
-        <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-4">
+        <div className="feed-engagement mt-4 flex items-center gap-3 border-t border-slate-100 pt-4">
           <ReactionBar
             reactions={likes}
             currentUserId={currentUserId}
             onReact={handlePostReact}
           />
-          <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-500 bg-white">
+          <button type="button" onClick={() => commentInputRef.current?.focus()} className="feed-comment-action inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-500 bg-white">
             <MessageCircle size={13} />
             {comments.length} {comments.length === 1 ? 'comentário' : 'comentários'}
-          </span>
+          </button>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="feed-comments mt-4 space-y-3">
           {comments.length > 3 && !showAllComments && (
             <button
               onClick={() => setShowAllComments(true)}
@@ -568,6 +594,7 @@ function SocialPost({
             />
             <div className="flex-1 flex items-center gap-1.5 bg-slate-50 rounded-full border border-slate-200 px-3 focus-within:border-orange-400 transition-colors">
               <input
+                ref={commentInputRef}
                 value={commentDraft}
                 onChange={event => onCommentChange(event.target.value)}
                 onKeyDown={event => {
@@ -577,11 +604,14 @@ function SocialPost({
                   }
                 }}
                 placeholder="Escreva um comentário..."
+                aria-label="Escreva um comentário"
                 className="h-9 flex-1 bg-transparent text-sm outline-none text-slate-700 placeholder:text-slate-400"
               />
               <button
+                type="button"
                 onClick={onComment}
                 disabled={!commentDraft.trim()}
+                aria-label="Enviar comentário"
                 className="text-orange-500 hover:text-orange-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-1"
               >
                 <Send size={14} />
@@ -618,8 +648,10 @@ export function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [wikiActivity, setWikiActivity] = useState<WikiFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [composeText, setComposeText] = useState('');
   const [composeType, setComposeType] = useState<Post['type']>('message');
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -634,6 +666,7 @@ export function Feed() {
 
   async function loadAll() {
     setLoading(true);
+    setLoadError('');
     try {
       const [feedPosts, wiki, gamif, ranking] = await Promise.all([
         getFeedPosts(),
@@ -645,6 +678,8 @@ export function Feed() {
       setWikiActivity(wiki);
       setGamification(gamif);
       if (ranking) setMyRankPosition(ranking.my_position);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar o feed.');
     } finally {
       setLoading(false);
     }
@@ -717,94 +752,41 @@ export function Feed() {
 
   const filtered = useMemo<FeedEntry[]>(() => {
     const entries: FeedEntry[] = [];
+    const query = search.trim().toLocaleLowerCase('pt-BR');
 
     if (filter !== 'wiki_update') {
       posts
-        .filter(post => filter === 'all' || post.type === filter)
+        .filter(post => (filter === 'all' || post.type === filter) && (!query || [post.title, post.content, post.users?.name].some(value => value?.toLocaleLowerCase('pt-BR').includes(query))))
         .forEach(post => entries.push({ _kind: 'post', _date: post.created_at, post }));
     }
 
     if (filter === 'all' || filter === 'wiki_update') {
-      wikiActivity.forEach(item => entries.push({ _kind: 'wiki', _date: item.updated_at, item }));
+      wikiActivity
+        .filter(item => !query || [item.title, wikiPlainText(item.content || ''), item.users?.name, item.categories?.name].some(value => value?.toLocaleLowerCase('pt-BR').includes(query)))
+        .forEach(item => entries.push({ _kind: 'wiki', _date: item.updated_at, item }));
     }
 
     return entries.sort((a, b) => new Date(b._date).getTime() - new Date(a._date).getTime());
-  }, [filter, posts, wikiActivity]);
+  }, [filter, posts, search, wikiActivity]);
 
-  const stats = {
-    posts: posts.length,
-    wiki: wikiActivity.length,
-    authors: new Set(posts.map(p => p.author_id).filter(Boolean)).size,
-    pinned: posts.filter(p => p.pinned).length,
-  };
+  const updateCount = posts.length + wikiActivity.length;
 
   const myAvatar = userAvatar(user?.name, user?.photo_url, 44);
 
   return (
-    <div className="social-feed-shell">
-      <aside className="social-left-panel">
-        <div className="social-profile-card">
-          <div className="social-profile-cover relative overflow-hidden">
-            {user?.cover_url && (
-              <img src={user.cover_url} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
-            )}
-          </div>
-          <div className="px-4 pb-4">
-            <img src={myAvatar} alt={user?.name || 'Usuário'} className="-mt-6 h-12 w-12 rounded-full object-cover ring-4 ring-white relative z-10" />
-            <h2 className="mt-2 text-sm font-black text-slate-900">{user?.name || 'Usuário'}</h2>
-            <p className="text-xs text-slate-500">{user?.position || user?.role_name || 'Colaborador'}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-              <Building2 size={13} />
-              {user?.departments?.name || user?.department_name || 'Rede Nex'}
-            </p>
-            {gamification && (
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold" style={{ color: gamification.rank.color }}>
-                    {gamification.rank.emoji} {gamification.rank.name}
-                  </span>
-                  {myRankPosition != null && (
-                    <span className="font-semibold text-slate-400">#{myRankPosition} Ranking</span>
-                  )}
-                </div>
-                <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${gamification.progress_pct}%`,
-                      background: `linear-gradient(90deg, ${gamification.rank.color}, ${gamification.next_rank?.color ?? gamification.rank.color})`,
-                    }}
-                  />
-                </div>
-                {gamification.next_rank && (
-                  <p className="text-[10px] text-slate-400">{gamification.xp_to_next.toLocaleString()} XP para {gamification.next_rank.name}</p>
-                )}
-              </div>
-            )}
-          </div>
+    <div className="feed-page">
+      <header className="feed-heading">
+        <div>
+          <p className="feed-eyebrow">Comunidade NEX</p>
+          <h1>Feed</h1>
+          <p>Novidades, conversas e ideias da nossa equipe.</p>
         </div>
-      </aside>
-
-      <main className="min-w-0 space-y-5">
-        <section className="social-hero">
-          <div>
-            <h1 className="flex items-center gap-3">
-              <img src="/assets/images/logo_nex.png" alt="Rede Nex" className="h-10 w-10 object-contain drop-shadow-md rounded-lg" />
-              Rede Nex
-            </h1>
-            <p>Comunicados, avisos e atualizações reais da operação.</p>
-          </div>
-          <div className="social-hero-metrics">
-            <span><strong>{stats.posts}</strong> Publicações</span>
-            <span><strong>{stats.wiki}</strong> Atualizações Wiki</span>
-            <span><strong>{stats.pinned}</strong> Fixadas</span>
-          </div>
-        </section>
-
-
-
+        <span className="feed-heading-count">{updateCount} atualizações</span>
+      </header>
+      <div className="feed-layout">
+      <main className="feed-main min-w-0 space-y-5">
         <StoriesBar />
-        <form onSubmit={submitPost} className="social-composer">
+        <form onSubmit={submitPost} className="social-composer feed-composer">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <img src={myAvatar} alt={user?.name || 'Usuário'} className="h-11 w-11 rounded-full object-cover" />
@@ -814,7 +796,7 @@ export function Feed() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="feed-compose-types flex flex-wrap items-center gap-2">
               {COMPOSE_TYPES.map(type => (
                 <button
                   key={type.key}
@@ -882,7 +864,7 @@ export function Feed() {
               </div>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="feed-compose-footer flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} />
                 <button
@@ -918,9 +900,44 @@ export function Feed() {
           </div>
         </form>
 
-        <div className="space-y-5">
+        <section className="feed-list-heading" id="feed-activity" aria-label="Filtrar publicações">
+          <div className="feed-list-title">
+            <div>
+              <p className="feed-eyebrow">Acompanhe</p>
+              <h2>Publicações</h2>
+            </div>
+            <span>{filtered.length} {filtered.length === 1 ? 'item' : 'itens'}</span>
+          </div>
+          <label className="feed-search">
+            <Search size={17} aria-hidden="true" />
+            <span className="sr-only">Pesquisar no feed</span>
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pesquisar publicações, pessoas e artigos" type="search" />
+          </label>
+          <div className="feed-filters">
+            {FILTERS.map(item => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setFilter(item.key)}
+                aria-pressed={filter === item.key}
+                className={cn('feed-filter', filter === item.key && 'is-active')}
+              >
+                <item.icon size={15} aria-hidden="true" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="feed-post-list space-y-5">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />)
+          ) : loadError ? (
+            <div className="feed-load-error" role="alert">
+              <AlertTriangle size={24} aria-hidden="true" />
+              <p>Não foi possível carregar as publicações.</p>
+              <button type="button" onClick={loadAll}>Tentar novamente</button>
+            </div>
           ) : filtered.length > 0 ? (
             filtered.map(entry =>
               entry._kind === 'wiki' ? (
@@ -948,35 +965,45 @@ export function Feed() {
             <div className="social-empty-state">
               <Newspaper size={44} />
               <h3>Nenhuma publicação encontrada</h3>
-              <p>Quando uma publicação for criada, ela aparecerá aqui.</p>
+              <p>{search ? 'Tente outra busca ou escolha uma categoria diferente.' : 'Quando uma publicação for criada, ela aparecerá aqui.'}</p>
+              {(search || filter !== 'all') && <button type="button" className="feed-reset-button" onClick={() => { setSearch(''); setFilter('all'); }}>Limpar filtros</button>}
             </div>
           )}
         </div>
       </main>
 
-      <aside className="social-right-panel">
-        <section className="social-panel">
-          <div className="mb-4 flex items-center gap-2">
-            <Bell size={16} className="text-orange-500" />
-            <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">Resumo</h2>
+      <aside className="feed-sidebar" aria-label="Resumo da comunidade">
+        <section className="feed-side-card feed-profile-card">
+          <div className="feed-profile-cover">
+            {user?.cover_url && <img src={user.cover_url} alt="" />}
+            <button type="button" className="feed-profile-cover-action" onClick={() => navigate('/perfil')}>
+              <ImageIcon size={13} aria-hidden="true" /> Alterar capa
+            </button>
           </div>
-          <div className="space-y-2">
-            {Object.entries(TYPE_CONFIG).filter(([key]) => !['alert', 'update'].includes(key)).map(([key, config]) => (
-              <button
-                key={key}
-                onClick={() => setFilter(filter === key ? 'all' : key)}
-                className={cn('social-type-row', filter === key && 'social-type-row-active')}
-              >
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: config.bar }} />
-                <config.icon size={14} style={{ color: config.bar }} />
-                <span>{config.label}</span>
-                <span className="ml-auto text-xs text-slate-500">{posts.filter(p => p.type === key).length}</span>
-              </button>
-            ))}
+          <div className="feed-profile-content">
+            <div className="feed-profile-top">
+              <img src={myAvatar} alt={user?.name || 'Usuário'} className="feed-profile-avatar" />
+              <div>
+                <p className="feed-side-eyebrow">Seu espaço</p>
+                <h2>{user?.name || 'Usuário'}</h2>
+                <p>{user?.position || user?.role_name || 'Colaborador'}</p>
+              </div>
+            </div>
+            <p className="feed-profile-department"><Building2 size={14} aria-hidden="true" /> {user?.departments?.name || user?.department_name || 'Rede Nex'}</p>
+            {gamification && (
+              <div className="feed-rank">
+                <div className="feed-rank-label">
+                  <span style={{ color: gamification.rank.color }}>{gamification.rank.emoji} {gamification.rank.name}</span>
+                  {myRankPosition != null && <span>#{myRankPosition} no ranking</span>}
+                </div>
+                <div className="feed-rank-track"><div style={{ width: `${gamification.progress_pct}%`, backgroundColor: gamification.rank.color }} /></div>
+                {gamification.next_rank && <p>{gamification.xp_to_next.toLocaleString()} XP para {gamification.next_rank.name}</p>}
+              </div>
+            )}
           </div>
         </section>
-
       </aside>
+      </div>
     </div>
   );
 }

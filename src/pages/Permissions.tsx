@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Shield, Check, X, Info, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Card } from '../components/ui/card';
+import { HrPermissionsPanel } from '../components/HrPermissionsPanel';
 
 const ROLES = [
   { name: 'Administrador', description: 'Controle total do sistema', color: 'bg-red-100 text-red-700' },
@@ -115,15 +116,17 @@ export function Permissions() {
 
   return (
     <div className="space-y-6">
+      <HrPermissionsPanel />
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Configurações legadas abaixo: armazenadas apenas neste navegador. Elas não concedem acesso ao RH; use o painel acima.</div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Permissões (RBAC)</h1>
+          <h1 className="text-xl font-bold text-slate-800">Preferências legadas de perfis</h1>
           <p className="text-sm text-slate-500 mt-0.5">Controle de acesso baseado em perfis</p>
         </div>
         {saved && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs font-medium">
             <CheckCircle2 size={13} />
-            Permissões salvas
+            Preferências salvas neste navegador
           </div>
         )}
       </div>

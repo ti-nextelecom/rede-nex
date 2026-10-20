@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Activity, AlertCircle, AlertTriangle, BarChart3, CheckCircle2, ChevronDown,
+  Activity, AlertCircle, AlertTriangle, BarChart3, CheckCircle2,
   Circle, Clock, Edit2, FolderKanban, GripVertical, Layers, LayoutGrid,
   List, Loader2, Plus, RefreshCw, Trash2, X, Zap,
 } from 'lucide-react';
@@ -392,7 +392,7 @@ export function PainelTIPage() {
                 const hex = COLOR_HEX[p.color] || '#3b82f6';
                 return (
                   <div key={p.id} className="rounded-xl p-4 border-t-2 transition-all hover:-translate-y-0.5"
-                    style={{ borderTopColor: hex, background: 'hsl(var(--background))', border: `1px solid hsl(var(--border))`, borderTopWidth: '3px', borderTopColor: hex }}>
+                    style={{ background: 'hsl(var(--background))', border: `1px solid hsl(var(--border))`, borderTopWidth: '3px', borderTopColor: hex }}>
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate" style={{ color: 'hsl(var(--foreground))' }}>{p.name}</p>
@@ -574,11 +574,11 @@ export function PainelTIPage() {
                     <div className="flex items-center justify-between px-3 py-2.5" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
                       <span className="text-xs font-semibold" style={{ color: col.accent }}>{col.label}</span>
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${col.accent}20`, color: col.accent }}>
-                        {tasks.filter(t => t.status === col.status).length}
+                        {filteredTasks.filter(t => t.status === col.status).length}
                       </span>
                     </div>
                     <div className="p-2 space-y-2 min-h-[120px]">
-                      {tasks.filter(t => t.status === col.status).map(t => (
+                      {filteredTasks.filter(t => t.status === col.status).map(t => (
                         <div
                           key={t.id}
                           draggable

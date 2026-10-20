@@ -8,11 +8,16 @@ import './env.js';
 import { sendPasswordResetEmail } from './email.js';
 import { getOrgChart } from './orgchart.repository.js';
 import { searchKnowledge } from './copiloto.js';
+import { buildCopilotoSystem, loadCopilotoContext, operationalBriefing, safeCopilotoHistory } from './copilotoContext.js';
+import { notifyTaskActivity, notifyProjectActivity } from './workNotifications.js';
 import { pool } from './db.js';
+import { createHrRouter } from './hr.js';
+import { jrhUploadsDir, downloadsDir } from './runtimePaths.js';
+import { releaseId } from './release.js';
 import { changePassword, createPasswordResetToken, getUserByToken, heartbeat, listOnlineUsers, login, logout, resetPasswordByToken, updateMyProfile } from './auth.repository.js';
 import { fetchBitrixUsers } from './bitrix.client.js';
 import { importBitrixUsers, listBitrixImports, listBitrixUsers } from './bitrix.repository.js';
-import { getMediaContent, saveChatAvatar, saveChatMedia, saveUserAvatar, saveUserCover, saveWikiMedia } from './media.repository.js';
+import { getMediaContent, getMediaByPath, saveChatAvatar, saveChatMedia, saveUserAvatar, saveUserCover, saveWikiMedia, saveProjectCover } from './media.repository.js';
 import {
   addParticipants, createConversation, deleteMessage, editMessage, getMessageEditHistory,
   getNotes, listConversations, listGroupParticipants,
@@ -106,17 +111,30 @@ import {
   listAnexos, saveAnexo, deleteAnexo, streamAnexo,
   getFatura, deleteSetor} from './pc.repository.js';
 import { listProjects, createProject, updateProject, deleteProject, listSteps, createStep, updateStep, deleteStep, addStepAssignee, removeStepAssignee, listStepHistory, addStepHistory, listComments, createComment, updateComment, deleteComment, listAttachments, createAttachment, deleteAttachment, getAttachmentForDownload, listRequests, createRequest } from './projects.repository.js';
-import { listJRHPosts, createJRHPost, recordJRHPostView, listJRHPostViews, toggleJRHReaction, createJRHComment, checkIsHR, getMonthBirthdays, autoPublishTodayBirthdays, updateJRHPost, deleteJRHPost } from './jrh.repository.js';
+import {
+  listJRHPosts,
+  createJRHPost,
+  recordJRHPostView,
+  listJRHPostViews,
+  toggleJRHReaction,
+  createJRHComment,
+  checkIsHR,
+  getMonthBirthdays,
+  autoPublishTodayBirthdays,
+  updateJRHPost,
+  deleteJRHPost
+} from './jrh.repository.js';
 import { listStories, createStory, recordStoryView, listStoryViewers } from './stories.repository.js';
-import { initTiTables, listTiProjects, createTiProject, updateTiProject, deleteTiProject, listTiTasks, createTiTask, updateTiTask, deleteTiTask, getTiTaskHistory, getTiSummary, seedTiData } from './ti.repository.js';
+import { listTiProjects, createTiProject, updateTiProject, deleteTiProject, listTiTasks, createTiTask, updateTiTask, deleteTiTask, getTiTaskHistory, getTiSummary } from './ti.repository.js';
+import { listDemands, getDemand, createDemand, updateDemand, deleteDemand, listDemandComments, addDemandComment, listDemandFiles, addDemandFile, deleteDemandFileById, implUploadsDir } from './implementation.repository.js';
 
 const port = Number(process.env.PORT || 3333);
-initTiTables().then(() => seedTiData()).catch(e => console.error('[TI] Init error:', e.message));
-const UPLOADS_JRH_DIR = '/opt/rede-nex/deploy_v2/uploads/jrh';
+// DDL runs explicitly via db:migrate. Never seed example projects at startup.
+const UPLOADS_JRH_DIR = jrhUploadsDir;
 let lastBirthdayCheckDate = ''; // run autoPublish once per day
 mkdirSync(UPLOADS_JRH_DIR, { recursive: true });
 const ALLOWED_UPLOAD_MIME = new Set(['image/jpeg','image/jpg','image/png','image/gif','image/webp','video/mp4','video/webm','video/quicktime']);
-const MAX_JSON_BYTES = Number(process.env.MAX_JSON_BYTES || 25 * 1024 * 1024);
+const MAX_JSON_BYTES = Number(process.env.MAX_JSON_BYTES || 32 * 1024 * 1024);
 const allowedOrigins = new Set((process.env.CORS_ORIGINS || 'http://127.0.0.1:5173,http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean));
 
 function getRealIP(req) {
@@ -297,6 +315,8 @@ function validateRequired(payload, fields) {
   return missing.length ? `Campos obrigatorios: ${missing.join(', ')}` : null;
 }
 
+const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
+
 async function route(req, res) {
   if (req.method === 'OPTIONS') return sendEmpty(req, res);
 
@@ -312,9 +332,10 @@ async function route(req, res) {
   }
 
   try {
+    if (await handleHrRoutes(req, res, path)) return;
     if (req.method === 'GET' && path === '/api/health') {
       await pool.query('select 1');
-      return sendJson(req, res, 200, { status: 'ok', service: 'rede-nex-api' });
+      return sendJson(req, res, 200, { status: 'ok', service: 'rede-nex-api', release: releaseId });
     }
 
     if (req.method === 'GET' && path === '/api/auth/check') {
@@ -331,7 +352,7 @@ async function route(req, res) {
       const { join: pjoin } = await import('node:path');
       const fileName = decodeURIComponent(path.replace('/api/downloads/', ''));
       if (!/^[\w .%-]+\.(zip|yml|exe)$/i.test(fileName)) return sendError(req, res, 404, 'NOT_FOUND', 'Not found');
-      const filePath = pjoin('/opt/rede-nex/downloads', fileName);
+      const filePath = pjoin(downloadsDir, fileName);
       try {
         const stats = await stat(filePath);
         res.writeHead(200, {
@@ -822,7 +843,9 @@ async function route(req, res) {
           const payload = await readJson(req);
           const error = validateRequired(payload, ['title']);
           if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
-          return sendJson(req, res, 201, { data: await createTask(user.id, payload) });
+          const task = await createTask(user.id, payload);
+          await notifyTaskActivity(task, user, 'Você foi envolvido em uma tarefa', notifyUsers).catch(error => console.error('[Task notification]', error.message));
+          return sendJson(req, res, 201, { data: task });
         }
       }
 
@@ -846,6 +869,7 @@ async function route(req, res) {
           if (!isOwner && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao para editar esta tarefa');
           const taskPayload = await readJson(req);
           const task = await updateTask(taskId, taskPayload);
+          if (task) await notifyTaskActivity(task, user, task.status === 'done' && existing.status !== 'done' ? 'Tarefa concluída' : 'Atualização em uma tarefa sua', notifyUsers).catch(error => console.error('[Task notification]', error.message));
           let xpTask = null;
           if (task && taskPayload.status === 'done' && existing.status !== 'done') {
             xpTask = await awardXP(user.id, 'complete_task', taskId).catch(() => null);
@@ -864,10 +888,15 @@ async function route(req, res) {
       }
 
       if (segments[3] === 'comments' && req.method === 'POST') {
+        const existing = await getTask(taskId);
+        if (!existing) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+        const related = existing.created_by === user.id || existing.owner_id === user.id || existing.assignees?.some(person => person.id === user.id);
+        if (!related && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
         const payload = await readJson(req);
         const error = validateRequired(payload, ['content']);
         if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
         const task = await addTaskComment(taskId, user.id, payload.content);
+        await notifyTaskActivity(existing, user, 'Novo comentário em uma tarefa sua', notifyUsers).catch(error => console.error('[Task notification]', error.message));
         return sendJson(req, res, 201, { data: task });
       }
 
@@ -1030,7 +1059,6 @@ async function route(req, res) {
       const user = await requireUser(req, res);
       if (!user) return;
       const trainingId = segments[2];
-      await pool.query('CREATE TABLE IF NOT EXISTS training_progress (user_id text NOT NULL, training_id text NOT NULL, progress_pct int NOT NULL DEFAULT 0, completed_at timestamptz, PRIMARY KEY (user_id, training_id))');
       if (req.method === 'GET') {
         const pr = await pool.query('SELECT progress_pct, completed_at FROM training_progress WHERE user_id=$1 AND training_id=$2', [user.id, trainingId]);
         return sendJson(req, res, 200, { data: pr.rows[0] || { progress_pct: 0, completed_at: null } });
@@ -1671,9 +1699,20 @@ async function route(req, res) {
     // Copiloto IA
     if (path === '/api/copiloto' && req.method === 'POST') {
       const user = await requireUser(req, res); if (!user) return;
-      const { message = '', history = [] } = await readJson(req);
+      const body = await readJson(req);
+      const message = typeof body.message === 'string' ? body.message.trim().slice(0, 8000) : '';
+      if (!message) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Mensagem obrigatória');
+      const history = safeCopilotoHistory(body.history);
 
       const firstName = user.name ? user.name.trim().split(' ')[0] : (user.email ? user.email.split('@')[0] : 'você');
+
+      // The personal briefing stays INSIDE Rede NEX; never call OpenRouter with
+      // task/project context until explicit data-sharing approval is obtained.
+      if (body.intent === 'daily-briefing' || /briefing|minhas pendências|meu dia/i.test(message)) {
+        const briefing = await loadCopilotoContext(user, { listTasks, listProjects, listSteps });
+        return sendJson(req, res, 200, { reply: operationalBriefing(briefing, firstName), source: 'rules', internalOnly: true });
+      }
+      const systemPrompt = await buildCopilotoSystem(user);
 
       const openRouterKey = process.env.OPENROUTER_API_KEY;
       if (openRouterKey) {
@@ -1689,120 +1728,7 @@ async function route(req, res) {
             body: JSON.stringify({
               model: 'google/gemini-2.5-flash',
               messages: [
-                { role: 'system', content: `Você é o Copiloto da Rede Nex, assistente pessoal de ${firstName} na plataforma interna da NexTelecom. Responda sempre em português brasileiro, de forma clara, direta e amigável. Use markdown para formatar respostas longas.
-
-## NAVEGAÇÃO DA PLATAFORMA
-O menu lateral (sidebar) contém todos os módulos. No mobile, a navegação fica na barra inferior.
-
-### MÓDULOS E CAMINHOS
-- **Dashboard** (/) — visão geral com estatísticas, posts recentes e resumo de atividades
-- **Feed** (/feed) — mural de publicações: clique no campo de texto → escolha tipo (Publicação, Comunicado, Alerta, Atualização, Evento, Enquete) → escreva e publique. Para editar/excluir: clique nos 3 pontos no post. Para reagir: botão curtir. Para comentar: clique em "Comentar".
-- **Bate-papo** (/bate-papo) — chat em tempo real. À esquerda: lista de conversas. Botão "+" = nova conversa (individual ou grupo). Para criar grupo: "+" → "Novo grupo" → adicionar participantes → confirmar. Use @ para mencionar. Para silenciar: clique nos 3 pontos da conversa → Silenciar.
-- **Tarefas** (/tarefas) — gerenciador de tarefas. Botão "Nova Tarefa" → preencher título, descrição, prazo, prioridade, responsáveis. Aba "Checklists" = sublistas de itens. Aba "Minhas Listas" = listas personalizadas (criar via botão "+"). Filtros por status, prioridade e responsável disponíveis.
-- **Wiki** (/wiki) — base de conhecimento. Menu esquerdo = categorias. Botão "Novo Artigo" → escolher categoria → preencher título e conteúdo (suporta Markdown). Para editar artigo existente: abrir artigo → botão "Editar". Busca no topo da página.
-- **Calendário** (/calendario) — agenda. Vista mensal/semanal no canto superior direito. Para criar evento: clicar em um dia ou botão "Novo Evento" → preencher título, data, hora, descrição. Integração Google Calendar: Perfil → Config → cole o link iCal público do Google Calendar.
-- **Treinamentos** (/treinamentos) — capacitação. Cards de cursos com filtros por categoria e nível. Clique em um card → "Iniciar Treinamento" → vídeo/material reproduzido inline. Progresso salvo automaticamente. XP concedido ao concluir.
-- **Drive** (/drive) — repositório de arquivos. Botão "Upload" = enviar arquivo. Botão "Nova Pasta" = criar pasta. Para baixar: clique no arquivo → botão download. Para deletar: ícone de lixeira.
-- **Formulários** (/formularios) — criação e preenchimento de formulários internos. Admins podem criar; todos podem preencher.
-- **Assinatura Digital** (/assinatura) — fluxo de assinatura de documentos. Upload do documento → adicionar signatários → enviar para assinatura.
-- **Organograma** (/organograma) — estrutura hierárquica da empresa. Visualização interativa dos departamentos e líderes.
-- **Notas** (/notas) — bloco de notas pessoal. Salvo localmente no dispositivo (não sincronizado). Criar nota: botão "+".
-- **Ranking** (/ranking) — classificação de colaboradores por XP. Atualizado em tempo real.
-- **Analytics** (/analytics) — relatórios e métricas da plataforma (disponível para admins/gestores).
-- **Colaboradores** (/colaboradores) — lista de todos os usuários. Clique em um nome = ver perfil completo.
-- **Ajuda** (/ajuda) — central de suporte TI. Abre chamado diretamente na fila do HubSoft.
-- **Copiloto** (/copiloto) — esta página (versão completa do assistente IA).
-- **Perfil** (/perfil) — dados pessoais: foto, capa, bio, cargo, departamento, responsabilidades. Aba "Segurança" = alterar senha. Aba "Config" = Google Calendar iCal, preferências.
-
-### FUNCIONALIDADES ESPECIAIS
-- **Gamificação**: XP ganho ao criar posts, comentar, completar tarefas, contribuir na Wiki, participar de treinamentos. Ver missões e badges no Perfil.
-- **Notificações**: sino no topo → lista de notificações. Clique = ir para o item. "Marcar todas como lidas" disponível.
-- **Dark mode**: botão lua/sol no topo da navbar.
-- **Busca global**: lupa no topo → busca em toda a plataforma.
-- **Menções**: use @ seguido do nome em qualquer campo de texto (chat, comentários, tarefas).
-- **Chamados TI**: menu Ajuda → descreva o problema → abre automaticamente no HubSoft.
-
-### PERMISSÕES
-- Administrador/Gestor: acesso total, incluindo criar/editar/excluir conteúdo de outros, gerenciar usuários, ver Analytics e Logs.
-- Usuário padrão: criar/editar/excluir apenas o próprio conteúdo.
-
-Seja conciso e direto. Se o usuário perguntar sobre algo que não existe na plataforma, informe claramente. Não invente funcionalidades.
-
-## PERFIL DO USUÁRIO
-Você está conversando com **${firstName}** (${user.name || firstName}). Regras de personalização:
-- Chame-o sempre pelo primeiro nome (${firstName}) ao cumprimentar ou personalizar respostas — não em cada frase
-- Observe o estilo de escrita e vocabulário das mensagens: se técnico, responda com termos técnicos; se simples, seja didático e use analogias
-- Ajuste o tamanho das respostas ao comportamento do usuário: respostas longas se ele faz perguntas elaboradas, curtas e diretas se é objetivo
-- Se o histórico mostrar preferência por listas/bullet points, priorize esse formato
-- O objetivo é que cada usuário sinta que o copilot foi feito especificamente para ele
-
-## SERVIÇOS E TECNOLOGIA NEXELECOM
-Você também é especialista nos serviços de telecomunicações da NexTelecom e pode responder dúvidas técnicas e comerciais sobre conectividade.
-
-### FIBRA ÓPTICA E FTTH
-A NexTelecom opera redes FTTH (Fiber To The Home). Caminho do sinal: OLT → fibra → splitter/CTO → cabo drop → ONT/ONU → roteador → dispositivos.
-- OLT: equipamento da NexTelecom que concentra e entrega o serviço óptico
-- CTO: caixa de distribuição óptica no poste/calçada
-- Splitter: divisor passivo — distribui o sinal para vários clientes (não aumenta velocidade)
-- ONT/ONU: equipamento na casa/empresa que converte sinal óptico para Ethernet e Wi-Fi
-- ONT: possui Wi-Fi integrado | ONU: sem Wi-Fi, requer roteador externo
-
-### INTERNET: DOWNLOAD E UPLOAD
-- Download: dados que chegam — streaming, abrir sites, receber arquivos
-- Upload: dados que saem — videochamadas, backup em nuvem, câmeras, envio de arquivos
-- 1 Gbps = 1000 Mbps (notação decimal de rede)
-- Internet lenta: teste por cabo (Ethernet direto na ONT) para separar link do Wi-Fi
-
-### WI-FI
-- Internet ≠ Wi-Fi: o link pode estar ok e o Wi-Fi estar ruim
-- 2,4 GHz: maior alcance, atravessa obstáculos, mais interferência — bom para distâncias maiores
-- 5 GHz: mais canais, maior capacidade próximo ao roteador, menor alcance através de paredes
-- Causas de Wi-Fi ruim: paredes/lajes, roteador em local inadequado, interferência de redes vizinhas, distância excessiva
-- RSSI: -30 a -50 = ótimo | -51 a -67 = bom | -68 a -75 = atenção | abaixo de -75 = fraco
-
-### PLANOS E TIPOS DE LINK
-- Banda Larga: uso residencial e negócios comuns, boa relação custo-benefício
-- Link Semidedicado: empresas com necessidade de previsibilidade
-- Link Dedicado: operação crítica — sistemas, VPN, servidores publicados, filiais. Requer levantamento técnico
-- Pergunta chave: o que acontece com o negócio quando a internet para?
-
-### EQUIPAMENTOS
-- Roteador: distribui Wi-Fi e executa DHCP/NAT/firewall — não cria internet, apenas distribui o recebido da ONT/ONU
-- Repetidor: retransmite Wi-Fi existente — instalar onde ainda há sinal. Não aumenta velocidade
-- Rede Mesh: vários nós coordenados como uma única rede Wi-Fi. Backhaul por cabo quando possível
-
-### IP E ENDEREÇAMENTO
-- IP privado: 192.168.x.x, 10.x.x.x, 172.16-31.x.x — rede local, não roteável na internet
-- IP público dinâmico: pode mudar em reconexões. Suficiente para navegação
-- IP público fixo: permanente. Facilita VPNs, câmeras/NVR, servidores. IP fixo NÃO aumenta velocidade
-- CGNAT: vários clientes compartilham IPs públicos. Navegação funciona. Publicação de servidores e acesso remoto podem exigir IP público. CGNAT NÃO significa internet lenta
-- DHCP: atribui automaticamente IP, máscara, gateway e DNS
-
-### TELEFONIA IP (VoIP)
-- Voz digitalizada e transportada em pacotes pela rede
-- Ramal: extensão interna do PABX
-- Tronco SIP: conexão IP entre PABX e operadora. Ramais ≠ chamadas simultâneas
-- Qualidade da voz: latência (eco), jitter (voz picotada), perda de pacotes (cortes)
-- Boa voz precisa de rede estável, baixa perda e atraso controlado — não depende apenas de muitos Mbps
-
-### PORTABILIDADE NUMÉRICA
-- Permite trocar de operadora mantendo o mesmo número
-- Confirmar titularidade, identificar linhas, validar documentação conforme procedimento vigente
-
-### DIAGNÓSTICO PRÁTICO
-Separe as 5 camadas: meio físico → tipo de acesso → Wi-Fi/rede local → Telefonia IP → endereçamento IP
-- Internet lenta: 1) teste por cabo. 2) por cabo ruim → verificar link com operadora. 3) por cabo ok → investigar Wi-Fi
-- Sinal óptico fraco (potência abaixo de -27 dBm) → problema físico na fibra (dobra, sujeira, conector)
-- Câmeras, backup em nuvem e envio de arquivos grandes: atenção especial ao upload
-
-### ATENDIMENTO COMERCIAL
-- Ouça o cenário completo antes de propor solução
-- Perguntas que orientam: Quantas pessoas usam? Há home office? Câmeras/NVR? VPN? Servidores? Telefonia?
-- Apresentar: situação atual + solução proposta + ganho esperado
-- Objeções comuns: preço (foco no custo da instabilidade), operadora atual (compare com dados reais), prazo (mostre urgência concreta)
-- Nunca inventar preços, prazos ou especificações técnicas — consultar tabela vigente
-
-Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataforma, siga as instruções acima. Para dúvidas de telecom/conectividade, use o conhecimento desta seção.` },
+                { role: 'system', content: systemPrompt },
                 ...history.slice(-10).map(m => ({ role: m.role, content: m.content })),
                 { role: 'user', content: message },
               ],
@@ -1812,7 +1738,7 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
           });
           const aiData = await aiRes.json();
           const reply = aiData.choices?.[0]?.message?.content || 'Não consegui processar sua mensagem. Tente novamente.';
-          return sendJson(req, res, 200, { reply });
+          return sendJson(req, res, 200, { reply, ...(navigateTo ? { navigate_to: navigateTo } : {}) });
         } catch (aiErr) {
           console.error('[Copiloto] OpenRouter error:', aiErr.message);
         }
@@ -2157,7 +2083,19 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
       if (req.method === 'GET') return sendJson(req, res, 200, { data: await listProjects() });
       if (req.method === 'POST') {
         const body = await readJson(req);
-        return sendJson(req, res, 201, { data: await createProject(body, user) });
+        const project = await createProject(body, user);
+        await notifyProjectActivity(project, user, 'Você é responsável por um novo projeto', { listSteps, listUsers, notifyUsers }).catch(error => console.error('[Project notification]', error.message));
+        return sendJson(req, res, 201, { data: project });
+      }
+    }
+
+    if (segments[1] === 'projects' && segments[2] && segments[3] === 'cover') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        const result = await saveProjectCover(segments[2], body);
+        return sendJson(req, res, 200, { data: result });
       }
     }
 
@@ -2167,6 +2105,7 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
       if (req.method === 'PUT' || req.method === 'PATCH') {
         const body = await readJson(req);
         const updated = await updateProject(segments[2], body);
+        if (updated) await notifyProjectActivity(updated, user, 'Atualização em um projeto seu', { listSteps, listUsers, notifyUsers }).catch(error => console.error('[Project notification]', error.message));
         return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Projeto não encontrado');
       }
       if (req.method === 'DELETE') { await deleteProject(segments[2]); return sendEmpty(req, res); }
@@ -2178,7 +2117,10 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
       if (req.method === 'GET') return sendJson(req, res, 200, { data: await listSteps(segments[2]) });
       if (req.method === 'POST') {
         const body = await readJson(req);
-        return sendJson(req, res, 201, { data: await createStep({ ...body, project_id: segments[2] }, user) });
+        const step = await createStep({ ...body, project_id: segments[2] }, user);
+        if (step.responsible_user_id && step.responsible_user_id !== user.id) await notifyUsers({ actorId: user.id, actorName: user.name, actorPhotoUrl: user.photo_url,
+          title: 'Você é responsável por uma nova etapa', message: step.name, type: 'project', link: `/projetos?projeto=${encodeURIComponent(segments[2])}`, userIds: [step.responsible_user_id] }).catch(error => console.error('[Project notification]', error.message));
+        return sendJson(req, res, 201, { data: step });
       }
     }
 
@@ -2188,6 +2130,10 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
       if (req.method === 'PUT' || req.method === 'PATCH') {
         const body = await readJson(req);
         const updated = await updateStep(segments[4], body, user);
+        if (updated) {
+          const project = (await listProjects()).find(item => item.id === segments[2]);
+          if (project) await notifyProjectActivity(project, user, `Etapa atualizada: ${updated.name}`, { listSteps, listUsers, notifyUsers }).catch(error => console.error('[Project notification]', error.message));
+        }
         return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Etapa não encontrada');
       }
       if (req.method === 'DELETE') { await deleteStep(segments[4]); return sendEmpty(req, res); }
@@ -2281,6 +2227,14 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
     }
 
 
+    if (req.method === 'GET' && segments[0] === 'uploads' && segments[1] !== 'jrh') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const media = await getMediaByPath(segments.slice(1).join('/'));
+      return media?.file_data ? sendBinary(req, res, 200, media.file_data, media.file_type)
+        : sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
+    }
+
     // ── J-RH (Jornal do RH) ─────────────────────────────────
     // Static uploads: /uploads/jrh/<filename>
     if (segments[0] === 'uploads' && segments[1] === 'jrh' && segments[2] && req.method === 'GET') {
@@ -2290,6 +2244,23 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
         const stat = statSync(filepath);
         const ext = extname(filename).toLowerCase();
         const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime' };
+        const mime = mimeMap[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': mime, 'Content-Length': stat.size, 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': req.headers.origin || '*' });
+        createReadStream(filepath).pipe(res);
+        return;
+      } catch {
+        return sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
+      }
+    }
+
+    // ── Implementation uploads static files ──────────────────────────
+    if (segments[0] === 'uploads' && segments[1] === 'implementation' && segments[2]) {
+      const filename = segments[2].replace(/[^a-zA-Z0-9._-]/g, '');
+      const filepath = join(implUploadsDir, filename);
+      try {
+        const stat = statSync(filepath);
+        const ext = extname(filename).toLowerCase();
+        const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
         const mime = mimeMap[ext] || 'application/octet-stream';
         res.writeHead(200, { 'Content-Type': mime, 'Content-Length': stat.size, 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': req.headers.origin || '*' });
         createReadStream(filepath).pipe(res);
@@ -2331,6 +2302,9 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
         if (lastBirthdayCheckDate !== todayDate) {
           lastBirthdayCheckDate = todayDate;
           await autoPublishTodayBirthdays().catch(() => {});
+
+
+
         }
         return sendJson(req, res, 200, { data: await listJRHPosts() });
       }
@@ -2380,6 +2354,8 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
 
   // ── TI Dashboard ────────────────────────────────────────────────
   if (segments[0] === 'api' && segments[1] === 'ti') {
+    const user = await requireUser(req, res);
+    if (!user) return;
     if (segments[2] === 'summary') {
       const sum = await getTiSummary();
       return sendJson(req, res, 200, sum);
@@ -2424,8 +2400,7 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
         }
         if (req.method === 'PUT') {
           const body = await readJson(req);
-          const user = req.user;
-          return sendJson(req, res, 200, await updateTiTask(tid, body, user?.name || 'Sistema'));
+          return sendJson(req, res, 200, await updateTiTask(tid, body, user.name));
         }
         if (req.method === 'DELETE') {
           await deleteTiTask(tid);
@@ -2434,6 +2409,69 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
       }
     }
   }
+    // ── Implementação e Correção ─────────────────────────────────────
+    if (segments[0] === 'api' && segments[1] === 'implementation') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const ADMIN_IMPL = ['Administrador', 'Gestor'];
+      const isAdmin = ADMIN_IMPL.includes(user.role_name);
+
+      if (req.method === 'GET' && !segments[2]) {
+        const filters = {};
+        if (url.searchParams.get('stage')) filters.stage = url.searchParams.get('stage');
+        if (url.searchParams.get('type'))  filters.type  = url.searchParams.get('type');
+        return sendJson(req, res, 200, { data: await listDemands(filters) });
+      }
+      if (req.method === 'POST' && !segments[2]) {
+        const body = await readJson(req);
+        if (!body.title?.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Título obrigatório');
+        return sendJson(req, res, 201, { data: await createDemand({ ...body, created_by: user.id }) });
+      }
+      if (segments[2] === 'files' && segments[3] && req.method === 'DELETE') {
+        await deleteDemandFileById(segments[3], user.id, isAdmin);
+        return sendJson(req, res, 200, { ok: true });
+      }
+      if (segments[2] && segments[2] !== 'files') {
+        const demandId = segments[2];
+        if (req.method === 'GET' && !segments[3]) {
+          const demand = await getDemand(demandId);
+          if (!demand) return sendError(req, res, 404, 'NOT_FOUND', 'Demanda não encontrada');
+          return sendJson(req, res, 200, { data: demand });
+        }
+        if (req.method === 'PUT' && !segments[3]) {
+          const body = await readJson(req);
+          if ((body.stage !== undefined || body.deadline !== undefined || body.assigned_to !== undefined) && !isAdmin)
+            return sendError(req, res, 403, 'FORBIDDEN', 'Apenas o setor T.I. pode alterar etapa e prazo');
+          const updated = await updateDemand(demandId, body);
+          if (!updated) return sendError(req, res, 404, 'NOT_FOUND', 'Demanda não encontrada');
+          return sendJson(req, res, 200, { data: updated });
+        }
+        if (req.method === 'DELETE' && !segments[3]) {
+          if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas o setor T.I. pode excluir demandas');
+          await deleteDemand(demandId);
+          return sendJson(req, res, 200, { ok: true });
+        }
+        if (segments[3] === 'comments' && req.method === 'GET')
+          return sendJson(req, res, 200, { data: await listDemandComments(demandId) });
+        if (segments[3] === 'comments' && req.method === 'POST') {
+          if (!isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Apenas o setor T.I. pode comentar');
+          const body = await readJson(req);
+          if (!body.content?.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Conteúdo obrigatório');
+          return sendJson(req, res, 201, { data: await addDemandComment(demandId, user.id, body.content.trim()) });
+        }
+        if (segments[3] === 'files' && req.method === 'GET')
+          return sendJson(req, res, 200, { data: await listDemandFiles(demandId) });
+        if (segments[3] === 'files' && req.method === 'POST') {
+          const demand = await getDemand(demandId);
+          if (!demand) return sendError(req, res, 404, 'NOT_FOUND', 'Demanda não encontrada');
+          if (demand.created_by !== user.id && !isAdmin)
+            return sendError(req, res, 403, 'FORBIDDEN', 'Apenas o autor ou T.I. podem anexar arquivos');
+          const { data, filename, mime } = await readJson(req);
+          if (!data || !filename) return sendError(req, res, 400, 'VALIDATION_ERROR', 'data e filename obrigatórios');
+          return sendJson(req, res, 201, { data: await addDemandFile(demandId, user.id, data, filename, mime) });
+        }
+      }
+    }
         // Copiloto IA — NEX Telecom Knowledge Base
     if (path === '/copiloto' && req.method === 'POST') {
       const user = await requireUser(req, res); if (!user) return;
@@ -2442,7 +2480,512 @@ Responda dúvidas técnicas e comerciais de forma clara. Para dúvidas da plataf
       return sendJson(req, res, 200, { reply });
     }
 
-        return sendError(req, res, 404, 'NOT_FOUND', 'Rota não encontrada');
+        
+
+    // POST /api/tts — ElevenLabs TTS
+    if (path === '/api/tts' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const { text } = await readJson(req);
+      if (!text || typeof text !== 'string') return sendError(req, res, 400, 'BAD_REQUEST', 'text obrigatorio');
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      if (!apiKey) return sendError(req, res, 503, 'NO_KEY', 'ElevenLabs nao configurado');
+      const voiceId = process.env.ELEVENLABS_VOICE_ID || 'nPczCjzI2devNBz1zQrb';
+      try {
+        const eleRes = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId + '/stream', {
+          method: 'POST',
+          headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+          body: JSON.stringify({ text: text.slice(0, 1000), model_id: 'eleven_v4_turbo', voice_settings: { stability: 0.75, similarity_boost: 0.85, style: 0.0, use_speaker_boost: true } }),
+        });
+        if (!eleRes.ok) { const e = await eleRes.text(); return sendError(req, res, 502, 'TTS_ERROR', 'ElevenLabs ' + eleRes.status); }
+        const buf = Buffer.from(await eleRes.arrayBuffer());
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length, 'Cache-Control': 'no-store' });
+        res.end(buf);
+        return;
+      } catch(e) { return sendError(req, res, 502, 'TTS_ERROR', e.message); }
+    }
+
+    // POST /api/jarves — Jarves: assistente IA pessoal por usuário
+    if (path === '/api/jarves' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      const { messages, voice_mode } = await readJson(req);
+      if (!Array.isArray(messages) || !messages.length) {
+        return sendError(req, res, 400, 'BAD_REQUEST', 'messages é obrigatório');
+      }
+
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) return sendError(req, res, 503, 'NO_KEY', 'OpenRouter não configurado');
+
+      const isAdmin = ['Administrador', 'Gestor'].includes(user.role_name);
+      const _jNow = new Date(); const _jDate = _jNow.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Sao_Paulo' }); const _jTime = _jNow.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+      const firstName = (user.name || 'usuário').split(' ')[0];
+
+      let systemPrompt = `Você é Jarves, o assistente pessoal de IA de ${user.name || firstName} na plataforma Rede Nex da NexTelecom.
+
+Perfil do usuário: ${user.name} | Cargo: ${user.position || 'não informado'} | Departamento: ${user.department_name || 'não informado'} | Papel: ${user.role_name || 'Usuário'}${isAdmin ? ' (ADMINISTRADOR — acesso total)' : ''}
+
+Personalidade: JARVIS — preciso, eficiente e direto como o assistente do Tony Stark.
+- Respostas SEMPRE curtas: máximo 2-3 frases por resposta. Nunca produza textos longos.
+- Vá direto ao ponto, sem introduções ou explicações desnecessárias
+- Proativo: mencione tarefas atrasadas ou urgências quando detectar
+- Use o primeiro nome "${firstName}" ao se dirigir ao usuário
+- Tom: profissional, confiante, levemente formal
+
+Capacidades disponíveis:
+- Consultar e atualizar tarefas do usuário (status, prazo, prioridade, comentários)
+- Criar novas tarefas e atribuir a outros usuários
+- Consultar projetos, etapas e progresso
+- Criar e atualizar projetos
+- Verificar e criar eventos do calendário
+- Listar conversas e enviar mensagens no chat
+- Listar notificações
+- Buscar artigos na base de conhecimento (Wiki)
+- Buscar usuários do sistema${isAdmin ? '\n- Criar e gerenciar usuários (acesso administrativo)' : ''}
+
+Instruções:
+- Quando cumprimentado ou questionado sobre trabalho pendente, use as ferramentas para buscar dados reais antes de responder
+- Se houver tarefas atrasadas, mencione-as proativamente de forma cordial
+- Use markdown apenas quando necessário — prefira frases curtas
+- Responda sempre em português do Brasil
+- Máximo de 4 iterações de ferramentas por resposta
+- Para criar tarefas, projetos ou eventos, SEMPRE confirme os detalhes antes de criar
+- Ao listar projetos, verifique também as etapas para dar informação completa${voice_mode ? '\nMODO VOZ ATIVO: máximo 2 frases, zero markdown, resposta imediata.' : ''}`;
+
+      systemPrompt += String.fromCharCode(10) + 'Data e hora atual: ' + _jDate + ', ' + _jTime + '.' + String.fromCharCode(10) + String.fromCharCode(10) + "## Plataforma Rede Nex — Funcionalidades e rotas\n\n- Feed (/feed): publicacoes, comunicados, eventos e enquetes\n- Wiki (/wiki): base de conhecimento, processos e procedimentos\n- Tarefas (/tarefas): gestao de tarefas com prazo, prioridade, checklists\n- Bate-papo (/bate-papo): mensagens em tempo real, grupos, mencionar com @\n- Calendario (/calendario): agenda corporativa, eventos, lembretes\n- Projetos (/projetos): projetos com etapas, responsaveis e progresso\n- Ranking (/ranking): XP e gamificacao\n- Treinamentos (/treinamentos): capacitacao interna, XP ao concluir\n- Drive (/drive): repositorio de arquivos e documentos\n- Conexao RH (/jrh): mural do RH, aniversariantes, comunicados\n- Notas (/notas): bloco de notas pessoal\n- Painel Estrategico (/analytics): indicadores e metricas estrategicas\n- Prestacao de Contas (/prestacao-contas): despesas e aprovacoes financeiras\n- Formularios (/formularios): criacao e resposta de formularios\n- Organograma (/organograma): estrutura organizacional\n- Colaboradores (/colaboradores): lista de todos os usuarios\n- Lousas (/lousas): quadros brancos colaborativos\n- Gestao TI (/gestao-ti): painel do time de TI\n\n## NexTelecom\n\nProvedora de internet e telecomunicacoes na Bahia, Brasil.\nServicos: fibra optica residencial e empresarial, Wi-Fi gerenciado, Telefonia IP (VoIP), IP fixo, CGNAT, suporte tecnico especializado.\nSetores: TI, CS (Customer Success), NOC (Network Operations Center), Suporte Tecnico, Financeiro, RH, Comercial, CGR (Engenharia de Rede).\n\nPara navegar a uma pagina use SEMPRE a ferramenta navegar_para — nunca diga \"va ate X\", execute a navegacao diretamente.\nPara duvidas de TI ou chamados: orientar a abrir chamado via HubSoft ou contatar TI pelo Bate-papo.";
+      const tools = [
+        {
+          type: 'function',
+          function: {
+            name: 'listar_minhas_tarefas',
+            description: 'Lista as tarefas do usuário atual (criadas por ele, das quais é responsável ou está atribuído), com status, prazo e prioridade',
+            parameters: { type: 'object', properties: {}, required: [] }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'criar_tarefa',
+            description: 'Cria uma nova tarefa para o usuário ou atribuída a outro usuário',
+            parameters: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', description: 'Título da tarefa' },
+                description: { type: 'string', description: 'Descrição detalhada (opcional)' },
+                priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'], description: 'Prioridade (padrão: normal)' },
+                deadline: { type: 'string', description: 'Prazo no formato YYYY-MM-DD (opcional)' },
+                owner_id: { type: 'string', description: 'UUID do responsável pela tarefa (opcional, padrão: usuário atual)' },
+                assignee_ids: { type: 'array', items: { type: 'string' }, description: 'Lista de UUIDs de pessoas atribuídas (opcional)' }
+              },
+              required: ['title']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'atualizar_tarefa',
+            description: 'Atualiza status, prioridade, prazo ou título de uma tarefa existente',
+            parameters: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'UUID da tarefa' },
+                title: { type: 'string', description: 'Novo título (opcional)' },
+                status: { type: 'string', enum: ['todo', 'in_progress', 'review', 'done'], description: 'Novo status' },
+                priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'], description: 'Nova prioridade' },
+                deadline: { type: 'string', description: 'Novo prazo YYYY-MM-DD (opcional, null para remover)' }
+              },
+              required: ['id']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'comentar_tarefa',
+            description: 'Adiciona um comentário a uma tarefa',
+            parameters: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'UUID da tarefa' },
+                comentario: { type: 'string', description: 'Texto do comentário' }
+              },
+              required: ['id', 'comentario']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'listar_projetos',
+            description: 'Lista todos os projetos da empresa com status e progresso',
+            parameters: { type: 'object', properties: {}, required: [] }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'listar_etapas_projeto',
+            description: 'Lista as etapas de um projeto específico com status e responsáveis',
+            parameters: {
+              type: 'object',
+              properties: {
+                project_id: { type: 'string', description: 'UUID do projeto' }
+              },
+              required: ['project_id']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'criar_projeto',
+            description: 'Cria um novo projeto',
+            parameters: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Nome do projeto' },
+                summary: { type: 'string', description: 'Descrição resumida (opcional)' },
+                deadline: { type: 'string', description: 'Prazo no formato YYYY-MM-DD (opcional)' },
+                category: { type: 'string', description: 'Categoria: Estratégico, Operacional, Melhoria, Infraestrutura (padrão: Estratégico)' }
+              },
+              required: ['name']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'atualizar_projeto',
+            description: 'Atualiza status, progresso ou próxima ação de um projeto',
+            parameters: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'UUID do projeto' },
+                status: { type: 'string', description: 'Novo status: Não iniciado, Em andamento, Concluído, Pausado' },
+                progress: { type: 'number', description: 'Progresso de 0 a 100' },
+                next_action: { type: 'string', description: 'Próxima ação a ser tomada' }
+              },
+              required: ['id']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'listar_eventos_calendario',
+            description: 'Lista eventos do calendário do usuário em um período, incluindo Google Calendar (iCal) se configurado. Inclui campo source: interno ou google.',
+            parameters: {
+              type: 'object',
+              properties: {
+                from: { type: 'string', description: 'Data inicial YYYY-MM-DD (padrão: hoje)' },
+                to: { type: 'string', description: 'Data final YYYY-MM-DD (padrão: próximos 7 dias)' }
+              },
+              required: []
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'criar_evento_calendario',
+            description: 'Cria um novo evento no calendário do usuário',
+            parameters: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', description: 'Título do evento' },
+                start_at: { type: 'string', description: 'Data/hora de início no formato ISO 8601 (ex: 2026-10-20T09:00:00)' },
+                end_at: { type: 'string', description: 'Data/hora de fim no formato ISO 8601' },
+                description: { type: 'string', description: 'Descrição do evento (opcional)' },
+                location: { type: 'string', description: 'Local do evento (opcional)' },
+                all_day: { type: 'boolean', description: 'Evento de dia inteiro (padrão: false)' }
+              },
+              required: ['title', 'start_at', 'end_at']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'listar_conversas',
+            description: 'Lista as conversas recentes do usuário no chat com última mensagem',
+            parameters: { type: 'object', properties: {}, required: [] }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'enviar_mensagem',
+            description: 'Envia uma mensagem em uma conversa de chat existente',
+            parameters: {
+              type: 'object',
+              properties: {
+                conversation_id: { type: 'string', description: 'UUID da conversa' },
+                mensagem: { type: 'string', description: 'Texto da mensagem' }
+              },
+              required: ['conversation_id', 'mensagem']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'listar_notificacoes',
+            description: 'Lista as notificações recentes do usuário',
+            parameters: { type: 'object', properties: {}, required: [] }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'buscar_wiki',
+            description: 'Busca artigos na base de conhecimento da empresa (Wiki)',
+            parameters: {
+              type: 'object',
+              properties: {
+                busca: { type: 'string', description: 'Termo de busca' }
+              },
+              required: ['busca']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'buscar_usuarios',
+            description: 'Busca usuários do sistema pelo nome ou e-mail (útil para atribuir tarefas)',
+            parameters: {
+              type: 'object',
+              properties: {
+                q: { type: 'string', description: 'Nome ou e-mail para buscar (opcional — lista todos se omitido)' }
+              },
+              required: []
+            }
+          }
+        },
+
+        {
+          type: 'function',
+          function: {
+            name: 'navegar_para',
+            description: 'Navega para uma pagina da Rede Nex. Use SEMPRE que o usuario pedir para abrir, ir para ou acessar uma secao. Exemplos: abrir tarefas, ir para projetos, mostrar calendario.',
+            parameters: {
+              type: 'object',
+              properties: {
+                rota: { type: 'string', enum: ['/', '/tarefas', '/projetos', '/calendario', '/wiki', '/bate-papo', '/perfil', '/feed', '/drive', '/notas', '/formularios', '/lousas', '/ranking', '/analytics', '/colaboradores', '/organograma', '/configuracoes', '/treinamentos', '/ajuda', '/jrh', '/gestao-ti'], description: 'Rota de destino' },
+                mensagem: { type: 'string', description: 'Mensagem curta confirmando (ex: Abrindo suas tarefas!)' }
+              },
+              required: ['rota', 'mensagem']
+            }
+          }
+        },
+        ...(isAdmin ? [
+          {
+            type: 'function',
+            function: {
+              name: 'criar_usuario',
+              description: 'Cria um novo usuário no sistema (somente administradores)',
+              parameters: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Nome completo' },
+                  email: { type: 'string', description: 'E-mail de acesso' },
+                  password: { type: 'string', description: 'Senha inicial (mín. 8 chars, maiúscula, número e especial)' },
+                  position: { type: 'string', description: 'Cargo (opcional)' },
+                  department_id: { type: 'string', description: 'UUID do departamento (opcional)' },
+                  role_id: { type: 'string', description: 'UUID do papel/role (opcional)' }
+                },
+                required: ['name', 'email', 'password']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'atualizar_usuario',
+              description: 'Atualiza dados de um usuário no sistema (somente administradores)',
+              parameters: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'UUID do usuário' },
+                  name: { type: 'string', description: 'Novo nome (opcional)' },
+                  email: { type: 'string', description: 'Novo e-mail (opcional)' },
+                  position: { type: 'string', description: 'Novo cargo (opcional)' },
+                  department_id: { type: 'string', description: 'UUID do novo departamento (opcional)' },
+                  role_id: { type: 'string', description: 'UUID do novo papel/role (opcional)' },
+                  status: { type: 'string', enum: ['active', 'inactive'], description: 'Status do usuário (opcional)' }
+                },
+                required: ['id']
+              }
+            }
+          }
+        ] : [])
+      ];
+
+      const unwrap = (v) => Array.isArray(v) ? v : (Array.isArray(v?.data) ? v.data : []);
+
+      const execTool = async (name, args) => {
+        if (name === 'listar_minhas_tarefas') {
+          const raw = await listTasks(user.id);
+          return unwrap(raw).map(t => ({
+            id: t.id, title: t.title, status: t.status, priority: t.priority,
+            deadline: t.deadline, owner: t.owner?.name, assignees: (t.assignees || []).map(a => a.name)
+          }));
+        }
+        if (name === 'criar_tarefa') {
+          const result = await createTask(user.id, {
+            title: args.title, description: args.description,
+            priority: args.priority || 'normal', deadline: args.deadline || null,
+            owner_id: args.owner_id || null, assignee_ids: args.assignee_ids || []
+          });
+          return { sucesso: true, tarefa: { id: result?.id, title: result?.title, status: result?.status } };
+        }
+        if (name === 'atualizar_tarefa') {
+          const { id, ...input } = args;
+          const result = await updateTask(id, input);
+          return { sucesso: true, tarefa: { id: result?.id, title: result?.title, status: result?.status, priority: result?.priority } };
+        }
+        if (name === 'comentar_tarefa') {
+          await addTaskComment(args.id, user.id, args.comentario);
+          return { sucesso: true };
+        }
+        if (name === 'listar_projetos') {
+          const raw = await listProjects();
+          return unwrap(raw).map(p => ({
+            id: p.id, name: p.name, status: p.status, progress: p.progress,
+            phase: p.phase, deadline: p.deadline, next_action: p.next_action,
+            responsible_name: p.responsible_name
+          }));
+        }
+        if (name === 'listar_etapas_projeto') {
+          const raw = await listSteps(args.project_id);
+          return unwrap(raw).map(s => ({
+            id: s.id, title: s.title, status: s.status, deadline: s.deadline,
+            assignees: (s.assignees || []).map(a => a.name)
+          }));
+        }
+        if (name === 'criar_projeto') {
+          const result = await createProject({
+            name: args.name, summary: args.summary || null,
+            deadline: args.deadline || null, category: args.category || 'Estratégico',
+            responsible_name: user.name, responsible_photo_url: user.photo_url || null
+          }, user);
+          return { sucesso: true, projeto: { id: result?.id, name: result?.name } };
+        }
+        if (name === 'atualizar_projeto') {
+          const { id, ...body } = args;
+          await updateProject(id, body);
+          return { sucesso: true };
+        }
+        if (name === 'listar_eventos_calendario') {
+          const today = new Date().toISOString().slice(0, 10);
+          const next7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+          const from = args.from || today;
+          const to = args.to || next7;
+          const raw = await listEvents(user.id, { from, to });
+          let allEvents = unwrap(raw);
+          if (user.google_ical_url) {
+            try {
+              const googleEvents = await fetchGoogleCalendarEvents(user.google_ical_url, { from, to });
+              allEvents = [...allEvents, ...googleEvents].sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+            } catch (e) { console.error('[Jarvis iCal error]', e.message); }
+          }
+          return allEvents.map(e => ({ id: e.id, title: e.title, start_at: e.start_at, end_at: e.end_at, location: e.location, all_day: e.all_day, source: e.source || 'interno' }));
+        }
+        if (name === 'criar_evento_calendario') {
+          const result = await createEvent(user.id, {
+            title: args.title, start_at: args.start_at, end_at: args.end_at,
+            description: args.description || null, location: args.location || null,
+            all_day: !!args.all_day, participant_ids: []
+          });
+          return { sucesso: true, evento: { id: result?.id, title: result?.title, start_at: result?.start_at } };
+        }
+        if (name === 'listar_conversas') {
+          const raw = await listConversations(user.id);
+          return unwrap(raw).slice(0, 15).map(c => ({
+            id: c.id, name: c.name, type: c.type, unread_count: c.unread_count,
+            last_message: c.last_message ? { content: c.last_message.content, sender: c.last_message.sender?.name } : null
+          }));
+        }
+        if (name === 'enviar_mensagem') {
+          const result = await sendMessage(user.id, args.conversation_id, args.mensagem);
+          return result ? { sucesso: true } : { erro: 'Conversa não encontrada ou sem permissão' };
+        }
+        if (name === 'listar_notificacoes') {
+          const raw = await listNotifications(user.id);
+          return unwrap(raw).slice(0, 20).map(n => ({ id: n.id, title: n.title, message: n.message, type: n.type, read: n.read_at !== null, created_at: n.created_at }));
+        }
+        if (name === 'buscar_wiki') {
+          const raw = await listArticles({ search: args.busca, status: 'published', pageSize: 8, userRole: user.role_name, userId: user.id });
+          return unwrap(raw).map(a => ({ id: a.id, title: a.title, slug: a.slug, category: a.categories?.name, tags: a.tags }));
+        }
+        if (name === 'buscar_usuarios') {
+          const raw = await listUsers({ search: args.q || '', limit: 20 });
+          return unwrap(raw).map(u => ({ id: u.id, name: u.name, email: u.email, position: u.position, department: u.departments?.name, role: u.roles?.name }));
+        }
+        if (name === 'criar_usuario' && isAdmin) {
+          const result = await createUser({ name: args.name, email: args.email, password: args.password, position: args.position || null, department_id: args.department_id || null, role_id: args.role_id || null });
+          return { sucesso: true, usuario: { id: result?.id, name: result?.name, email: result?.email } };
+        }
+        if (name === 'atualizar_usuario' && isAdmin) {
+          const { id, ...body } = args;
+          await updateUser(id, body);
+          return { sucesso: true };
+        }
+        if (name === 'navegar_para') { navigateTo = args.rota; return { sucesso: true, mensagem: args.mensagem }; }
+        return { erro: 'Ferramenta não disponível para este usuário' };
+      };
+
+      let navigateTo = null;
+      let currentMessages = [{ role: 'system', content: systemPrompt }, ...messages.slice(-20)];
+      let reply = '';
+
+      for (let iter = 0; iter < 4; iter++) {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://rede.nextelecom.net.br',
+            'X-Title': 'Rede Nex Jarves'
+          },
+          body: JSON.stringify({ model: 'google/gemini-2.5-flash', messages: currentMessages, tools, tool_choice: 'auto', max_tokens: 2000 })
+        });
+
+        if (!orRes.ok) {
+          const errTxt = await orRes.text().catch(() => '');
+          return sendError(req, res, 502, 'OR_ERROR', `OpenRouter ${orRes.status}: ${errTxt.slice(0, 200)}`);
+        }
+
+        const orJson = await orRes.json();
+        const msg = orJson.choices?.[0]?.message;
+        if (!msg) return sendError(req, res, 502, 'OR_ERROR', 'Resposta inválida do OpenRouter');
+
+        currentMessages.push(msg);
+
+        if (!msg.tool_calls?.length) {
+          reply = msg.content ?? '';
+          break;
+        }
+
+        for (const tc of msg.tool_calls) {
+          let result;
+          try {
+            const args = JSON.parse(tc.function.arguments || '{}');
+            result = await execTool(tc.function.name, args);
+          } catch (e) {
+            result = { erro: e.message };
+          }
+          currentMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+        }
+      }
+
+      if (!reply) reply = 'Desculpe, não consegui processar sua solicitação no momento. Tente novamente.';
+      return sendJson(req, res, 200, { reply });
+    }
+
+    return sendError(req, res, 404, 'NOT_FOUND', 'Rota não encontrada');
   } catch (error) {
     if (error?.statusCode) {
       return sendError(req, res, error.statusCode, error.code || 'REQUEST_ERROR', error.message);
@@ -2518,11 +3061,25 @@ const wsPingInterval = setInterval(() => {
   });
 }, 25000);
 
-httpServer.listen(port, () => {
-  console.log(`Rede Nex API running at http://localhost:${port}/api`);
+httpServer.listen(port, process.env.HOST || '127.0.0.1', () => {
+  console.log(`Rede Nex API listening on port ${port}`);
 });
 
 // Daily cleanup of expired sessions
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   pool.query("DELETE FROM user_sessions WHERE expires_at < now()").catch(() => {});
 }, 24 * 60 * 60 * 1000);
+
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  clearInterval(wsPingInterval);
+  clearInterval(cleanupInterval);
+  for (const client of wss.clients) client.close(1001, 'Atualização do servidor');
+  wss.close();
+  httpServer.close(() => pool.end().then(() => process.exit(0)));
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

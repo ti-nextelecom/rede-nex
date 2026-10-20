@@ -4,8 +4,8 @@ import {
 import { createPortal } from 'react-dom';
 import {
   Bell, BellOff, BookOpen, Camera, Check, CheckCheck, ChevronLeft, Crown, Eye, FileText, History, Image,
-  Mic, MicOff, MessageCircle, Moon, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Plus, Reply, Search, Send,
-  Settings, Shield, Smile, Sticker, Sun, Trash2, UserMinus, UserPlus, Users, Video, X,
+  Mic, MicOff, MessageCircle, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Plus, Reply, Search, Send,
+  Settings, Shield, Smile, Sticker, Trash2, UserMinus, UserPlus, Users, Video, X,
 } from 'lucide-react';
 import {
   addParticipantsToGroup, createConversation, deleteChatMessage, editChatMessage, getConversations,
@@ -16,7 +16,7 @@ import {
   type ChatConversation, type ChatMessage, type GroupParticipant, type MessageEdit, type MessageReader,
 } from '../lib/chatApi';
 import { getUsers } from '../lib/appApi';
-import { apiGet, apiPatch, apiPut } from '../lib/apiClient';
+import { apiGet, apiPut } from '../lib/apiClient';
 import { useAuth } from '../lib/auth';
 import { cn } from '../lib/utils';
 import { callStore } from '../lib/callStore';
@@ -204,18 +204,6 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   const bubbleBg = mine ? theme.bubbleColor : (darkMode ? '#202c33' : '#ffffff');
   const bubbleText = mine ? theme.textColor : (darkMode ? '#e9edef' : '#374151');
 
-  if (message.is_deleted) {
-    return (
-      <div className="relative group max-w-[85%]" style={swipeStyle}>
-        <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
-          {!mine && isGroup && <p className="mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
-          <p className="text-sm italic" style={{ color: mine ? `${theme.textColor}70` : '#9ca3af' }}>🚫 Mensagem apagada</p>
-          {timestamp}
-        </div>
-      </div>
-    );
-  }
-
   const menu = showMenu && (
     <div ref={menuRef} className={`absolute z-40 ${mine ? 'right-8' : 'left-8'} bottom-full mb-1 rounded-xl border border-slate-200 bg-white shadow-xl py-1 min-w-[148px]`}>
       {onReply && <button onClick={() => { onReply(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><Reply size={14} className="text-blue-500" /> Responder</button>}
@@ -300,6 +288,18 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   );
 
   const swipeStyle = { transform: `translateX(${swipeDx}px)`, transition: swipeDx === 0 ? 'transform 0.2s' : 'none' };
+
+  if (message.is_deleted) {
+    return (
+      <div className="relative group max-w-[85%]" style={swipeStyle}>
+        <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
+          {!mine && isGroup && <p className="mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+          <p className="text-sm italic" style={{ color: mine ? `${theme.textColor}70` : '#9ca3af' }}>🚫 Mensagem apagada</p>
+          {timestamp}
+        </div>
+      </div>
+    );
+  }
 
   if (content.startsWith('[AUDIO_MSG]')) {
     return (
@@ -912,7 +912,7 @@ export function Chat() {
 
   // Theme — loaded from localStorage for immediate display, synced from API on mount
   const [theme, setTheme] = useState<ChatTheme>(loadTheme);
-  const [darkMode, setDarkMode] = useState(() => user?.dark_mode ?? (localStorage.getItem('chat_dark_mode') === '1'));
+  const [darkMode] = useState(() => user?.dark_mode ?? (localStorage.getItem('chat_dark_mode') === '1'));
 
   useEffect(() => {
     apiGet<{ data: ChatTheme | null }>('/users/me/chat-theme').then(res => {
@@ -923,12 +923,6 @@ export function Chat() {
       }
     }).catch(() => {});
   }, []);
-  function toggleDark() {
-    const next = !darkMode;
-    setDarkMode(next);
-    localStorage.setItem('chat_dark_mode', next ? '1' : '0');
-    apiPatch('/users/me/dark-mode', { dark_mode: next }).catch(() => {});
-  }
 
   // User profile modal
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -942,7 +936,7 @@ export function Chat() {
 
   // File attachment preview
   const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'document'; raw: File } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Editing
@@ -1070,7 +1064,7 @@ export function Chat() {
     const c = messagesContainerRef.current;
     if (!c) return;
     function onScroll() {
-      isNearBottomRef.current = c.scrollHeight - c.scrollTop - c.clientHeight < 150;
+      if (c) isNearBottomRef.current = c.scrollHeight - c.scrollTop - c.clientHeight < 150;
     }
     c.addEventListener('scroll', onScroll, { passive: true });
     return () => c.removeEventListener('scroll', onScroll);
@@ -1602,7 +1596,7 @@ export function Chat() {
                 const mine = message.sender_id === user?.id;
                 const lastReadAt = selectedConversation?.other_participant?.last_read_at;
                 return (
-                  <div key={message.id} className={cn('flex gap-2', mine && 'justify-end')}>
+                  <div key={message.id} className={cn('chat-message-row flex gap-2', mine && 'justify-end')}>
                     {!mine && (
                       <button
                         onClick={() => {

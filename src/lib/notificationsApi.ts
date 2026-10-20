@@ -4,7 +4,7 @@ export interface NotificationRow {
   id: string;
   title: string;
   message?: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'feed' | 'wiki' | 'chat';
+  type: 'info' | 'success' | 'warning' | 'error' | 'feed' | 'wiki' | 'chat' | 'task' | 'project';
   read: boolean;
   link?: string;
   actor_name?: string;

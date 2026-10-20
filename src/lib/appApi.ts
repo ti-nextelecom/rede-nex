@@ -118,8 +118,9 @@ export async function createDepartment(name: string, description?: string): Prom
   return response.data;
 }
 
-export async function updateDepartment(id: string, name: string, description?: string): Promise<Department> {
-  const response = await apiPut<ApiResponse<Department>>(`/departments/${id}`, { name, description });
+export async function updateDepartment(id: string, input: string | Partial<Pick<Department, 'name' | 'description' | 'manager_id' | 'parent_id'>>, description?: string): Promise<Department> {
+  const body = typeof input === 'string' ? { name: input, description } : input;
+  const response = await apiPut<ApiResponse<Department>>(`/departments/${id}`, body);
   if (!response.data) throw new Error('Departamento não atualizado');
   return response.data;
 }

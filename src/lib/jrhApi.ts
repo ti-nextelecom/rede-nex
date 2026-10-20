@@ -37,6 +37,8 @@ export type JRHPost = {
   video_url: string | null;
   pinned: boolean;
   visibility: string;
+  period_start: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
   users: { id: string; name: string; email: string; photo_url: string | null; department_name: string | null } | null;
@@ -45,7 +47,6 @@ export type JRHPost = {
   view_count: number;
   viewers: JRHViewer[];
 };
-
 
 export async function uploadJRHFile(file: File): Promise<string> {
   const data = await new Promise<string>((resolve, reject) => {
@@ -77,6 +78,8 @@ export async function createJRHPost(input: {
   category?: string;
   image_url?: string;
   video_url?: string;
+  period_start?: string | null;
+  expires_at?: string | null;
 }): Promise<JRHPost> {
   const res = await apiPost<ApiResponse<JRHPost>>('/jrh', input);
   if (!res.data) throw new Error('Post não criado');
@@ -93,6 +96,8 @@ export async function updateJRHPost(postId: string, input: {
   category?: string | null;
   image_url?: string | null;
   video_url?: string | null;
+  period_start?: string | null;
+  expires_at?: string | null;
 }): Promise<JRHPost> {
   const res = await apiPut<{ data: JRHPost }>(`/jrh/posts/${postId}`, input);
   return res.data;

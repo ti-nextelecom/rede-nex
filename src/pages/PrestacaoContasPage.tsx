@@ -54,9 +54,9 @@ const readAsDataUrl = (file: File): Promise<string> =>
   });
 
 function useChartJs(): boolean {
-  const [loaded, setLoaded] = useState(!!(window as Record<string, unknown>).Chart);
+  const [loaded, setLoaded] = useState(!!(window as unknown as Record<string, unknown>).Chart);
   useEffect(() => {
-    if ((window as Record<string, unknown>).Chart) { setLoaded(true); return; }
+    if ((window as unknown as Record<string, unknown>).Chart) { setLoaded(true); return; }
     const s = document.createElement('script');
     s.src = '/prestacao-contas/chart.min.js';
     s.onload = () => setLoaded(true);
@@ -236,7 +236,7 @@ export function PrestacaoContasPage() {
   useEffect(() => {
     if (view !== 'bi' || !biReady || !chartJsLoaded || !biLancs.length) return;
     type ChartCtor = new (el: HTMLCanvasElement, cfg: unknown) => { destroy(): void };
-    const C = (window as Record<string, unknown>).Chart as ChartCtor;
+    const C = (window as unknown as Record<string, unknown>).Chart as ChartCtor;
     biChartRefs.current.forEach(c => { try { c.destroy(); } catch { /**/ } });
     biChartRefs.current = [];
     const refs: { destroy(): void }[] = [];
@@ -276,7 +276,7 @@ export function PrestacaoContasPage() {
     const porMes: Record<string, number> = {};
     biLancs.forEach(l => { if (!l.data) return; const m = l.data.slice(0, 7); porMes[m] = (porMes[m] || 0) + parseFloat(l.valor); });
     const mesE = Object.entries(porMes).sort((a, b) => a[0].localeCompare(b[0]));
-    const mesLabel = ([k]: [string]) => { const [y, m] = k.split('-'); return new Date(+y, +m - 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }); };
+    const mesLabel = ([k]: [string, number]) => { const [y, m] = k.split('-'); return new Date(+y, +m - 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }); };
     if (mesE.length) mk('pc-chart-mes', {
       type: 'line',
       data: { labels: mesE.map(mesLabel), datasets: [{ label: 'Gastos', data: mesE.map(([, v]) => v), borderColor: '#3b82f6', backgroundColor: '#3b82f610', fill: true, tension: 0.4, pointRadius: 5, pointHoverRadius: 8 }] },
@@ -399,11 +399,11 @@ export function PrestacaoContasPage() {
     } catch (e: unknown) { toast(e instanceof Error ? e.message : String(e)); }
   };
 
-  const validarLancamento = async (status: 'aprovado' | 'inconsistente', obs?: string) => {
+  const validarLancamento = async (status: Lancamento['status'], obs?: string) => {
     if (!drawerLanc) return;
     try {
       await pcUpdateLancamentoStatus(drawerLanc.id, { status, obs });
-      toast(status === 'aprovado' ? '✓ Lançamento aprovado.' : '⚠ Marcado como inconsistente.');
+      toast(status === 'aprovado' ? '✓ Lançamento aprovado.' : status === 'pendente' ? 'Lançamento devolvido para análise.' : '⚠ Marcado como inconsistente.');
       await openDrawer(drawerLanc.id);
       if (periodo) await loadLancamentos(periodo);
     } catch (e: unknown) { toast(e instanceof Error ? e.message : String(e)); }

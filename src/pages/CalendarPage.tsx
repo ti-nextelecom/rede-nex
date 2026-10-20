@@ -7,6 +7,10 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../lib/apiClient';
 import { getUsers } from '../lib/appApi';
 import { useAuth } from '../lib/auth';
 import { cn } from '../lib/utils';
+import { useSearchParams } from 'react-router-dom';
+import { clearAssistantIntent, readAssistantIntent } from '../lib/assistantIntent';
+import { AccessibleModal } from '../components/AccessibleModal';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 
 interface CalEvent {
   id: string;
@@ -39,6 +43,9 @@ type View = 'month' | 'agenda';
 
 export function CalendarPage() {
   const { user } = useAuth();
+  const [params,setParams]=useSearchParams();
+  const [assistantDraft,setAssistantDraft]=useState(false);
+  const [saveError,setSaveError]=useState('');
   const today = new Date();
   // Default to agenda on mobile
   const [view, setView] = useState<View>(() =>
@@ -81,6 +88,7 @@ export function CalendarPage() {
   useEffect(() => { getUsers().then(setUsers).catch(() => {}); }, []);
 
   const openCreate = (date?: Date) => {
+    setAssistantDraft(false);setSaveError('');
     const s = date ? toLocalISOString(date) : defaultStart();
     const e = date ? toLocalISOString(new Date(date.getTime() + 3600000)) : defaultEnd();
     setEditEvent(null);
@@ -88,7 +96,22 @@ export function CalendarPage() {
     setShowModal(true);
   };
 
+  useEffect(()=>{
+    const intent=readAssistantIntent(params);
+    if(params.get('visao')==='agenda')setView('agenda');
+    if(intent.create){
+      const day=intent.day || new Date().toLocaleDateString('en-CA',{timeZone:'America/Bahia'});
+      const start=new Date(`${day}T${intent.time || '00:00'}:00-03:00`);
+      const end=intent.time?new Date(start.getTime()+60*60*1000):new Date(`${day}T23:59:00-03:00`);
+      setEditEvent(null);setSelectedEvent(null);setSaveError('');setAssistantDraft(true);
+      setForm({title:intent.title,description:'',location:'',start_at:toLocalISOString(start),end_at:toLocalISOString(end),all_day:!intent.time,color:COLORS[0],participant_ids:[]});
+      setYear(start.getFullYear());setMonth(start.getMonth());setShowModal(true);
+    }
+    if(intent.create||params.has('visao'))setParams(clearAssistantIntent,{replace:true});
+  },[params,setParams]);
+
   const openEdit = (ev: CalEvent) => {
+    setAssistantDraft(false);setSaveError('');
     setEditEvent(ev);
     setForm({
       title: ev.title, description: ev.description || '', location: ev.location || '',
@@ -103,6 +126,8 @@ export function CalendarPage() {
 
   const handleSave = async () => {
     if (!form.title.trim()) return;
+    setSaveError('');
+    if(!form.start_at||!form.end_at||new Date(form.end_at)<=new Date(form.start_at)){setSaveError('Informe um período válido; o fim deve ser posterior ao início.');return;}
     setSaving(true);
     try {
       const payload = {
@@ -114,7 +139,8 @@ export function CalendarPage() {
       else await apiPost('/calendar/events', payload);
       setShowModal(false);
       await loadEvents();
-    } finally { setSaving(false); }
+    } catch(error) {setSaveError(error instanceof Error?error.message:'Não foi possível salvar o evento.');}
+    finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -338,45 +364,47 @@ export function CalendarPage() {
 
       {/* Create/Edit modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+        <AccessibleModal title={editEvent?'Editar evento':'Novo evento'} onClose={()=>{if(!saving)setShowModal(false);}} className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-24px)] max-w-lg -translate-x-1/2 -translate-y-1/2 outline-none">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
-              <h2 className="text-base font-bold text-slate-800">{editEvent ? 'Editar evento' : 'Novo evento'}</h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
+              <h2 aria-hidden="true" className="text-base font-bold text-slate-800">{editEvent ? 'Editar evento' : 'Novo evento'}</h2>
+              <button aria-label="Fechar formulário de evento" disabled={saving} onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
             </div>
             <div className="px-5 py-4 space-y-4">
+              {assistantDraft&&<p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Rascunho preparado pelo assistente. Confira data, horário e participantes antes de salvar. Sem participantes adicionais, o evento fica na sua agenda. Não há alarme automático.</p>}
+              {saveError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Título *</label>
-                <input value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))}
+                <input aria-label="Título do evento" value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" placeholder="Nome do evento" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Início *</label>
-                  <input type="datetime-local" value={form.start_at} onChange={e => setForm(f => ({...f, start_at: e.target.value}))}
+                  <input aria-label="Início do evento" type="datetime-local" value={form.start_at} onChange={e => setForm(f => ({...f, start_at: e.target.value}))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Fim *</label>
-                  <input type="datetime-local" value={form.end_at} onChange={e => setForm(f => ({...f, end_at: e.target.value}))}
+                  <input aria-label="Fim do evento" type="datetime-local" value={form.end_at} onChange={e => setForm(f => ({...f, end_at: e.target.value}))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Local</label>
-                <input value={form.location} onChange={e => setForm(f => ({...f, location: e.target.value}))}
+                <input aria-label="Local do evento" value={form.location} onChange={e => setForm(f => ({...f, location: e.target.value}))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" placeholder="Sala, endereço ou link" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Descrição</label>
-                <textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))}
+                <textarea aria-label="Descrição do evento" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))}
                   rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" placeholder="Detalhes..." />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-2">Cor</label>
                 <div className="flex gap-2 flex-wrap">
                   {COLORS.map(c => (
-                    <button key={c} onClick={() => setForm(f => ({...f, color: c}))}
+                    <button key={c} aria-label={'Cor do evento ' + c} aria-pressed={form.color===c} onClick={() => setForm(f => ({...f, color: c}))}
                       className={cn('w-8 h-8 rounded-full border-2 transition-all', form.color === c ? 'border-slate-700 scale-110' : 'border-transparent')}
                       style={{ backgroundColor: c }} />
                   ))}
@@ -389,8 +417,7 @@ export function CalendarPage() {
                     {users.filter(u => u.id !== user?.id).map(u => (
                       <label key={u.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 min-h-[36px]">
                         <input type="checkbox" checked={form.participant_ids.includes(u.id)} onChange={() => toggleParticipant(u.id)} className="accent-orange-500 w-4 h-4" />
-                        <img src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=24&background=f97316&color=fff`}
-                          alt={u.name} className="w-6 h-6 rounded-full" />
+                        <Avatar className="w-6 h-6"><AvatarImage src={u.photo_url} alt=""/><AvatarFallback>{u.name.split(' ').slice(0,2).map(part=>part[0]).join('')}</AvatarFallback></Avatar>
                         <span className="text-sm text-slate-700">{u.name}</span>
                       </label>
                     ))}
@@ -409,7 +436,7 @@ export function CalendarPage() {
               </button>
             </div>
           </div>
-        </div>
+        </AccessibleModal>
       )}
     </div>
   );

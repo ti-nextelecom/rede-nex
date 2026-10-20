@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { X, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface Props {
   src: string;

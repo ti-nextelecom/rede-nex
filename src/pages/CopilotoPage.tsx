@@ -1,11 +1,17 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Bot, Loader2, Send, Sparkles, User } from 'lucide-react';
 import { apiPost } from '../lib/apiClient';
+import { apiGet } from '../lib/apiClient';
+import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
+import { fetchPersonalProjects } from '../lib/personalProjects';
+import { buildWorkBriefing, type WorkTask } from '../../shared/personalWork.mjs';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  internalOnly?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -49,6 +55,9 @@ function renderMd(text: string): string {
 }
 
 export function CopilotoPage() {
+  const { user } = useAuth();
+  const [params] = useSearchParams();
+  const showDaily = params.get('briefing') === 'hoje';
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
@@ -59,6 +68,26 @@ export function CopilotoPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDaily || !user) return;
+    let active = true;
+    setLoading(true);
+    void Promise.all([apiGet<{ data: WorkTask[] }>('/tasks'), fetchPersonalProjects(user)]).then(([tasks, personal]) => {
+      if (!active) return;
+      const briefing = buildWorkBriefing(tasks.data || [], personal.projects, user.id);
+      const content = [`**Seu briefing de hoje, ${user.name.split(' ')[0]}**`,
+        `Resumo operacional interno — não gerado por IA. ${briefing.pending} pendência(s), ${briefing.overdue} vencida(s), ${briefing.today} para hoje.`,
+        ...briefing.focus.map((task, index) => `${index + 1}. ${task.title} — ${task.deadline ? `prazo ${task.deadline.slice(0, 10)}` : 'definir prazo'}`),
+        ...briefing.projects.map(project => `• ${project.name} (${project.involvement === 'responsible' ? 'responsável' : 'participante'}): ${project.pending_count === null ? 'etapas indisponíveis' : `${project.pending_count} etapa(s) pendente(s)`}.`),
+        ...(personal.incomplete ? ['Algumas etapas estão indisponíveis; o resumo pode estar incompleto.'] : []),
+        'Os dados internos permanecem na REDE NEX. A análise por IA externa depende de autorização de compartilhamento.',
+      ].join('\n\n');
+      setMessages([{ id: 'daily', role: 'assistant', content, internalOnly: true }]);
+    }).catch(() => { if (active) setMessages([{ id: 'daily-error', role: 'assistant', content: 'Não foi possível consultar suas pendências agora. Atualize a página para tentar novamente.' }]); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [showDaily, user]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,14 +103,15 @@ export function CopilotoPage() {
     setLoading(true);
 
     try {
-      const res = await apiPost<{ reply: string }>('/copiloto', {
+      const res = await apiPost<{ reply: string; internalOnly?: boolean }>('/copiloto', {
         message: trimmed,
-        history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+        history: messages.filter(m => !m.internalOnly).slice(-6).map(m => ({ role: m.role, content: m.content })),
       });
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: res.reply || 'Desculpe, não consegui processar sua mensagem.',
+        internalOnly: res.internalOnly,
       }]);
     } catch {
       setMessages(prev => [...prev, {

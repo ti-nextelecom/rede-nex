@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import type { User } from '../types';
 import { apiGet, apiPost, apiPut } from './apiClient';
 
+const READ_ONLY_REMOTE = import.meta.env.VITE_REMOTE_READ_ONLY === 'true';
+
 type LoginResult = {
   user: User & {
     must_change_password?: boolean;
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || READ_ONLY_REMOTE) return;
 
     let stopped = false;
     const beat = () => {

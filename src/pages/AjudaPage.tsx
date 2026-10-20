@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, HelpCircle, Search, BookOpen, MessageCircle, ListTodo, Smartphone, Star, Calendar, GraduationCap, TicketCheck, Send, AlertTriangle, Monitor, Download } from 'lucide-react';
-import { useAuth } from '../lib/auth';
 
 const FAQ: { category: string; icon: React.ElementType; items: { q: string; a: string }[] }[] = [
   {
@@ -77,7 +76,6 @@ const TIPOS: { value: Tipo; label: string; desc: string; icon: string }[] = [
 ];
 
 function ChamadoForm() {
-  const { user } = useAuth();
   const [tipo, setTipo] = useState<Tipo>('helpdesk');
   const [descricao, setDescricao] = useState('');
   const [urgente, setUrgente] = useState(false);

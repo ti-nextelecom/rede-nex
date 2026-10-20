@@ -118,9 +118,9 @@ export interface PcMinhasPermissoes {
 type R<T> = Promise<{ data: T }>;
 
 export const pcListSetores = (): R<Setor[]> => apiGet('/pc/setores');
-export const pcCreateSetor = (b: { nome: string; card_last4?: string | null; responsavel?: string | null; responsavel_user_id?: string | null; card_brand?: string | null }): R<Setor> => apiPost('/pc/setores', b);
-export const pcUpdateSetor = (id: string, b: { nome: string; card_last4?: string | null; responsavel?: string | null; responsavel_user_id?: string | null; ativo?: boolean; card_brand?: string | null }): R<Setor> => apiPut(`/pc/setores/${id}`, b);
-export const pcDeleteSetor = (id: string): R<{ deleted: boolean }> => apiDelete(`/pc/setores/${id}`);
+export const pcCreateSetor = (b: { nome: string; card_last4?: string | null; responsavel?: string | null; responsavel_user_id?: string | null; card_brand?: string | null; validador_user_id?: string | null }): R<Setor> => apiPost('/pc/setores', b);
+export const pcUpdateSetor = (id: string, b: { nome: string; card_last4?: string | null; responsavel?: string | null; responsavel_user_id?: string | null; ativo?: boolean; card_brand?: string | null; validador_user_id?: string | null }): R<Setor> => apiPut(`/pc/setores/${id}`, b);
+export const pcDeleteSetor = (id: string): Promise<void> => apiDelete(`/pc/setores/${id}`);
 
 export const pcListPeriodos = (setorId: string): R<Periodo[]> => apiGet(`/pc/setores/${setorId}/periodos`);
 export const pcCreatePeriodo = (b: { setor_id: string; periodo: string; data_inicio: string; data_fim: string; responsavel?: string | null; responsavel_user_id?: string | null }): R<Periodo> => apiPost('/pc/periodos', b);

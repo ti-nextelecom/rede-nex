@@ -39,6 +39,7 @@ import {
   updateProjectComment,
   updateProjectStep,
   uploadProjectAttachment,
+  uploadProjectCover,
 } from '../lib/projectsApi';
 import type { CommentMention, Project, ProjectAttachment, ProjectComment, ProjectStep, ProjectUser, Status, StepHistory } from '../lib/projectsApi';
 
@@ -50,6 +51,106 @@ const statusOptions: Status[] = [
   'Atrasado',
 ];
 
+
+function toMainStatusStep(s: Status): 'Em andamento' | 'Concluído' {
+  return (s === 'Concluído' || s === 'Concluído Antes do Prazo') ? 'Concluído' : 'Em andamento';
+}
+function toSubStatusStep(s: Status): string {
+  if (s === 'Atrasado') return 'Atrasado';
+  if (s === 'Atenção') return 'Atenção';
+  if (s === 'Não iniciado') return 'Não iniciado';
+  if (s === 'Concluído Antes do Prazo') return 'Concluído Antes do Prazo';
+  return '';
+}
+function fromMainAndSubStep(main: 'Em andamento' | 'Concluído', sub: string): Status {
+  if (main === 'Concluído') return sub === 'Concluído Antes do Prazo' ? 'Concluído Antes do Prazo' : 'Concluído';
+  if (sub === 'Atrasado') return 'Atrasado';
+  if (sub === 'Atenção') return 'Atenção';
+  if (sub === 'Não iniciado') return 'Não iniciado';
+  return 'Em andamento';
+}
+
+type StepSubOpt = { value: string; label: string; cls: string; dot: string };
+function StatusSubPickerStep({ value, onChange }: { value: Status; onChange: (s: Status) => void }) {
+  const main = toMainStatusStep(value);
+  const sub = toSubStatusStep(value);
+  const inProgressSubs: StepSubOpt[] = [
+    { value: '', label: 'Em andamento', cls: 'status-progress', dot: 'dot-progress' },
+    { value: 'Não iniciado', label: 'Aguardando', cls: 'status-idle', dot: 'dot-idle' },
+    { value: 'Atrasado', label: 'Atrasado', cls: 'status-late', dot: 'dot-late' },
+    { value: 'Atenção', label: 'Atenção', cls: 'status-attention', dot: 'dot-attention' },
+  ];
+  const doneSubs: StepSubOpt[] = [
+    { value: '', label: 'Concluído', cls: 'status-done', dot: 'dot-done' },
+    { value: 'Concluído Antes do Prazo', label: 'Antes do prazo', cls: 'status-early', dot: 'dot-early' },
+  ];
+  const subs = main === 'Em andamento' ? inProgressSubs : doneSubs;
+  return (
+    <div style={{marginTop:8}}>
+      <div style={{display:'flex',gap:8,marginBottom:6}}>
+        <label className="status-preset-option">
+          <input type="radio" name="edit_step_main" checked={main==='Em andamento'} onChange={() => onChange(fromMainAndSubStep('Em andamento', sub))} />
+          <span className="status-preset-pill status-progress"><i className="dot-progress" />Em andamento</span>
+        </label>
+        <label className="status-preset-option">
+          <input type="radio" name="edit_step_main" checked={main==='Concluído'} onChange={() => onChange(fromMainAndSubStep('Concluído', sub))} />
+          <span className="status-preset-pill status-done"><i className="dot-done" />Concluído</span>
+        </label>
+      </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,paddingLeft:8,borderLeft:'2px solid #e2e8f0'}}>
+        {subs.map(opt => (
+          <label key={opt.value} className="status-preset-option">
+            <input type="radio" name="edit_step_sub" checked={sub===opt.value} onChange={() => onChange(fromMainAndSubStep(main, opt.value))} />
+            <span className={`status-preset-pill ${opt.cls}`} style={{fontSize:11}}><i className={opt.dot} />{opt.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UserSearchSelectDetail({ users, selectName, required, emptyLabel }: { users: ProjectUser[]; selectName: string; required?: boolean; emptyLabel?: string }) {
+  const [inputText, setInputText] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [open, setOpen] = useState(false);
+  const suggestions = inputText ? users.filter(u => u.name.toLowerCase().includes(inputText.toLowerCase())) : users;
+  const handleSelect = (u: ProjectUser) => { setInputText(u.name); setSelectedId(u.id); setOpen(false); };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setInputText(e.target.value); setSelectedId(''); setOpen(true); };
+  return (
+    <div style={{position:'relative'}}>
+      <input type="text" value={inputText} onChange={handleChange} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={emptyLabel || 'Buscar usuário…'} autoComplete="off" style={{width:'100%',boxSizing:'border-box',fontSize:13,padding:'4px 8px',borderRadius:6,border:'1px solid #e2e8f0'}} />
+      <input type="hidden" name={selectName} value={selectedId} />
+      {open && suggestions.length > 0 && (
+        <div style={{position:'absolute',zIndex:9,background:'#fff',border:'1px solid #e2e8f0',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
+          {suggestions.slice(0, 8).map(u => (
+            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid #f1f5f9',cursor:'pointer',fontSize:13}}>
+              {u.photo_url ? <img src={u.photo_url} alt={u.name} style={{width:26,height:26,borderRadius:'50%',objectFit:'cover',flexShrink:0}} /> : <div style={{width:26,height:26,borderRadius:'50%',background:'#304363',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{getInitials(u.name)}</div>}
+              <span>{u.name}{u.department_name ? ` · ${u.department_name}` : ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MentionPickerDropdown({ users, selected, onAdd, onClose }: { users: ProjectUser[]; selected: { id: string; name: string }[]; onAdd: (u: ProjectUser) => void; onClose: () => void }) {
+  const [q, setQ] = useState('');
+  const available = users.filter(u => !selected.some(m => m.id === u.id));
+  const filtered = q ? available.filter(u => u.name.toLowerCase().includes(q.toLowerCase())) : available;
+  return (
+    <div className="mention-picker-dropdown">
+      <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar usuário…" autoComplete="off" style={{width:'100%',boxSizing:'border-box',padding:'4px 8px',fontSize:12,border:'1px solid #e2e8f0',borderRadius:4,marginBottom:4}} />
+      {filtered.map(u => (
+        <button key={u.id} type="button" className="mention-picker-option" onClick={() => { onAdd(u); onClose(); }}>
+          {u.photo_url ? <img src={u.photo_url} alt={u.name} className="avatar avatar-photo" style={{width:20,height:20}} /> : <div className="avatar avatar-navy" style={{width:20,height:20,fontSize:9}}>{getInitials(u.name)}</div>}
+          {u.name}
+        </button>
+      ))}
+      {filtered.length === 0 && <span style={{padding:'8px 12px',fontSize:12,color:'#64748b'}}>{available.length === 0 ? 'Todos mencionados' : 'Nenhum encontrado'}</span>}
+    </div>
+  );
+}
 
 const ACCENT_HEX: Record<string, string> = {
   blue: '#2878ee', teal: '#13a99b', pink: '#d83b9e',
@@ -83,7 +184,7 @@ const statusLabel: Record<Status, string> = {
   'Concluído': 'Concluído',
   'Concluído Antes do Prazo': 'Concluído antes do prazo',
   'Atrasado': 'Atrasado',
-  'Atenção': 'Andamento',
+  'Atenção': 'Atenção',
   'Não iniciado': 'Aguardando',
 };
 
@@ -125,6 +226,8 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
   const [uploadingFile, setUploadingFile] = useState(false);
   const [attachStepId, setAttachStepId] = useState('');
   const attachFileRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const commentImgRef = useRef<HTMLInputElement>(null);
   const [comments, setComments] = useState<ProjectComment[]>([]);
   const [commentAuthor, setCommentAuthor] = useState('');
@@ -559,6 +662,24 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
     }
   };
 
+  const handleCoverUpload = async (file: File) => {
+    setUploadingCover(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await uploadProjectCover(project.id, { data: dataUrl, file_name: file.name, file_type: file.type });
+      onProjectUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao enviar capa.');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
   const handleReorder = async (fromIdx: number, toIdx: number) => {
     if (fromIdx === toIdx) return;
     const reordered = [...steps];
@@ -632,7 +753,19 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       <button className="back-button" onClick={onBack}><ArrowLeft size={16} /> Voltar para projetos</button>
 
       <div className="detail-header">
-        <div className={`project-badge tone-${project.accent} large-badge`}>{project.code}</div>
+        <div className="detail-cover-wrap">
+          {project.cover_image
+            ? <img src={project.cover_image} alt={project.code} className="detail-cover-img" />
+            : <div className={`project-badge tone-${project.accent} large-badge`}>{project.code}</div>}
+          {isAdmin && (
+            <button className="cover-upload-btn" title={uploadingCover ? 'Enviando...' : 'Trocar capa'} disabled={uploadingCover}
+              onClick={() => coverInputRef.current?.click()}>
+              <ImagePlus size={15} />
+            </button>
+          )}
+          <input ref={coverInputRef} type="file" accept="image/*" style={{display:'none'}}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value=''; }} />
+        </div>
         <div>
           <span className="card-category">{project.category}</span>
           <h2 className="detail-title">{project.name}</h2>
@@ -724,15 +857,12 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
                     <Plus size={12} /> @Mencionar
                   </button>
                   {showMentionPicker && (
-                    <div className="mention-picker-dropdown">
-                      {users.filter((u) => !commentMentions.some((m) => m.id === u.id)).map((u) => (
-                        <button key={u.id} type="button" className="mention-picker-option" onClick={() => { setCommentMentions((prev) => [...prev, { id: u.id, name: u.name }]); setShowMentionPicker(false); }}>
-                          {u.photo_url ? <img src={u.photo_url} alt={u.name} className="avatar avatar-photo" style={{width:20,height:20}} /> : <div className="avatar avatar-navy" style={{width:20,height:20,fontSize:9}}>{getInitials(u.name)}</div>}
-                          {u.name}
-                        </button>
-                      ))}
-                      {users.filter((u) => !commentMentions.some((m) => m.id === u.id)).length === 0 && <span style={{padding:'8px 12px',fontSize:12,color:'#64748b'}}>Todos mencionados</span>}
-                    </div>
+                    <MentionPickerDropdown
+                      users={users}
+                      selected={commentMentions}
+                      onAdd={(u) => setCommentMentions((prev) => [...prev, { id: u.id, name: u.name }])}
+                      onClose={() => setShowMentionPicker(false)}
+                    />
                   )}
                 </div>
               </div>
@@ -1082,7 +1212,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       </div>
 
       {showStepForm && createPortal(
-        <div className="modal-overlay" onClick={() => setShowStepForm(false)}>
+        <div className="project-dialog modal-overlay" onClick={() => setShowStepForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div><span className="section-kicker">Nova etapa</span><h3>{project.name}</h3></div>
@@ -1099,15 +1229,22 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
               </div>
               <label>Status inicial
                 <div className="status-preset-picker">
-                  {statusOptions.map((s) => (
-                    <label key={s} className="status-preset-option">
-                      <input type="radio" name="status_preset" value={s} defaultChecked={s === 'Não iniciado'} onChange={() => setStepFormCustomStatus(false)} />
-                      <span className={`status-preset-pill ${statusPillClass[s]}`}>
-                        <i className={statusDotClass[s]} />
-                        {statusLabel[s]}
-                      </span>
-                    </label>
-                  ))}
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:6}}>
+                    {(['Em andamento','Não iniciado','Atrasado','Atenção'] as Status[]).map((s) => (
+                      <label key={s} className="status-preset-option">
+                        <input type="radio" name="status_preset" value={s} defaultChecked={s === 'Não iniciado'} onChange={() => setStepFormCustomStatus(false)} />
+                        <span className={`status-preset-pill ${statusPillClass[s]}`}><i className={statusDotClass[s]} />{statusLabel[s]}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6,paddingLeft:8,borderLeft:'2px solid #e2e8f0',marginBottom:6}}>
+                    {(['Concluído','Concluído Antes do Prazo'] as Status[]).map((s) => (
+                      <label key={s} className="status-preset-option">
+                        <input type="radio" name="status_preset" value={s} defaultChecked={false} onChange={() => setStepFormCustomStatus(false)} />
+                        <span className={`status-preset-pill ${statusPillClass[s]}`}><i className={statusDotClass[s]} />{statusLabel[s]}</span>
+                      </label>
+                    ))}
+                  </div>
                   <label className="status-preset-option">
                     <input type="radio" name="status_preset" value="__custom__" onChange={() => setStepFormCustomStatus(true)} />
                     <span className="status-preset-pill status-custom">
@@ -1141,14 +1278,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
                 <p className="step-form-no-users">Nenhum usuário cadastrado ainda.</p>
               ) : (
                 <label>Responsável <span className="optional">opcional</span>
-                  <select name="user_id" defaultValue="">
-                    <option value="">Sem responsável</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}{u.department_name ? ` · ${u.department_name}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <UserSearchSelectDetail users={users} selectName="user_id" emptyLabel="Sem responsável" />
                 </label>
               )}
               <div className="form-actions">
@@ -1161,7 +1291,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       document.body)}
 
       {editingStep && createPortal(
-        <div className="modal-overlay" onClick={() => setEditingStep(null)}>
+        <div className="project-dialog modal-overlay" onClick={() => setEditingStep(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div><span className="section-kicker">Editar etapa</span><h3>{editingStep.name}</h3></div>
@@ -1179,14 +1309,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
                 <label>Prazo final<input type="date" value={editStepData.deadline} onChange={(e) => setEditStepData((d) => ({ ...d, deadline: e.target.value }))} /></label>
               </div>
               <label>Status
-                <div className="status-preset-picker" style={{marginTop:8}}>
-                  {statusOptions.map((s) => (
-                    <label key={s} className="status-preset-option">
-                      <input type="radio" name="edit_step_status" value={s} checked={editStepData.status === s} onChange={() => setEditStepData((d) => ({ ...d, status: s }))} />
-                      <span className={`status-preset-pill ${statusPillClass[s]}`}><i />{statusLabel[s]}</span>
-                    </label>
-                  ))}
-                </div>
+                <StatusSubPickerStep value={editStepData.status} onChange={(s) => setEditStepData((d) => ({ ...d, status: s }))} />
               </label>
               <label>Etiqueta <span className="optional">opcional</span>
                 <input value={editStepData.tag} onChange={(e) => setEditStepData((d) => ({ ...d, tag: e.target.value }))} placeholder="Ex.: BLOQUEADO, CRÍTICO, AGUARDA…" maxLength={25} />
@@ -1202,7 +1325,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       document.body)}
 
       {editingStepStatus && createPortal(
-        <div className="modal-overlay" onClick={() => setEditingStepStatus(null)}>
+        <div className="project-dialog modal-overlay" onClick={() => setEditingStepStatus(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div><span className="section-kicker">Status da etapa</span><h3>{editingStepStatus.name}</h3></div>
@@ -1250,7 +1373,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       document.body)}
 
       {deliveryStep && createPortal(
-        <div className="modal-overlay" onClick={() => { setDeliveryStep(null); setEditingDelivery(false); }}>
+        <div className="project-dialog modal-overlay" onClick={() => { setDeliveryStep(null); setEditingDelivery(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div><span className="section-kicker">{editingDelivery ? 'Editar data de entrega' : 'Registrar entrega'}</span><h3>{deliveryStep.name}</h3></div>
@@ -1272,7 +1395,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       document.body)}
 
       {historyStep && createPortal(
-        <div className="modal-overlay" onClick={() => setHistoryStep(null)}>
+        <div className="project-dialog modal-overlay" onClick={() => setHistoryStep(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:560}}>
             <div className="modal-header">
               <div><span className="section-kicker">Histórico da etapa</span><h3>{historyStep.name}</h3></div>
@@ -1305,7 +1428,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
       document.body)}
 
       {assigningStep && createPortal(
-        <div className="modal-overlay" onClick={() => setAssigningStep(null)}>
+        <div className="project-dialog modal-overlay" onClick={() => setAssigningStep(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
@@ -1321,14 +1444,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
             ) : (
               <form className="project-form" onSubmit={handleAssignUser}>
                 <label>{assigningType === 'responsible' ? 'Responsável (único)' : 'Participante'}
-                  <select name="user_id" required defaultValue="">
-                    <option value="" disabled>Selecione…</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}{u.department_name ? ` · ${u.department_name}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <UserSearchSelectDetail users={users} selectName="user_id" required emptyLabel="Selecione…" />
                 </label>
                 {assigningType === 'responsible' && <p style={{fontSize:12,color:'#64748b',margin:0}}>O responsável aparece na tela de apresentação. Apenas um por etapa.</p>}
                 <div className="form-actions">

@@ -1,11 +1,15 @@
 import {
-  ChangeEvent, FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState,
+  ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
+import { dayKey } from '../../shared/personalWork.mjs';
+import { wsEventBus } from '../lib/wsEventBus';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import {
   AlarmClock, Bell, BellOff, BookOpen, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronsDown, ChevronUp, Crown, Eye, FileText, History, Image,
-  Mic, MicOff, MessageCircle, Moon, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Plus, Reply, Search, Send,
-  Settings, Shield, Smile, Sticker, Sun, Trash2, UserMinus, UserPlus, Users, Video, X,
+  Mic, MicOff, MessageCircle, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Plus, Reply, Search, Send,
+  Settings, Shield, Smile, Sticker, Trash2, UserMinus, UserPlus, Users, Video, X,
 } from 'lucide-react';
 import {
   addParticipantsToGroup, createConversation, deleteChatMessage, editChatMessage, getConversations,
@@ -25,6 +29,7 @@ import { getRanking } from '../lib/gamificationApi';
 import type { User } from '../types';
 import type { RankingEntry } from '../lib/gamificationApi';
 import { StoriesBar } from '../components/stories/StoriesBar';
+import './chat.css';
 
 interface IncomingToast { id: string; title: string; body: string; conversationId: string; }
 
@@ -167,7 +172,6 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   const [loadingReaders, setLoadingReaders] = useState(false);
   const historyBtnRef = useRef<HTMLButtonElement | null>(null);
   const [historyBtnRect, setHistoryBtnRect] = useState<DOMRect | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
   const [swipeDx, setSwipeDx] = useState(0);
 
@@ -177,13 +181,6 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     if (dx < 0 && Math.abs(dx) < 90) setSwipeDx(dx);
   }
   function handleTouchEnd() { if (swipeDx < -50 && onReply) onReply(message); setSwipeDx(0); }
-
-  useEffect(() => {
-    if (!showMenu) return;
-    function close(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); }
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [showMenu]);
 
   async function handleViewReaders() {
     if (readers !== null) { setReaders(null); return; }
@@ -216,8 +213,8 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   }
 
 
-  const menu = showMenu && (
-    <div ref={menuRef} className={`absolute z-40 ${mine ? 'right-8' : 'left-8'} bottom-full mb-1 rounded-xl border border-slate-200 bg-white shadow-xl py-1 min-w-[148px]`}>
+  const menu = (
+    <div className="chat-message-actions">
       {onReply && <button onClick={() => { onReply(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><Reply size={14} className="text-blue-500" /> Responder</button>}
       {canEdit && <button onClick={() => { onEdit!(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><Pencil size={14} className="text-orange-500" /> Editar</button>}
       {canDelete && <button onClick={() => { onDelete!(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Excluir</button>}
@@ -252,7 +249,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   );
 
   const timestamp = (
-    <div className="mt-1 flex items-center gap-1 justify-end text-[10px]" style={{ color: mine ? `${theme.textColor}99` : '#9ca3af' }}>
+    <div className="chat-message-metadata mt-1 flex items-center gap-1 justify-end text-[10px]" style={{ color: mine ? `${theme.textColor}99` : '#9ca3af' }}>
       <button onClick={() => setShowTooltip(v => !v)} className="hover:underline">{timeLabel(message.created_at)}</button>
       {message.edited_at && (
         <button ref={historyBtnRef} onClick={loadHistory} title="Ver histórico" className="hover:opacity-80"><Pencil size={9} /></button>
@@ -292,11 +289,16 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   );
 
   const menuBtn = (
-    <button onClick={e => { e.stopPropagation(); setShowMenu(v => !v); }}
+    <Popover open={showMenu} onOpenChange={setShowMenu}>
+    <PopoverTrigger asChild>
+    <button onClick={e => e.stopPropagation()} aria-label="Opções da mensagem" aria-expanded={showMenu}
       className="absolute -top-2 opacity-0 group-hover:opacity-100 h-7 w-7 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-800 transition-opacity"
       style={mine ? { right: 4 } : { left: 4 }}>
       <MoreVertical size={13} />
     </button>
+    </PopoverTrigger>
+    <PopoverContent align={mine ? 'end' : 'start'} side="top" sideOffset={8} collisionPadding={12} className="chat-message-menu w-52 rounded-xl border-slate-700 bg-[#192437] p-1.5 text-slate-100">{menu}</PopoverContent>
+    </Popover>
   );
 
   const swipeStyle = { transform: `translateX(${swipeDx}px)`, transition: swipeDx === 0 ? 'transform 0.2s' : 'none' };
@@ -310,7 +312,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           <audio controls src={content.slice(11)} className="w-full max-w-[360px] h-12" preload="none" style={{ minWidth: 280 }} />
           {timestamp}
         </div>
-        {menuBtn}{menu}{tooltip}{editHistory}{readersPopup}
+        {menuBtn}{tooltip}{editHistory}{readersPopup}
       </div>
     );
   }
@@ -331,7 +333,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           </a>
           {timestamp}
         </div>
-        {menuBtn}{menu}{tooltip}{editHistory}{readersPopup}
+        {menuBtn}{tooltip}{editHistory}{readersPopup}
       </div>
     );
   }
@@ -346,7 +348,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
             {timeLabel(message.created_at)}<ReadTick mine={mine} seen={seen} />
           </div>
         </div>
-        {menuBtn}{menu}{tooltip}{editHistory}
+        {menuBtn}{tooltip}{editHistory}
       </div>
     );
   }
@@ -366,7 +368,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}>{caption}</p>}
           {timestamp}
         </div>
-        {menuBtn}{menu}{tooltip}{editHistory}
+        {menuBtn}{tooltip}{editHistory}
       </div>
     );
   }
@@ -385,7 +387,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}>{caption}</p>}
           {timestamp}
         </div>
-        {menuBtn}{menu}{tooltip}{editHistory}
+        {menuBtn}{tooltip}{editHistory}
       </div>
     );
   }
@@ -399,7 +401,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
         <p className="whitespace-pre-wrap text-[17px] leading-relaxed break-words">{content}</p>
         {timestamp}
       </div>
-      {menuBtn}{menu}{tooltip}{editHistory}{readersPopup}
+      {menuBtn}{tooltip}{editHistory}{readersPopup}
     </div>
   );
 }
@@ -558,7 +560,13 @@ function GroupSettings({
 }
 
 /* ── ThemePanel ─────────────────────────────────────────────────────────── */
-function ThemePanel({ theme, onChange, onClose }: { theme: ChatTheme; onChange: (t: ChatTheme) => void; onClose: () => void }) {
+function ThemePanel({ theme, darkMode, onChange, onToggleDark, onClose }: {
+  theme: ChatTheme;
+  darkMode: boolean;
+  onChange: (t: ChatTheme) => void;
+  onToggleDark: () => void;
+  onClose: () => void;
+}) {
   const BUBBLE_PRESETS = ['#005c4b', '#1d4ed8', '#7c3aed', '#be185d', '#b45309', '#1f2937'];
   const BG_PRESETS = ['#eef2f5', '#f0fdf4', '#fef3c7', '#fdf2f8', '#eff6ff', '#1a1a2e'];
   const BG_IMAGES = [
@@ -612,6 +620,16 @@ function ThemePanel({ theme, onChange, onClose }: { theme: ChatTheme; onChange: 
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={15} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Aparência</p>
+            <button type="button" onClick={onToggleDark} aria-pressed={darkMode}
+              className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <span>Modo escuro</span>
+              <span className={cn('text-xs font-semibold', darkMode ? 'text-orange-600' : 'text-slate-500')}>
+                {darkMode ? 'Ativado' : 'Desativado'}
+              </span>
+            </button>
+          </div>
           <div>
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Cor das suas mensagens</p>
             <div className="flex flex-wrap gap-2">
@@ -867,12 +885,18 @@ function UserProfileModal({ profileUser, conversations, onClose, onChat }: {
 /* ── Main Chat ──────────────────────────────────────────────────────────── */
 export function Chat() {
   const { user } = useAuth();
+  const [chatParams, setChatParams] = useSearchParams();
+  const requestedConversation = chatParams.get('conversa');
 
   const [callState, setCallStateLocal] = useState<CallState>(() => callStore.getState());
   useEffect(() => callStore.subscribe(setCallStateLocal), []);
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const currentConversation = useRef<string | null>(null);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState('');
+  useEffect(() => { currentConversation.current = selectedId; }, [selectedId]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -881,6 +905,7 @@ export function Chat() {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionParticipants, setMentionParticipants] = useState<import('../lib/chatApi').GroupParticipant[]>([]);
   const [conversationSearch, setConversationSearch] = useState('');
+  const [conversationFilter, setConversationFilter] = useState<'all' | 'unread' | 'groups'>('all');
   const [userSearch, setUserSearch] = useState('');
   const [messageSearch, setMessageSearch] = useState('');
   const [showMsgSearch, setShowMsgSearch] = useState(false);
@@ -915,6 +940,7 @@ export function Chat() {
   // Theme — loaded from localStorage for immediate display, synced from API on mount
   const [theme, setTheme] = useState<ChatTheme>(loadTheme);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('chat_dark_mode') === '1');
+  const [openConvActionsId, setOpenConvActionsId] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<{ data: ChatTheme | null }>('/users/me/chat-theme').then(res => {
@@ -977,6 +1003,11 @@ export function Chat() {
   const atBottomRef = useRef(true);
 
   const selectedConversation = conversations.find(c => c.id === selectedId);
+  const selectedMuted = !!selectedConversation?.is_muted;
+  useEffect(() => {
+    wsEventBus.emit({ type: 'conversation:active', conversationId: selectedId });
+    return () => wsEventBus.emit({ type: 'conversation:active', conversationId: null });
+  }, [selectedId]);
 
   const usersById = useMemo(() => {
     const map = new Map<string, User>();
@@ -1021,14 +1052,28 @@ export function Chat() {
     return next;
   }, [selectedId]);
 
+  useEffect(() => {
+    if (requestedConversation && conversations.some(c => c.id === requestedConversation)) {
+      setSelectedId(requestedConversation);
+      setMobileView('messages');
+      setChatParams(params => { params.delete('conversa'); return params; }, { replace: true });
+    }
+  }, [requestedConversation, conversations, setChatParams]);
+
   const loadMessages = useCallback(async (conversationId: string, notify = false) => {
-    const { messages: next, hasMore } = await getMessages(conversationId);
+    const result = await getMessages(conversationId).catch(() => {
+      if (currentConversation.current === conversationId) { setMessagesLoading(false); setMessagesError('Não foi possível atualizar as mensagens.'); }
+      return null;
+    });
+    if (!result || currentConversation.current !== conversationId) return;
+    const { messages: next, hasMore } = result;
+    setMessagesLoading(false); setMessagesError('');
     const previousIds = knownMessageIdsRef.current;
     const incoming = next.filter(m => !previousIds.has(m.id) && m.sender_id !== user?.id);
     knownMessageIdsRef.current = new Set(next.map(m => m.id));
     setMessages(next);
     setHasMoreMessages(hasMore);
-    const convIsMuted = conversationId ? mutedConvIds.has(conversationId) : false;
+    const convIsMuted = selectedMuted;
     if (notify && incoming.length && !firstLoadRef.current && !convIsMuted) {
       const last = incoming[incoming.length - 1];
       const title = last.sender?.name || selectedConversation?.name || 'Nova mensagem';
@@ -1050,7 +1095,7 @@ export function Chat() {
       }
     }
     firstLoadRef.current = false;
-  }, [browserNotifications, selectedConversation?.name, soundEnabled, user?.id]);
+  }, [browserNotifications, selectedConversation?.name, soundEnabled, user?.id, selectedMuted]);
 
   const loadOlderMessages = useCallback(async () => {
     if (!selectedId || loadingOlder || !hasMoreMessages) return;
@@ -1059,6 +1104,7 @@ export function Chat() {
     setLoadingOlder(true);
     try {
       const { messages: older, hasMore } = await getMessages(selectedId, oldest.id);
+      if (currentConversation.current !== selectedId) return;
       setMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id));
         const fresh = older.filter(m => !existingIds.has(m.id));
@@ -1082,6 +1128,7 @@ export function Chat() {
     firstLoadRef.current = true;
     knownMessageIdsRef.current = new Set();
     setHasMoreMessages(false);
+    setMessagesLoading(true); setMessagesError(''); setMessages([]);
     loadMessages(selectedId, false);
     markConversationRead(selectedId).catch(() => {});
     const iv = setInterval(() => { loadMessages(selectedId, true); loadConversations(); }, 3500);
@@ -1113,6 +1160,16 @@ export function Chat() {
   useEffect(() => {
     const c = messagesContainerRef.current;
     if (c && atBottomRef.current) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+  }, [messages.length]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    // Images can change row height after the request finishes. Follow only if
+    // the user was already at the bottom; never pull them away from history.
+    const observer = new ResizeObserver(() => { if (atBottomRef.current) container.scrollTop = container.scrollHeight; });
+    container.querySelectorAll('.chat-message-row').forEach(row => observer.observe(row));
+    return () => observer.disconnect();
   }, [messages.length]);
 
   useEffect(() => {
@@ -1157,10 +1214,6 @@ export function Chat() {
     }
     await sendText(messageText);
     setMessageText('');
-  }
-
-  function handleKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
   function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
@@ -1260,15 +1313,6 @@ export function Chat() {
     setSelectedId(conv.id);
   }
 
-  async function openSelfChat() {
-    const existing = conversations.find(c => c.type === 'direct' && !c.other_participant);
-    if (existing) { setSelectedId(existing.id); setMobileView('messages'); return; }
-    const conv = await createConversation({ type: 'direct', participant_ids: [user!.id] });
-    await loadConversations();
-    setSelectedId(conv.id);
-    setMobileView('messages');
-  }
-
   function handleConvUpdate(updated: ChatConversation) {
     setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
   }
@@ -1342,9 +1386,6 @@ export function Chat() {
     setReminderText(''); setReminderDateTime(''); setShowReminderModal(false);
   }
 
-  // Muted conversation ids
-  const mutedConvIds = useMemo(() => new Set(conversations.filter(c => c.is_muted).map(c => c.id)), [conversations]);
-
   // Unread counts by user ID (for right panel badges)
   const unreadByUserId = useMemo(() => {
     const map = new Map<string, number>();
@@ -1359,9 +1400,12 @@ export function Chat() {
   // Filtered conversations
   const filteredConversations = useMemo(() => {
     const q = conversationSearch.trim().toLowerCase();
-    const base = !q ? conversations : conversations.filter(c => c.name?.toLowerCase().includes(q) || c.last_message?.content?.toLowerCase().includes(q));
+    const base = conversations.filter(c => {
+      const matchesFilter = conversationFilter === 'all' || (conversationFilter === 'unread' ? c.unread_count > 0 : c.type === 'group');
+      return matchesFilter && (!q || `${c.name || ''} ${c.other_participant?.name || ''} ${c.last_message?.content || ''}`.toLowerCase().includes(q));
+    });
     return [...base].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
-  }, [conversations, conversationSearch]);
+  }, [conversations, conversationSearch, conversationFilter]);
 
   // Filtered messages (search)
   const displayedMessages = useMemo(() => {
@@ -1382,6 +1426,7 @@ export function Chat() {
   return (
     <div
       className={cn('chat-shell flex overflow-hidden', darkMode ? 'bg-[#111b21] chat-dark' : 'bg-slate-50')}
+      data-mobile-view={mobileView}
     >
       {/* Lightbox */}
       {lightboxSrc && (
@@ -1414,25 +1459,23 @@ export function Chat() {
 
       {/* ── Left: Conversations ── */}
       <aside className={cn(
-        cn('overflow-hidden border-r flex flex-col flex-shrink-0', darkMode ? 'bg-[#111b21] border-[#2a3942]' : 'bg-slate-50 border-slate-200'),
+        cn('chat-conversations overflow-hidden border-r flex flex-col flex-shrink-0', darkMode ? 'bg-[#111b21] border-[#2a3942]' : 'bg-slate-50 border-slate-200'),
         'w-full md:w-[260px]',
         mobileView === 'messages' ? 'hidden md:flex' : 'flex'
       )}>
-        <div className="border-b border-slate-100 p-4 flex-shrink-0">
+        <div className="chat-list-heading border-b border-slate-100 p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className={cn("text-lg font-bold", darkMode ? "text-[#e9edef]" : "text-slate-900")}>Bate-papo</h1>
-              <p className={cn("text-xs", darkMode ? "text-[#8696a0]" : "text-slate-600")}>Mensagens, diretas e grupos</p>
+              <p className={cn("text-xs", darkMode ? "text-[#8696a0]" : "text-slate-600")}>Sua equipe, mais perto.</p>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={toggleDark} className={cn('h-9 w-9 rounded-lg flex items-center justify-center transition-colors', darkMode ? 'bg-slate-700 text-yellow-300 hover:bg-slate-600' : 'text-slate-500 hover:bg-slate-100')} title={darkMode ? 'Modo claro' : 'Modo noturno'}>
-                {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
+            <div className="chat-list-actions flex items-center gap-1">
+              <button type="button" onClick={() => setMobileUsersOpen(true)} className="chat-icon-button" title="Encontrar pessoas" aria-label="Encontrar pessoas"><UserPlus size={22} /></button>
               <button onClick={() => setShowTheme(v => !v)} className={cn('h-9 w-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100', showTheme && 'bg-orange-50 text-orange-600')} title="Personalizar"><Palette size={16} /></button>
               <button onClick={() => setNewGroupOpen(v => !v)} className="h-9 w-9 rounded-lg bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600" title="Criar grupo"><Plus size={17} /></button>
             </div>
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="chat-preferences mt-3 flex gap-2">
             <button onClick={() => setSoundEnabled(v => !v)}
               className={cn('flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold', soundEnabled ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600')}>
               {soundEnabled ? <Bell size={13} /> : <BellOff size={13} />} Som
@@ -1444,7 +1487,12 @@ export function Chat() {
           </div>
           <div className="relative mt-2">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={conversationSearch} onChange={e => setConversationSearch(e.target.value)} placeholder="Buscar conversas..." className={cn("h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400", darkMode ? "bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]" : "border-slate-200 bg-white")} />
+            <input value={conversationSearch} onChange={e => setConversationSearch(e.target.value)} placeholder="Buscar conversas..." aria-label="Buscar conversas" className={cn("h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400", darkMode ? "bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]" : "border-slate-200 bg-white")} />
+          </div>
+          <div className="chat-conversation-filters" aria-label="Filtrar conversas">
+            {([{ id: 'all', label: 'Todas' }, { id: 'unread', label: 'Não lidas' }, { id: 'groups', label: 'Grupos' }] as const).map(filter => (
+              <button key={filter.id} type="button" aria-pressed={conversationFilter === filter.id} onClick={() => setConversationFilter(filter.id)}>{filter.label}</button>
+            ))}
           </div>
         </div>
 
@@ -1517,36 +1565,44 @@ export function Chat() {
           document.body
         )}
 
-        <StoriesBar />
-        <div className="flex-1 overflow-y-auto">
+        <div className="chat-stories"><StoriesBar /></div>
+        <div className="chat-conversation-list flex-1 overflow-y-auto">
 
-          {filteredConversations.length ? filteredConversations.map(conv => (
-            <div key={conv.id} className={cn('group w-full border-b flex items-center gap-3 transition-colors', darkMode ? 'border-[#2a3942] hover:bg-[#1f2c34]' : 'border-slate-50 hover:bg-slate-50', selectedId === conv.id && (darkMode ? 'bg-[#2a3942]' : 'bg-orange-50'))}>
+          {filteredConversations.length ? filteredConversations.map((conv, index) => (
+            <div key={conv.id} className={cn(
+              'chat-conversation-row group relative w-full border-b flex items-center gap-3 transition-colors',
+              darkMode ? 'border-[#2a3942] hover:bg-[#1f2c34]' : 'border-slate-50 hover:bg-slate-50',
+              conv.type === 'direct' && !!conv.other_participant && !conv.other_participant.online &&
+                filteredConversations[index - 1]?.type === 'direct' &&
+                filteredConversations[index - 1]?.other_participant?.online &&
+                (darkMode ? 'mt-4 border-t-2 border-t-[#3b4a54] pt-2' : 'mt-4 border-t-2 border-t-slate-200 pt-2'),
+              selectedId === conv.id && (darkMode ? 'bg-[#2a3942]' : 'bg-orange-50'),
+            )}>
               {/* Avatar: click → profile (direct) or select (group) */}
               <button
                 onClick={() => {
                   if (conv.type === 'direct') openProfileFromConv(conv);
                   else { setSelectedId(conv.id); setMobileView('messages'); }
                 }}
-                className="pl-4 py-3 flex-shrink-0 hover:opacity-80 transition-opacity"
+                className="chat-conversation-avatar pl-4 py-3 flex-shrink-0 hover:opacity-80 transition-opacity"
                 title={conv.type === 'direct' ? 'Ver perfil' : undefined}
               >
                 <ConvAvatar conv={conv} usersById={usersById} />
               </button>
               {/* Body: click → select conversation */}
-              <button onClick={() => { setSelectedId(conv.id); setMobileView('messages'); setMentionQuery(null); setMentionParticipants([]); }} className="min-w-0 flex-1 text-left pr-2 py-3">
+              <button onClick={() => { setSelectedId(conv.id); setMobileView('messages'); setMentionQuery(null); setMentionParticipants([]); }} className="chat-conversation-body min-w-0 flex-1 text-left pr-2 py-3" aria-current={selectedId === conv.id ? 'true' : undefined} title={conv.name || 'Minhas notas'}>
                 <div className="flex items-center gap-1.5">
-                  <p className={cn("truncate text-[15px] font-bold", darkMode ? "text-[#e9edef]" : "text-slate-800")}>{conv.type === 'direct' && !conv.other_participant ? 'Minhas Notas' : (conv.name || 'Conversa direta')}</p>
+                  <p className={cn("chat-conversation-name min-w-0 whitespace-normal break-words text-[15px] font-bold leading-5", darkMode ? "text-[#e9edef]" : "text-slate-800")}>{conv.type === 'direct' && !conv.other_participant ? 'Minhas notas' : (conv.name || 'Conversa direta')}</p>
                   {conv.is_pinned && <Pin size={10} className="text-orange-400 flex-shrink-0" />}
                   {conv.unread_count > 0 && !conv.is_muted && <span className="flex-shrink-0 min-w-[20px] text-center rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white leading-tight">{conv.unread_count}</span>}
                   {conv.is_muted && <BellOff size={11} className="text-slate-400 flex-shrink-0" />}
                 </div>
                 {conv.type === 'direct' ? (
-                  <p className={cn('truncate text-xs font-medium', conv.other_participant?.online ? 'text-emerald-600' : 'text-slate-500')}>
+                  <p className={cn('chat-conversation-preview truncate text-xs font-medium', conv.other_participant?.online ? 'text-emerald-600' : 'text-slate-500')}>
                     {convPresenceLabel(conv)}
                   </p>
                 ) : (
-                  <p className="truncate text-xs text-slate-600">
+                  <p className="chat-conversation-preview truncate text-xs text-slate-600">
                     {conv.last_message?.content?.startsWith('[AUDIO_MSG]') ? '🎤 Áudio'
                       : conv.last_message?.content?.startsWith('[STICKER]') ? '🎭 Figurinha'
                       : conv.last_message?.content?.startsWith('[IMAGE]') ? '📷 Foto'
@@ -1555,38 +1611,59 @@ export function Chat() {
                   </p>
                 )}
               </button>
-              <button
-                onClick={e => handlePinConversation(conv.id, e)}
-                title={conv.is_pinned ? 'Desafixar conversa' : 'Fixar conversa'}
-                className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Pin size={14} className={conv.is_pinned ? 'text-orange-500' : ''} />
-              </button>
-              <button
-                onClick={e => handleToggleMute(conv.id, e)}
-                title={conv.is_muted ? 'Reativar notificações' : 'Silenciar'}
-                className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-orange-500 mr-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                {conv.is_muted ? <Bell size={14} /> : <BellOff size={14} />}
-              </button>
+              <div className="chat-conversation-actions absolute bottom-1 right-1 hidden opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 md:flex">
+                <button
+                  onClick={e => handlePinConversation(conv.id, e)}
+                  title={conv.is_pinned ? 'Desafixar conversa' : 'Fixar conversa'}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-orange-500"
+                >
+                  <Pin size={14} className={conv.is_pinned ? 'text-orange-500' : ''} />
+                </button>
+                <button
+                  onClick={e => handleToggleMute(conv.id, e)}
+                  title={conv.is_muted ? 'Reativar notificações' : 'Silenciar'}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-orange-500"
+                >
+                  {conv.is_muted ? <Bell size={14} /> : <BellOff size={14} />}
+                </button>
+              </div>
+              <Popover open={openConvActionsId === conv.id} onOpenChange={open => setOpenConvActionsId(open ? conv.id : null)}>
+                <PopoverTrigger asChild>
+                  <button type="button" className="chat-conversation-more flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-orange-500 md:hidden"
+                    aria-label={`Opções da conversa ${conv.name || 'Conversa direta'}`}>
+                    <MoreVertical size={18} aria-hidden="true" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" sideOffset={6} className="w-48 border-slate-700 bg-[#192437] p-1.5 text-slate-100">
+                  <button type="button" onClick={e => { setOpenConvActionsId(null); void handlePinConversation(conv.id, e); }}
+                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-slate-700">
+                    <Pin size={15} aria-hidden="true" /> {conv.is_pinned ? 'Desafixar conversa' : 'Fixar conversa'}
+                  </button>
+                  <button type="button" onClick={e => { setOpenConvActionsId(null); void handleToggleMute(conv.id, e); }}
+                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-slate-700">
+                    {conv.is_muted ? <Bell size={15} aria-hidden="true" /> : <BellOff size={15} aria-hidden="true" />}
+                    {conv.is_muted ? 'Reativar notificações' : 'Silenciar'}
+                  </button>
+                </PopoverContent>
+              </Popover>
             </div>
           )) : (
-            <div className={cn("p-8 text-center text-sm", darkMode ? "text-[#8696a0]" : "text-slate-600")}>Nenhuma conversa criada.</div>
+            <div className="chat-list-empty"><Search size={28} /><strong>Nenhuma conversa encontrada</strong><p>{conversationSearch || conversationFilter !== 'all' ? 'Ajuste a busca ou os filtros.' : 'Encontre uma pessoa da equipe para começar.'}</p>{(conversationSearch || conversationFilter !== 'all') && <button type="button" onClick={() => { setConversationSearch(''); setConversationFilter('all'); }}>Limpar filtros</button>}</div>
           )}
         </div>
       </aside>
 
       {/* ── Center: Messages ── */}
       <main className={cn(
-        cn('min-w-0 overflow-hidden flex-col flex-1 lg:rounded-r-2xl', darkMode ? 'bg-[#0d1418]' : 'bg-white'),
+        cn('chat-message-pane min-w-0 overflow-hidden flex-col flex-1 lg:rounded-r-2xl', darkMode ? 'bg-[#0d1418]' : 'bg-white'),
         mobileView === 'list' ? 'hidden md:flex' : 'flex'
       )}>
         {selectedConversation ? (
           <>
             {/* Header */}
-            <div className={cn("flex items-center gap-2 border-b px-3 md:px-5 py-3 flex-shrink-0", darkMode ? "border-[#2a3942] bg-[#202c33]" : "border-slate-100 bg-white")}>
+            <div className={cn("chat-thread-header flex items-center gap-2 border-b px-3 md:px-5 py-3 flex-shrink-0", darkMode ? "border-[#2a3942] bg-[#202c33]" : "border-slate-100 bg-white")}>
               <button className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 flex-shrink-0"
-                onClick={() => setMobileView('list')}>
+                onClick={() => setMobileView('list')} aria-label="Voltar às conversas">
                 <ChevronLeft size={20} />
               </button>
               <button
@@ -1596,13 +1673,13 @@ export function Chat() {
               >
                 <ConvAvatar conv={selectedConversation} usersById={usersById} />
               </button>
-              <div className="min-w-0 flex-1">
+              <div className="chat-thread-identity min-w-0 flex-1">
                 <button
                   onClick={() => openProfileFromConv(selectedConversation)}
                   className={cn('truncate text-base font-bold block w-full text-left', darkMode ? 'text-[#e9edef]' : 'text-slate-900', selectedConversation.type === 'direct' && 'hover:text-[#0057b8] transition-colors')}
                   disabled={selectedConversation.type !== 'direct'}
                 >
-                  {selectedConversation.name || 'Conversa direta'}
+                  {selectedConversation.type === 'direct' && !selectedConversation.other_participant ? 'Minhas notas' : selectedConversation.name || 'Conversa direta'}
                 </button>
                 {selectedConversation.type === 'group' ? (
                   <p className="text-xs text-slate-600">
@@ -1614,7 +1691,7 @@ export function Chat() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="chat-thread-actions flex items-center gap-1 flex-shrink-0">
                 {selectedConversation.type === 'direct' && selectedConversation.other_participant && (
                   <>
                     <button
@@ -1644,11 +1721,12 @@ export function Chat() {
                 <button
                   onClick={() => setMobileUsersOpen(v => !v)}
                   title="Usuários"
-                  className={cn('md:hidden h-8 w-8 flex items-center justify-center rounded-lg transition-colors', mobileUsersOpen ? 'bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-100')}
+                  aria-label="Mostrar pessoas" aria-expanded={mobileUsersOpen}
+                  className={cn('chat-show-people h-8 w-8 flex items-center justify-center rounded-lg transition-colors', mobileUsersOpen ? 'bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-100')}
                 >
                   <Users size={15} />
                 </button>
-                <button onClick={() => setShowMsgSearch(v => !v)}
+                <button onClick={() => setShowMsgSearch(v => !v)} title="Buscar nesta conversa" aria-label="Buscar nesta conversa" aria-expanded={showMsgSearch}
                   className={cn('h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100', showMsgSearch && 'bg-orange-50 text-orange-600')}>
                   <Search size={15} />
                 </button>
@@ -1657,7 +1735,7 @@ export function Chat() {
                   <BookOpen size={15} />
                 </button>
                 {selectedConversation.type === 'group' && (
-                  <button onClick={() => setShowGroupSettings(v => !v)}
+                  <button onClick={() => setShowGroupSettings(v => !v)} title="Configurações do grupo" aria-label="Configurações do grupo"
                     className={cn('h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100', showGroupSettings && 'bg-orange-100 text-orange-600')}>
                     <Settings size={15} />
                   </button>
@@ -1695,11 +1773,12 @@ export function Chat() {
             )}
 
             {/* Messages */}
-            <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto px-8 py-5" onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
+            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging')} aria-label="Mensagens da conversa" onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
               background: theme.bgImage
                 ? `url(${theme.bgImage}) center/cover`
                 : (darkMode && theme.bgColor === DEFAULT_THEME.bgColor ? '#0d1418' : theme.bgColor),
             }}>
+              {messagesError && <div role="alert" className="chat-load-error">{messagesError} <button onClick={() => selectedId && void loadMessages(selectedId)}>Tentar novamente</button></div>}
               {hasMoreMessages && (
                 <div className="flex justify-center pt-1 pb-2">
                   <button
@@ -1711,11 +1790,17 @@ export function Chat() {
                   </button>
                 </div>
               )}
-              {displayedMessages.length ? displayedMessages.map(message => {
+              {displayedMessages.length ? displayedMessages.map((message, index) => {
                 const mine = message.sender_id === user?.id;
+                const previous = displayedMessages[index - 1];
+                const newDay = !previous || dayKey(previous.created_at) !== dayKey(message.created_at);
+                const continuation = !newDay && previous?.sender_id === message.sender_id
+                  && new Date(message.created_at).getTime() - new Date(previous.created_at).getTime() < 5 * 60_000;
                 const lastReadAt = selectedConversation?.other_participant?.last_read_at;
                 return (
-                  <div key={message.id} className={cn('flex gap-2', mine && 'justify-end')}>
+                  <Fragment key={message.id}>
+                  {newDay && <div className="chat-day-divider"><time dateTime={message.created_at}>{new Date(message.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</time></div>}
+                  <div className={cn('chat-message-row flex gap-2', mine && 'justify-end', continuation && 'is-continuation')}>
                     {!mine && (
                       <button
                         onClick={() => {
@@ -1758,10 +1843,11 @@ export function Chat() {
                       isPinned={selectedConversation?.pinned_message?.id === message.id}
                     />
                   </div>
+                  </Fragment>
                 );
               }) : (
                 <div className="flex h-full items-center justify-center text-sm text-slate-600 bg-white/60 rounded-xl p-4">
-                  {messageSearch ? 'Nenhuma mensagem encontrada.' : 'Nenhuma mensagem ainda.'}
+                  {messagesLoading ? 'Carregando mensagens…' : messageSearch ? 'Nenhuma mensagem encontrada.' : messagesError ? 'Mensagens indisponíveis no momento.' : 'Nenhuma mensagem ainda.'}
                 </div>
               )}
               {showScrollBtn && (
@@ -1875,15 +1961,15 @@ export function Chat() {
                     <button onClick={() => { mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop()); mediaRecorderRef.current = null; setIsRecording(false); if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); }} className="h-8 px-3 rounded-lg border border-red-200 text-red-600 text-xs font-bold">Cancelar</button>
                   </div>
                 )}
-                <form onSubmit={handleSend} className="relative flex items-center gap-2">
+                <form onSubmit={handleSend} className="chat-composer-form relative flex items-center gap-2">
                   {/* Mobile toggle — shows/hides tool buttons */}
                   <button type="button"
-                    className="md:hidden flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500"
-                    onClick={() => setShowInputTools(v => !v)} title="Ferramentas">
+                    className="chat-tools-toggle flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500"
+                    onClick={() => setShowInputTools(v => !v)} title="Ferramentas" aria-label="Ferramentas da mensagem" aria-expanded={showInputTools}>
                     {showInputTools ? <ChevronDown size={19} /> : <ChevronUp size={19} />}
                   </button>
                   {/* Tools (always visible desktop, toggle mobile) */}
-                  <div className={cn('items-center gap-2', showInputTools ? 'flex' : 'hidden md:flex')}>
+                  <div className={cn('chat-composer-tools items-center gap-2', showInputTools && 'is-open')}>
                   {/* Emoji */}
                   <div className="relative">
                     <button type="button" data-emoji-btn onClick={() => { setShowEmoji(v => !v); setShowStickers(false); }}
@@ -1891,7 +1977,7 @@ export function Chat() {
                       <Smile size={19} />
                     </button>
                     {showEmoji && (
-                      <div data-emoji-panel className="absolute bottom-14 left-0 z-30 w-72 rounded-xl border border-slate-200 bg-white shadow-2xl p-3">
+                      <div data-emoji-panel className="chat-emoji-panel absolute bottom-14 left-0 z-30 w-72 rounded-xl border border-slate-200 bg-white shadow-2xl p-3">
                         <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
                           {EMOJIS.map(e => (
                             <button key={e} type="button" onClick={() => { setMessageText(p => p + e); setShowEmoji(false); }}
@@ -1909,7 +1995,7 @@ export function Chat() {
                       <Sticker size={19} />
                     </button>
                     {showStickers && (
-                      <div data-sticker-panel className="absolute bottom-14 left-0 z-30 w-64 rounded-xl border border-slate-200 bg-white shadow-2xl p-3">
+                      <div data-sticker-panel className="chat-sticker-panel absolute bottom-14 left-0 z-30 w-64 rounded-xl border border-slate-200 bg-white shadow-2xl p-3">
                         <p className="text-xs font-bold text-slate-600 mb-2">Figurinhas</p>
                         <div className="grid grid-cols-4 gap-2">
                           {STICKERS.map(s => (
@@ -1978,21 +2064,21 @@ export function Chat() {
                     if (e.key === 'Escape') setMentionQuery(null);
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
                   }} onPaste={handlePaste}
-                    placeholder="Digite uma mensagem... (Shift+Enter para nova linha)" disabled={isRecording}
+                    placeholder="Mensagem…" aria-label="Escreva uma mensagem" disabled={isRecording}
                     rows={1}
                     className="flex-1 min-h-[40px] max-h-[120px] rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-400 resize-none overflow-y-auto leading-5 align-middle"
                     style={darkMode ? { backgroundColor: '#2a3942', borderColor: '#3b4a54', color: '#e9edef' } : {}} />
 
                   {/* Audio */}
-                  <button type="button" onClick={isRecording ? stopRecording : startRecording}
+                  <button type="button" onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Enviar gravação' : 'Gravar áudio'} aria-label={isRecording ? 'Enviar gravação' : 'Gravar áudio'}
                     className={cn('h-10 w-10 flex items-center justify-center rounded-lg transition-colors',
                       isRecording ? 'bg-red-500 text-white hover:bg-red-600' : 'text-slate-500 hover:bg-slate-100 hover:text-orange-500')}>
                     {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
                   </button>
 
                   {/* Send */}
-                  <button type="submit" disabled={!messageText.trim() || isRecording}
-                    className="h-10 rounded-lg bg-orange-500 px-4 text-white hover:bg-orange-600 disabled:opacity-40">
+                  <button type="submit" disabled={!messageText.trim() || isRecording} title="Enviar mensagem" aria-label="Enviar mensagem"
+                    className="chat-send-button h-10 rounded-lg bg-orange-500 px-4 text-white hover:bg-orange-600 disabled:opacity-40">
                     <Send size={16} />
                   </button>
                 </form>
@@ -2011,23 +2097,23 @@ export function Chat() {
       {/* ── Right: Online users panel — overlay on mobile, inline on desktop ── */}
       {mobileUsersOpen && (
         <div
-          className="md:hidden absolute inset-0 z-40 bg-black/20"
+          className="chat-people-backdrop absolute inset-0 z-40 bg-black/50"
           onClick={() => setMobileUsersOpen(false)}
         />
       )}
       <aside className={cn(
         'chat-users-drawer flex-col overflow-hidden border-l border-slate-200 bg-slate-50',
         mobileUsersOpen
-          ? 'flex absolute inset-y-0 right-0 z-50 w-[260px] shadow-2xl'
+          ? 'chat-users-drawer-mobile flex absolute inset-y-0 right-0 z-50 shadow-2xl'
           : 'hidden md:flex md:min-w-0 md:w-[220px] md:flex-shrink-0'
-      )}>
+      )} aria-label="Pessoas da equipe">
         <div className="border-b border-slate-100 p-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Users size={16} className="text-orange-500" />
-            <h2 className="text-sm font-bold text-slate-900">Usuários</h2>
+            <h2 className="text-sm font-bold text-slate-900">Pessoas</h2>
             <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{onlineUsers.length} online</span>
             <button
-              className="md:hidden h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              className="chat-people-close h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="Fechar pessoas"
               onClick={() => setMobileUsersOpen(false)}
             >
               <X size={15} />
@@ -2035,7 +2121,7 @@ export function Chat() {
           </div>
           <div className="relative mt-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Buscar para conversar..." className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-orange-400" />
+            <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Encontrar uma pessoa…" aria-label="Encontrar uma pessoa" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-orange-400" />
           </div>
         </div>
 
@@ -2059,7 +2145,7 @@ export function Chat() {
                     </button>
                     <button onClick={() => setProfileUser(item)} className="min-w-0 flex-1 text-left">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-[15px] font-semibold text-slate-800">{item.name}</p>
+                        <p className="min-w-0 whitespace-normal break-words text-[15px] font-semibold leading-5 text-slate-800">{item.name}</p>
                         {unread > 0 && <span className="flex-shrink-0 min-w-[18px] text-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-tight">{unread}</span>}
                       </div>
                       <p className="truncate text-xs text-emerald-600">Online</p>
@@ -2076,7 +2162,7 @@ export function Chat() {
 
           {/* Offline / last seen */}
           {offlineUsers.length > 0 && (
-            <div>
+            <div className={cn(onlineUsers.length > 0 && 'mt-4 border-t border-slate-200 pt-2')}>
               <div className="px-4 py-2 bg-slate-50 border-b border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Visto por último</p>
               </div>
@@ -2091,7 +2177,7 @@ export function Chat() {
                     </button>
                     <button onClick={() => setProfileUser(item)} className="min-w-0 flex-1 text-left">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-[15px] font-semibold text-slate-800">{item.name}</p>
+                        <p className="min-w-0 whitespace-normal break-words text-[15px] font-semibold leading-5 text-slate-800">{item.name}</p>
                         {unread > 0 && <span className="flex-shrink-0 min-w-[18px] text-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-tight">{unread}</span>}
                       </div>
                       <p className="truncate text-xs text-slate-500">{presenceLabel(item)}</p>
@@ -2114,7 +2200,7 @@ export function Chat() {
       )}
 
       {/* Theme panel */}
-      {showTheme && <ThemePanel theme={theme} onChange={setTheme} onClose={() => setShowTheme(false)} />}
+      {showTheme && <ThemePanel theme={theme} darkMode={darkMode} onChange={setTheme} onToggleDark={toggleDark} onClose={() => setShowTheme(false)} />}
 
       {/* Notes panel */}
       {showNotes && selectedConversation && (

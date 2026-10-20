@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Bell, ChevronDown, FolderKanban, Grid2X2, ListTodo, LogOut, Megaphone, MessageCircle, Newspaper, Search, Settings, User, X } from 'lucide-react';
+import { Bell, ChevronDown, Grid2X2, LogOut, Search, Settings, User, X } from 'lucide-react';
 import { useDarkMode } from '../../lib/useDarkMode';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 import { cn } from '../../lib/utils';
 import { wsEventBus } from '../../lib/wsEventBus';
 import { useAuth } from '../../lib/auth';
+import { useHrAccess } from '../../lib/hrAccess';
 import { getNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRow } from '../../lib/notificationsApi';
 import { PRIMARY_NAVIGATION, navigationForRole } from './navigation';
-import { ExpandableActionBar, type ExpandableActionBarItem } from '../ui/be-ui-expanable-action-bar';
 import './navbar.css';
 
 function timeAgo(dateStr: string) {
@@ -41,17 +41,11 @@ function playNotificationSound() {
   window.setTimeout(() => audio.close(), 350);
 }
 
-const NAV_ICONS: Record<string, React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>> = {
-  '/feed': Newspaper,
-  '/jrh': Megaphone,
-  '/bate-papo': MessageCircle,
-  '/tarefas': ListTodo,
-  '/projetos': FolderKanban,
-};
-
 export function Navbar() {
+  const [logoFailed, setLogoFailed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [moreSearch, setMoreSearch] = useState('');
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [chatUnread, setChatUnread] = useState(0);
   const [toast, setToast] = useState<NotificationRow | null>(null);
@@ -63,17 +57,19 @@ export function Navbar() {
   const locationPath = useRef(location.pathname);
   useDarkMode();
   const role = user?.roles?.name || user?.role_name || 'Usuário';
-  const items = navigationForRole(role);
+  const { allowed } = useHrAccess();
+  const items = navigationForRole(role, allowed('rh.view'));
   const moreItems = items.filter(item => !PRIMARY_NAVIGATION.some(primary => primary.to === item.to));
   const unreadCount = notifications.filter(item => !item.read).length;
   const searchItems = items.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')));
+  const filteredMoreItems = moreItems.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(moreSearch.toLocaleLowerCase('pt-BR')));
   const initials = (user?.name || 'NEX').split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('');
 
   const loadNotifications = useCallback(async () => {
     const next = (await getNotifications().catch(() => [])).filter(item => item.type !== 'chat');
     const unread = new Set(next.filter(item => !item.read).map(item => item.id));
     const newest = next.find(item => unread.has(item.id) && !knownUnread.current.has(item.id));
-    if (!firstLoad.current && newest) {
+    if (!firstLoad.current && newest && newest.type !== 'task' && newest.type !== 'project' && !newest.link?.startsWith('/tarefas') && !newest.link?.startsWith('/projetos')) {
       playNotificationSound();
       setToast(newest);
     }
@@ -103,6 +99,17 @@ export function Navbar() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, []);
+
   function navigateWithinApp(link?: string | null) {
     if (link?.startsWith('/') && !link.startsWith('//') && !link.includes('\\')) navigate(link);
   }
@@ -118,46 +125,53 @@ export function Navbar() {
 
   const feedHasDot = notifications.some(n => n.type === 'feed' && !n.read);
 
-  const primaryNavItems = useMemo<ExpandableActionBarItem[]>(() => PRIMARY_NAVIGATION.map(item => {
-    const Icon = NAV_ICONS[item.to] || item.icon;
-    const isChatUnread = item.to === '/bate-papo' && chatUnread > 0;
-    const isFeedUnread = item.to === '/feed' && feedHasDot;
-    const badge = isChatUnread ? String(chatUnread > 99 ? '99+' : chatUnread) : isFeedUnread ? '·' : undefined;
-    return {
-      id: item.to,
-      label: item.label,
-      icon: <Icon size={17} aria-hidden />,
-      active: location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to)),
-      badge,
-      onClick: () => navigate(item.to),
-    };
-  }), [location.pathname, chatUnread, feedHasDot, navigate]);
-
-  const activeNavId = primaryNavItems.find(i => i.active)?.id;
-
   return (
     <header className="navbar-modern">
       <div className="navbar-content">
         <NavLink to="/" className="navbar-logo" aria-label="REDE NEX — início">
-          <img src="/assets/images/logo_nex.png" alt="" className="h-8 w-auto" />
+          <span className="navbar-brand-mark" aria-hidden="true">{logoFailed ? <Grid2X2 size={23} /> : <img src="/assets/images/logo_nex.png" alt="" onError={() => setLogoFailed(true)} />}</span>
           <span>REDE <strong>NEX</strong></span>
         </NavLink>
         <nav className="navbar-nav" aria-label="Navegação principal">
-          <ExpandableActionBar
-            items={primaryNavItems}
-            activeId={activeNavId}
-            size="md"
-            collapseDelay={120}
-            classNames={{
-              root: 'navbar-expandable-root',
-              track: 'navbar-expandable-track',
-              activeItem: 'navbar-expandable-active',
-            }}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><button className={cn('nav-item', moreItems.some(item => item.to === location.pathname) && 'active')}><Grid2X2 size={17} />Mais<ChevronDown size={12} /></button></DropdownMenuTrigger>
+          <div className="navbar-primary-links">
+            {PRIMARY_NAVIGATION.map(item => {
+              const active = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+              return (
+                <NavLink key={item.to} to={item.to} className={cn('nav-item navbar-primary-link', active && 'active')}>
+                  <item.icon size={18} aria-hidden="true" />
+                  <span>{item.label}</span>
+                  {item.to === '/feed' && feedHasDot && <span className="nav-unread-dot" aria-label="Novas publicações" />}
+                  {item.to === '/bate-papo' && chatUnread > 0 && <span className="nav-unread-count" aria-label={`${chatUnread} mensagens não lidas`}>{chatUnread > 99 ? '99+' : chatUnread}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+          <DropdownMenu onOpenChange={open => { if (!open) setMoreSearch(''); }}>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={cn('nav-item', moreItems.some(item => item.to === location.pathname) && 'active')}>
+                <Grid2X2 size={17} />Mais<ChevronDown size={12} />
+              </button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="nex-more-menu">
-              {moreItems.map(item => <DropdownMenuItem key={item.to} asChild><NavLink to={item.to} className="gap-2"><item.icon size={17} />{item.label}</NavLink></DropdownMenuItem>)}
+              <div className="nex-more-menu-header">
+                <div><p>Mais recursos</p><span>Todos os módulos disponíveis</span></div>
+              </div>
+              <label className="nex-more-menu-search">
+                <Search size={16} />
+                <input autoFocus aria-label="Pesquisar recursos" placeholder="Pesquisar módulo..." value={moreSearch} onChange={event => setMoreSearch(event.target.value)} />
+              </label>
+              <div className="nex-more-menu-list">
+                {filteredMoreItems.map(item => (
+                  <DropdownMenuItem key={item.to} asChild>
+                    <NavLink to={item.to} className="nex-more-menu-item">
+                      <span className="nex-more-card-icon"><item.icon size={17} /></span>
+                      <span><strong>{item.label}</strong><small>{item.adminOnly ? 'Configuração administrativa' : 'Abrir recurso'}</small></span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+                {!filteredMoreItems.length && <p className="nex-more-empty">Nenhum recurso encontrado.</p>}
+              </div>
+              <div className="nex-more-footer"><Search size={14} /> <span>Atalho:</span> <kbd>Ctrl</kbd> <span>+</span> <kbd>K</kbd></div>
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>

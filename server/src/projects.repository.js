@@ -157,7 +157,7 @@ export async function addStepAssignee(body, actor) {
   // Phase 4: notify assigned user
   if (assignee?.user_id) {
     const { rows: stepRows } = await query(
-      'SELECT ps.name as step_name, p.name as proj_name FROM project_steps ps JOIN projects p ON p.id=ps.project_id WHERE ps.id=$1',
+      'SELECT ps.project_id, ps.name as step_name, p.name as proj_name FROM project_steps ps JOIN projects p ON p.id=ps.project_id WHERE ps.id=$1',
       [body.step_id]
     );
     const step = stepRows[0];
@@ -169,8 +169,8 @@ export async function addStepAssignee(body, actor) {
         title: 'Você foi adicionado a uma etapa',
         message: `Etapa: ${step.step_name} | Projeto: ${step.proj_name}`,
         type: 'project',
-        link: `/projetos`,
-        userIds: [assignee.user_id],
+        link: `/projetos?projeto=${encodeURIComponent(step.project_id)}`,
+        userIds: assignee.user_id === actor?.id ? [] : [assignee.user_id],
       }).catch(() => {});
     }
   }
@@ -250,7 +250,7 @@ export async function createComment(projectId, body, actor) {
         title: 'Novo comentário na sua etapa',
         message: `${actor?.name ?? 'Alguém'} comentou em ${projName}`,
         type: 'project',
-        link: `/projetos`,
+        link: `/projetos?projeto=${encodeURIComponent(projectId)}`,
         userIds,
       }).catch(() => {});
     }

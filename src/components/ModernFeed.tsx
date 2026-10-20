@@ -3,15 +3,14 @@
  * Demonstra o uso dos novos componentes com design futurista
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { PostCard } from '@/components/PostCard';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { Heart, Share2, MessageCircle, MoreVertical, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 interface Post {
   id: string;

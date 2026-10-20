@@ -1,5 +1,7 @@
 import { pool, query } from './db.js';
 import { cleanText, syncManyToMany } from './db_utils.js';
+import https from 'node:https';
+import http from 'node:http';
 
 const eventSelect = `
   select
@@ -158,7 +160,7 @@ export async function fetchGoogleCalendarEvents(icalUrl, { from, to } = {}) {
   const icsText = await new Promise((resolve, reject) => {
     function doGet(target, depth) {
       if (depth > 2) return reject(new Error('Too many redirects'));
-      const mod = target.startsWith('https') ? require('https') : require('http');
+      const mod = target.startsWith('https') ? https : http;
       const req = mod.get(target, { timeout: 10000 }, res => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           return doGet(res.headers.location, depth + 1);

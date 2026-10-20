@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import type { FormEvent, ReactNode } from 'react';
 import {
   ArrowRight,
@@ -44,7 +45,9 @@ import {
 import type { Accent, Project, ProjectRequest, ProjectStep, ProjectUser, Status } from '../lib/projectsApi';
 import { ProjectDetailView } from './ProjectDetail';
 import { useAuth } from '../lib/auth';
+import { clearAssistantIntent, readAssistantIntent } from '../lib/assistantIntent';
 import './projetos.css';
+import './projects-refinement.css';
 
 type Tab = 'Visão geral' | 'Projetos' | 'Solicitações' | 'Novo projeto' | 'Apresentação';
 
@@ -62,8 +65,114 @@ const statusStyles: Record<Status, { label: string; className: string; dotClass:
   Concluído: { label: 'Concluído', className: 'status-done', dotClass: 'dot-done' },
   'Concluído Antes do Prazo': { label: 'Concluído antes do prazo', className: 'status-early', dotClass: 'dot-early' },
   Atrasado: { label: 'Atrasado', className: 'status-late', dotClass: 'dot-late' },
-  Atenção: { label: 'Andamento', className: 'status-progress', dotClass: 'dot-progress' },
+  Atenção: { label: 'Atenção', className: 'status-attention', dotClass: 'dot-attention' },
 };
+
+function toMainStatus(s: Status): 'Em andamento' | 'Concluído' {
+  return (s === 'Concluído' || s === 'Concluído Antes do Prazo') ? 'Concluído' : 'Em andamento';
+}
+function toSubStatus(s: Status): string {
+  if (s === 'Atrasado') return 'Atrasado';
+  if (s === 'Atenção') return 'Atenção';
+  if (s === 'Não iniciado') return 'Não iniciado';
+  if (s === 'Concluído Antes do Prazo') return 'Concluído Antes do Prazo';
+  return '';
+}
+function fromMainAndSub(main: 'Em andamento' | 'Concluído', sub: string): Status {
+  if (main === 'Concluído') return sub === 'Concluído Antes do Prazo' ? 'Concluído Antes do Prazo' : 'Concluído';
+  if (sub === 'Atrasado') return 'Atrasado';
+  if (sub === 'Atenção') return 'Atenção';
+  if (sub === 'Não iniciado') return 'Não iniciado';
+  return 'Em andamento';
+}
+
+type SubOpt = { value: string; label: string; cls: string; dot: string };
+function StatusSubPicker({ value, onChange, radioNamePrefix }: { value: Status; onChange: (s: Status) => void; radioNamePrefix: string }) {
+  const main = toMainStatus(value);
+  const sub = toSubStatus(value);
+  const inProgressSubs: SubOpt[] = [
+    { value: '', label: 'Em andamento', cls: 'status-progress', dot: 'dot-progress' },
+    { value: 'Não iniciado', label: 'Aguardando', cls: 'status-idle', dot: 'dot-idle' },
+    { value: 'Atrasado', label: 'Atrasado', cls: 'status-late', dot: 'dot-late' },
+    { value: 'Atenção', label: 'Atenção', cls: 'status-attention', dot: 'dot-attention' },
+  ];
+  const doneSubs: SubOpt[] = [
+    { value: '', label: 'Concluído', cls: 'status-done', dot: 'dot-done' },
+    { value: 'Concluído Antes do Prazo', label: 'Antes do prazo', cls: 'status-early', dot: 'dot-early' },
+  ];
+  const subs = main === 'Em andamento' ? inProgressSubs : doneSubs;
+  return (
+    <div style={{marginTop:8}}>
+      <div style={{display:'flex',gap:8,marginBottom:6}}>
+        <label className="status-preset-option">
+          <input type="radio" name={`${radioNamePrefix}_main`} checked={main==='Em andamento'} onChange={() => onChange(fromMainAndSub('Em andamento', sub))} />
+          <span className="status-preset-pill status-progress"><i className="dot-progress" />Em andamento</span>
+        </label>
+        <label className="status-preset-option">
+          <input type="radio" name={`${radioNamePrefix}_main`} checked={main==='Concluído'} onChange={() => onChange(fromMainAndSub('Concluído', sub))} />
+          <span className="status-preset-pill status-done"><i className="dot-done" />Concluído</span>
+        </label>
+      </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,paddingLeft:8,borderLeft:'2px solid #e2e8f0'}}>
+        {subs.map(opt => (
+          <label key={opt.value} className="status-preset-option">
+            <input type="radio" name={`${radioNamePrefix}_sub`} checked={sub===opt.value} onChange={() => onChange(fromMainAndSub(main, opt.value))} />
+            <span className={`status-preset-pill ${opt.cls}`} style={{fontSize:11}}><i className={opt.dot} />{opt.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UserSearchSelectControlled({ users, value, onChangeVal, required }: { users: ProjectUser[]; value: string; onChangeVal: (val: string, user: ProjectUser | undefined) => void; required?: boolean }) {
+  const [inputText, setInputText] = useState(value);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setInputText(value); }, [value]);
+  const suggestions = inputText ? users.filter(u => u.name.toLowerCase().includes(inputText.toLowerCase())) : users;
+  const handleSelect = (u: ProjectUser) => { setInputText(u.name); setOpen(false); onChangeVal(u.name, u); };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setInputText(e.target.value); setOpen(true); onChangeVal('', undefined); };
+  return (
+    <div style={{position:'relative'}}>
+      <input type="text" value={inputText} onChange={handleChange} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder="Buscar responsável…" autoComplete="off" style={{width:'100%',boxSizing:'border-box',fontSize:13,padding:'4px 8px',borderRadius:6,border:'1px solid #e2e8f0'}} />
+      {open && suggestions.length > 0 && (
+        <div style={{position:'absolute',zIndex:9,background:'#fff',border:'1px solid #e2e8f0',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
+          {suggestions.slice(0, 8).map(u => (
+            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid #f1f5f9',cursor:'pointer',fontSize:13}}>
+              {u.photo_url ? <img src={u.photo_url} alt={u.name} style={{width:26,height:26,borderRadius:'50%',objectFit:'cover',flexShrink:0}} /> : <div style={{width:26,height:26,borderRadius:'50%',background:'#304363',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{getInitials(u.name)}</div>}
+              <span>{u.name}{u.role_name ? ` · ${u.role_name}` : ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserSearchSelectUncontrolled({ users, selectName, required, emptyLabel }: { users: ProjectUser[]; selectName: string; required?: boolean; emptyLabel?: string }) {
+  const [inputText, setInputText] = useState('');
+  const [selectedName, setSelectedName] = useState('');
+  const [open, setOpen] = useState(false);
+  const suggestions = inputText ? users.filter(u => u.name.toLowerCase().includes(inputText.toLowerCase())) : users;
+  const handleSelect = (u: ProjectUser) => { setInputText(u.name); setSelectedName(u.name); setOpen(false); };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setInputText(e.target.value); setSelectedName(''); setOpen(true); };
+  return (
+    <div style={{position:'relative'}}>
+      <input type="text" value={inputText} onChange={handleChange} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={emptyLabel || 'Buscar responsável…'} autoComplete="off" style={{width:'100%',boxSizing:'border-box',fontSize:13,padding:'4px 8px',borderRadius:6,border:'1px solid #e2e8f0'}} />
+      <input type="hidden" name={selectName} value={selectedName} />
+      {open && suggestions.length > 0 && (
+        <div style={{position:'absolute',zIndex:9,background:'#fff',border:'1px solid #e2e8f0',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
+          {suggestions.slice(0, 8).map(u => (
+            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid #f1f5f9',cursor:'pointer',fontSize:13}}>
+              {u.photo_url ? <img src={u.photo_url} alt={u.name} style={{width:26,height:26,borderRadius:'50%',objectFit:'cover',flexShrink:0}} /> : <div style={{width:26,height:26,borderRadius:'50%',background:'#304363',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{getInitials(u.name)}</div>}
+              <span>{u.name}{u.role_name ? ` · ${u.role_name}` : ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const accentOptions: { value: Accent; label: string; color: string }[] = [
   { value: 'blue', label: 'Azul', color: '#2878ee' },
@@ -115,20 +224,36 @@ function SidebarTabIcon({ tab }: { tab: Tab }) {
 
 export function ProjetosPage() {
   const auth = useAuth();
+  const [projectParams, setProjectParams] = useSearchParams();
+  const requestedProject = projectParams.get('projeto');
   const [activeTab, setActiveTab] = useState<Tab>('Visão geral');
   const [projects, setProjects] = useState<Project[]>([]);
   const [requests, setRequests] = useState<ProjectRequest[]>([]);
   const [users, setUsers] = useState<ProjectUser[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'Todos' | Status>('Em andamento');
+  const [statusFilter, setStatusFilter] = useState<'Todos' | Status>('Todos');
   const [search, setSearch] = useState('');
   const [isTvMode, setIsTvMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [assistantTitle,setAssistantTitle]=useState('');
   const now = useNow();
 
-  const isAdmin = auth.user?.role_name === 'Administrador';
+  useEffect(() => {
+    if (!requestedProject || loading || loadError) return;
+    const found = projects.find(project => project.id === requestedProject);
+    if (found) { setSelectedProject(found); setActiveTab('Projetos'); }
+    // Keep the item URL: reloads and copied links must reopen the same project.
+  }, [requestedProject, loading, loadError, projects]);
+  useEffect(()=>{
+    const intent=readAssistantIntent(projectParams);
+    if(intent.create){setAssistantTitle(intent.title);setSelectedProject(null);setActiveTab('Novo projeto');}
+    if(intent.search){setSearch(intent.search);setActiveTab('Projetos');setSelectedProject(null);}
+    if(intent.create||intent.search)setProjectParams(clearAssistantIntent,{replace:true});
+  },[projectParams,setProjectParams]);
+
+  const isAdmin = ['Administrador', 'Gestor'].includes(auth.user?.role_name ?? '');
 
   const loadProjects = useCallback(async () => {
     try {
@@ -163,7 +288,9 @@ export function ProjetosPage() {
   }, [loadProjects, loadRequests, loadUsers]);
 
   const filteredProjects = useMemo(() => projects.filter((project) => {
-    const matchesStatus = statusFilter === 'Todos' || project.status === statusFilter;
+    const matchesStatus = statusFilter === 'Todos'
+      || (statusFilter === 'Em andamento' && ['Em andamento','Atrasado','Atenção','Não iniciado'].includes(project.status))
+      || (statusFilter === 'Concluído' && ['Concluído','Concluído Antes do Prazo'].includes(project.status));
     const query = search.toLowerCase();
     return matchesStatus && (!query || `${project.name} ${project.responsible_name} ${project.category}`.toLowerCase().includes(query));
   }), [projects, search, statusFilter]);
@@ -173,13 +300,25 @@ export function ProjetosPage() {
     : 0;
 
   const onTabChange = (tab: Tab) => {
+    setAssistantTitle('');
     setActiveTab(tab);
     setSelectedProject(null);
+    setSidebarOpen(false);
+    if (projectParams.has('projeto')) setProjectParams(params => {
+      const next = new URLSearchParams(params); next.delete('projeto'); return next;
+    }, { replace: true });
   };
+
+  const openProject = (project: Project) => {
+    setSelectedProject(project); setActiveTab('Projetos');
+    setProjectParams(params => { const next = new URLSearchParams(params); next.set('projeto', project.id); return next; });
+  };
+  const closeProject = () => onTabChange('Projetos');
 
   const handleAddProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const name = String(form.get('name') || 'Novo projeto');
     const owner = String(form.get('owner') || 'A definir');
     const startDateValue = String(form.get('start_date') || '');
@@ -205,7 +344,7 @@ export function ProjetosPage() {
       });
       await loadProjects();
       onTabChange('Projetos');
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Falha ao criar projeto.');
     }
@@ -234,7 +373,7 @@ export function ProjetosPage() {
       return (
         <ProjectDetailView
           project={selectedProject}
-          onBack={() => setSelectedProject(null)}
+          onBack={closeProject}
           onProjectUpdated={loadProjects}
           isAdmin={isAdmin}
           currentUserId={auth.user?.id}
@@ -244,7 +383,7 @@ export function ProjetosPage() {
     }
     if (loading) return <div className="empty-state"><p>Carregando projetos…</p></div>;
     if (activeTab === 'Novo projeto') {
-      return <NewProjectView onSubmit={handleAddProject} onCancel={() => onTabChange('Projetos')} users={users} />;
+      return <NewProjectView onSubmit={handleAddProject} onCancel={() => onTabChange('Projetos')} users={users} initialTitle={assistantTitle} />;
     }
     if (activeTab === 'Solicitações') {
       return <RequestsView requests={requests} onResolve={loadRequests} />;
@@ -273,7 +412,7 @@ export function ProjetosPage() {
           onNew={() => onTabChange('Novo projeto')}
           onDelete={handleDeleteProject}
           onSave={handleSaveProject}
-          onOpenDetail={setSelectedProject}
+          onOpenDetail={openProject}
           isAdmin={isAdmin}
           users={users}
         />
@@ -286,6 +425,7 @@ export function ProjetosPage() {
         averageProgress={averageProgress}
         onProjects={() => onTabChange('Projetos')}
         onPresentation={() => onTabChange('Apresentação')}
+        onOpen={openProject}
         users={users}
       />
     );
@@ -315,8 +455,8 @@ export function ProjetosPage() {
     <div className="projetos-wrap">
       {sidebarOpen && <div className="sidebar-overlay open" onClick={() => setSidebarOpen(false)} />}
       <div className="projetos-layout">
-        <aside className={`projetos-sidebar${sidebarOpen ? ' open' : ''}`}>
-          <button className="sidebar-mobile-close" onClick={() => setSidebarOpen(false)}><X size={15} /></button>
+        <aside id="project-navigation" aria-label="Navegação de projetos" className={`projetos-sidebar${sidebarOpen ? ' open' : ''}`}>
+          <button className="sidebar-mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Fechar navegação de projetos"><X size={20} /></button>
           <div className="sidebar-brand">
             <div className="sidebar-brand-icon"><FolderKanban size={16} /></div>
             <strong>Projetos</strong>
@@ -327,6 +467,7 @@ export function ProjetosPage() {
               <button
                 key={tab}
                 className={activeTabForSidebar === tab ? 'sidebar-nav-item active' : 'sidebar-nav-item'}
+                aria-current={activeTabForSidebar === tab ? 'page' : undefined}
                 onClick={() => onTabChange(tab)}
               >
                 <SidebarTabIcon tab={tab} />
@@ -342,7 +483,7 @@ export function ProjetosPage() {
             <span className="sidebar-section-label">ACESSO RÁPIDO</span>
             <button className="sidebar-nav-item" onClick={() => onTabChange('Novo projeto')}>
                 <FilePlus2 size={15} />
-                <span>Crie apontamentos</span>
+                <span>Criar novo projeto</span>
               </button>
 
           </div>
@@ -375,8 +516,13 @@ export function ProjetosPage() {
         </aside>
         <div className="projetos-main">
           <div className="projetos-mobile-header">
-            <button className="projetos-menu-btn" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
+            <button className="projetos-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Abrir navegação de projetos" aria-expanded={sidebarOpen} aria-controls="project-navigation"><Menu size={22} /></button>
+            <strong>{selectedProject ? 'Detalhes do projeto' : activeTab}</strong>
           </div>
+          {!selectedProject && activeTab !== 'Novo projeto' && <header className="projects-page-heading">
+            <div><span className="section-kicker">Planejar. Colaborar. Entregar.</span><h1>Projetos que movem a NEX</h1><p>Acompanhe o progresso, alinhe prioridades e mantenha cada entrega em vista.</p></div>
+            <button type="button" className="primary-button" onClick={() => onTabChange('Novo projeto')}><Plus size={20} /> Novo projeto</button>
+          </header>}
           {loadError && <div className="error-banner">{loadError}</div>}
           {renderContent()}
         </div>
@@ -385,22 +531,26 @@ export function ProjetosPage() {
   );
 }
 
-function OverviewView({ projects, requests, averageProgress, onProjects, onPresentation, users }: {
+function OverviewView({ projects, requests, averageProgress, onProjects, onPresentation, onOpen, users }: {
   projects: Project[];
   requests: ProjectRequest[];
   averageProgress: number;
   onProjects: () => void;
   onPresentation: () => void;
+  onOpen: (project: Project) => void;
   users?: ProjectUser[];
 }) {
-  const active = projects.filter((p) => p.status === 'Em andamento').length;
-  const attention = projects.filter((p) => p.status === 'Atenção').length;
+  const active = projects.filter(p => !p.status.startsWith('Concluído'));
+  const today = new Date().toISOString().slice(0, 10);
+  const attention = active.filter(p => p.status === 'Atenção' || p.status === 'Atrasado' || (p.deadline && p.deadline.slice(0, 10) < today)).length;
+  const upcoming = active.filter(p => p.deadline && p.deadline.slice(0, 10) >= today).sort((a, b) => a.deadline!.localeCompare(b.deadline!));
+  const focus = [...active].sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999')).slice(0, 5);
   return (
     <div className="view-fade">
       <section className="metric-grid">
-        <MetricCard label="Projetos ativos" value={String(active + attention)} caption="em movimento agora" icon={<FolderKanban size={18} />} accent="blue" trend={`${active} em andamento`} />
+        <MetricCard label="Projetos ativos" value={String(active.length)} caption="frentes em movimento" icon={<FolderKanban size={20} />} accent="blue" trend={`${projects.length} projetos no portfólio`} />
         <MetricCard label="Andamento médio" value={`${averageProgress}%`} caption="do portfólio completo" icon={<Gauge size={18} />} accent="green" trend="portfólio" />
-        <MetricCard label="Próximos prazos" value={String(projects.filter((p) => p.deadline).length)} caption="marcados no painel" icon={<Clock3 size={18} />} accent="orange" trend={`${attention} exigem atenção`} />
+        <MetricCard label="Próximos prazos" value={String(upcoming.length)} caption="entregas planejadas" icon={<Clock3 size={20} />} accent="orange" trend={`${attention} exigem atenção`} />
         <MetricCard label="Solicitações" value={String(requests.length).padStart(2, '0')} caption="aguardando decisão" icon={<Sparkles size={18} />} accent="pink" trend="Ver solicitações" />
       </section>
       <section className="content-grid">
@@ -410,7 +560,8 @@ function OverviewView({ projects, requests, averageProgress, onProjects, onPrese
             <button className="text-button" onClick={onProjects}>Ver todos <ArrowUpRight size={15} /></button>
           </div>
           <div className="project-list">
-            {projects.slice(0, 5).map((project) => <ProjectRow project={project} key={project.id} users={users} />)}
+            {focus.map((project) => <ProjectRow project={project} key={project.id} users={users} onOpen={() => onOpen(project)} />)}
+            {!focus.length && <div className="empty-state"><FolderKanban size={30} /><h3>Nenhum projeto ativo</h3><p>As próximas iniciativas aparecerão aqui.</p></div>}
           </div>
         </div>
         <div className="panel timeline-panel">
@@ -419,16 +570,17 @@ function OverviewView({ projects, requests, averageProgress, onProjects, onPrese
             <button className="primary-button" onClick={onPresentation}><Play size={15} /> Apresentar</button>
           </div>
           <div className="timeline">
-            {projects.slice(0, 5).map((project) => (
+            {upcoming.slice(0, 5).map((project) => (
               <TimelineItem
                 key={project.id}
                 day={formatProjectDate(project.deadline).slice(0, 2)}
-                month={formatProjectDate(project.deadline).slice(3, 6).toUpperCase()}
+                month={new Date(`${project.deadline!.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()}
                 title={project.name}
                 owner={project.responsible_name}
                 color={project.accent}
               />
             ))}
+            {!upcoming.length && <div className="empty-state"><CalendarDays size={30} /><h3>Agenda aberta</h3><p>Os projetos com prazos futuros aparecerão aqui.</p></div>}
           </div>
         </div>
       </section>
@@ -439,7 +591,7 @@ function OverviewView({ projects, requests, averageProgress, onProjects, onPrese
           <h2>
             {attention > 0
               ? <>O portfólio tem <strong>{attention} projeto{attention > 1 ? 's' : ''}</strong> que pede{attention > 1 ? 'm' : ''} uma decisão esta semana.</>
-              : <>O portfólio está <strong>saudável</strong> e sem pendências críticas no momento.</>
+              : <>Nenhum projeto com <strong>atraso ou sinalização de atenção</strong> no portfólio atual.</>
             }
           </h2>
         </div>
@@ -465,26 +617,28 @@ function ProjectsView({ projects, projectsCount, statusFilter, setStatusFilter, 
 }) {
   const [editing, setEditing] = useState<Project | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
+  const [sortBy, setSortBy] = useState<'deadline' | 'progress' | 'name'>('deadline');
+  const sortedProjects = useMemo(() => [...projects].sort((a, b) => sortBy === 'name' ? a.name.localeCompare(b.name, 'pt-BR') : sortBy === 'progress' ? b.progress - a.progress : (a.deadline || '9999').localeCompare(b.deadline || '9999')), [projects, sortBy]);
   return (
     <div className="view-fade">
       <div className="view-heading">
-        <div><span className="section-kicker">Workspace / Projetos</span><h2>{statusFilter === 'Todos' ? 'Todos os projetos' : statusFilter} <span className="heading-count">{projectsCount}</span></h2></div>
-        <button className="primary-button" onClick={onNew}><Plus size={17} /> Novo projeto</button>
+        <div><span className="section-kicker">Portfólio</span><h2>{statusFilter === 'Todos' ? 'Todos os projetos' : statusFilter} <span className="heading-count">{projects.length} de {projectsCount}</span></h2></div>
       </div>
       <div className="filters">
-        <div className="search-field"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar projeto ou responsável" /></div>
-        <div className="filter-select"><Filter size={16} /><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'Todos' | Status)}><option>Todos</option><option>Não iniciado</option><option>Em andamento</option><option>Concluído</option><option>Concluído Antes do Prazo</option><option>Atrasado</option></select></div>
+        <div className="search-field"><Search size={20} /><input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Buscar projeto ou responsável" placeholder="Buscar projeto ou responsável" />{search && <button type="button" onClick={() => setSearch('')} aria-label="Limpar busca"><X size={18} /></button>}</div>
+        <div className="filter-select"><Filter size={18} /><select aria-label="Filtrar projetos por status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'Todos' | Status)}><option>Todos</option><option>Em andamento</option><option>Concluído</option></select></div>
+        <div className="filter-select"><select aria-label="Ordenar projetos" value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}><option value="deadline">Prazo mais próximo</option><option value="progress">Maior progresso</option><option value="name">Nome A–Z</option></select></div>
         <div className="view-mode-btns">
-          <button className={viewMode === 'grid' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('grid')} title="Cards"><LayoutGrid size={16} /></button>
-          <button className={viewMode === 'list' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('list')} title="Lista"><LayoutList size={16} /></button>
-          <button className={viewMode === 'calendar' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('calendar')} title="Calendário"><CalendarDays size={16} /></button>
+          <button className={viewMode === 'grid' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('grid')} aria-label="Visualizar em cartões" aria-pressed={viewMode === 'grid'} title="Cartões"><LayoutGrid size={20} /></button>
+          <button className={viewMode === 'list' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('list')} aria-label="Visualizar em lista" aria-pressed={viewMode === 'list'} title="Lista"><LayoutList size={20} /></button>
+          <button className={viewMode === 'calendar' ? 'view-mode-btn active' : 'view-mode-btn'} onClick={() => setViewMode('calendar')} aria-label="Visualizar calendário" aria-pressed={viewMode === 'calendar'} title="Calendário"><CalendarDays size={20} /></button>
         </div>
       </div>
       {projects.length === 0 ? (
-        <div className="empty-state"><Search size={28} /><h3>Nenhum projeto encontrado</h3><p>Crie um novo projeto ou ajuste os filtros.</p></div>
+        <div className="empty-state"><Search size={32} /><h3>Nenhum projeto encontrado</h3><p>Crie um novo projeto ou ajuste os filtros.</p>{search || statusFilter !== 'Todos' ? <button type="button" className="secondary-button" onClick={() => { setSearch(''); setStatusFilter('Todos'); }}>Limpar filtros</button> : <button type="button" className="primary-button" onClick={onNew}><Plus size={18} /> Novo projeto</button>}</div>
       ) : viewMode === 'grid' ? (
         <div className="project-card-grid">
-          {projects.map((project) => (
+          {sortedProjects.map((project) => (
             <ProjectCard
               project={project}
               key={project.id}
@@ -496,7 +650,7 @@ function ProjectsView({ projects, projectsCount, statusFilter, setStatusFilter, 
           ))}
         </div>
       ) : viewMode === 'list' ? (
-        <ProjectListView projects={projects} onEdit={isAdmin ? setEditing : undefined} onDelete={isAdmin ? onDelete : undefined} onOpen={onOpenDetail} users={users} />
+        <ProjectListView projects={sortedProjects} onEdit={isAdmin ? setEditing : undefined} onDelete={isAdmin ? onDelete : undefined} onOpen={onOpenDetail} users={users} />
       ) : (
         <ProjectCalendarView projects={projects} onOpen={onOpenDetail} />
       )}
@@ -539,7 +693,7 @@ function ProjectEditModal({ project, onClose, onSave, users }: {
   };
 
   return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="project-dialog modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div><span className="section-kicker">Editar projeto</span><h3>{project.name}</h3></div>
@@ -551,10 +705,7 @@ function ProjectEditModal({ project, onClose, onSave, users }: {
             <label>Responsável
               {users && users.length > 0 && ownerMode === 'select'
                 ? <>
-                    <select value={responsible} onChange={(e) => { const u = users.find(x => x.name === e.target.value); setResponsible(e.target.value); setResponsiblePhotoUrl(u?.photo_url ?? null); }} required>
-                      <option value="">Selecionar responsável…</option>
-                      {users.map((u) => <option key={u.id} value={u.name}>{u.name}{u.role_name ? ` · ${u.role_name}` : ''}</option>)}
-                    </select>
+                    <UserSearchSelectControlled users={users} value={responsible} onChangeVal={(v, u) => { setResponsible(v); setResponsiblePhotoUrl(u?.photo_url ?? null); }} required />
                     <button type="button" className="tag-add-btn" style={{marginTop:4}} onClick={() => setOwnerMode('text')}>Digitar manualmente</button>
                   </>
                 : <>
@@ -567,14 +718,7 @@ function ProjectEditModal({ project, onClose, onSave, users }: {
           </div>
           <div className="form-row">
             <label>Status
-              <div className="status-preset-picker" style={{marginTop:8}}>
-                {(['Não iniciado','Em andamento','Concluído','Concluído Antes do Prazo','Atrasado'] as Status[]).map((s) => (
-                  <label key={s} className="status-preset-option">
-                    <input type="radio" name="edit_status" value={s} checked={status === s} onChange={() => setStatus(s)} />
-                    <span className={`status-preset-pill ${statusStyles[s].className}`}><i />{statusStyles[s].label}</span>
-                  </label>
-                ))}
-              </div>
+              <StatusSubPicker value={status} onChange={setStatus} radioNamePrefix="edit_proj" />
             </label>
             <label>Fase
               <select value={phase} onChange={(e) => setPhase(e.target.value)}>
@@ -619,10 +763,11 @@ function ProjectEditModal({ project, onClose, onSave, users }: {
   document.body);
 }
 
-function NewProjectView({ onSubmit, onCancel, users }: {
+function NewProjectView({ onSubmit, onCancel, users, initialTitle='' }: {
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
   users: ProjectUser[];
+  initialTitle?: string;
 }) {
   const [accent, setAccent] = useState<Accent>('blue');
   const [newStatus, setNewStatus] = useState<Status>('Não iniciado');
@@ -637,14 +782,11 @@ function NewProjectView({ onSubmit, onCancel, users }: {
         <div className="form-tip"><CircleHelp size={17} /><span>Os prazos aparecem automaticamente no calendário e na apresentação do painel.</span></div>
       </div>
       <form className="project-form" onSubmit={onSubmit}>
-        <label>Nome do projeto<input name="name" required placeholder="Ex.: Expansão regional 2026" /></label>
+        <label>Nome do projeto<input name="name" required defaultValue={initialTitle} placeholder="Ex.: Expansão regional 2026" /></label>
         <label>Responsável
           {users.length > 0 && ownerMode === 'select'
             ? <>
-                <select name="owner" required>
-                  <option value="">Selecionar responsável…</option>
-                  {users.map((u) => <option key={u.id} value={u.name}>{u.name}{u.role_name ? ` · ${u.role_name}` : ''}</option>)}
-                </select>
+                <UserSearchSelectUncontrolled users={users} selectName="owner" required emptyLabel="Selecionar responsável…" />
                 <button type="button" className="tag-add-btn" style={{marginTop:4}} onClick={() => setOwnerMode('text')}>Digitar nome manualmente</button>
               </>
             : <>
@@ -665,14 +807,8 @@ function NewProjectView({ onSubmit, onCancel, users }: {
           <label>Prazo final<input name="deadline" type="date" /></label>
         </div>
         <label>Status inicial
-          <div className="status-preset-picker">
-            {(['Não iniciado','Em andamento','Concluído','Concluído Antes do Prazo','Atrasado'] as Status[]).map((s) => (
-              <label key={s} className="status-preset-option">
-                <input type="radio" name="status" value={s} checked={newStatus === s} onChange={() => setNewStatus(s)} />
-                <span className={`status-preset-pill ${statusStyles[s].className}`}><i />{statusStyles[s].label}</span>
-              </label>
-            ))}
-          </div>
+          <StatusSubPicker value={newStatus} onChange={setNewStatus} radioNamePrefix="new_proj" />
+          <input type="hidden" name="status" value={newStatus} />
         </label>
         <label>Etiqueta <span className="optional">opcional — ex: URGENTE, VIP, Q3</span>
           <input name="tag" placeholder="Texto livre para destacar informação" maxLength={30} />
@@ -979,10 +1115,14 @@ function MetricCard({ label, value, caption, icon, accent, trend }: { label: str
   return <div className="metric-card"><div className={`metric-icon metric-${accent}`}>{icon}</div><span className="metric-label">{label}</span><strong className="metric-value">{value}</strong><span className="metric-caption">{caption}</span><div className={`metric-trend trend-${accent}`}><TrendingUp size={13} /> {trend}</div></div>;
 }
 
-function ProjectRow({ project, users }: { project: Project; users?: ProjectUser[] }) {
+function ProjectRow({ project, users, onOpen }: { project: Project; users?: ProjectUser[]; onOpen: () => void }) {
   return (
-    <div className={`project-row ${getStatusRowCls(project.status)}`}>
-      <div className={`project-badge tone-${project.accent}`}>{project.code}</div>
+    <button type="button" className={`project-row ${getStatusRowCls(project.status)}`} onClick={onOpen} aria-label={`Abrir projeto ${project.name}`}>
+      {project.cover_image ? (
+        <img src={project.cover_image} alt={project.code} style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}} />
+      ) : (
+        <div className={`project-badge tone-${project.accent}`}>{project.code}</div>
+      )}
       <div className="project-row-main">
         <div className="project-row-title"><strong>{project.name}</strong><StatusPill status={project.status} />{project.tag && <span className="project-tag">{project.tag}</span>}</div>
         <div className="project-progress-line"><div className="progress-track"><div className={`progress-fill fill-${project.accent}`} style={{ width: `${project.progress}%` }} /></div><span>{project.progress}%</span></div>
@@ -993,15 +1133,17 @@ function ProjectRow({ project, users }: { project: Project; users?: ProjectUser[
         <CalendarDays size={14} /> {formatProjectDate(project.deadline)}
       </span>
       <ChevronRight className="row-arrow" size={16} />
-    </div>
+    </button>
   );
 }
 
 function ProjectCard({ project, onEdit, onDelete, onOpen, users }: { project: Project; onEdit?: () => void; onDelete?: () => void; onOpen: () => void; users?: ProjectUser[] }) {
   return (
-    <article className={`project-card card-${project.accent}`} onClick={onOpen} role="button">
+    <article className={`project-card card-${project.accent}`}>
       <div className="card-top">
-        <div className={`project-badge tone-${project.accent}`}>{project.code}</div>
+        {project.cover_image
+          ? <img src={project.cover_image} alt={project.code} style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}} />
+          : <div className={`project-badge tone-${project.accent}`}>{project.code}</div>}
         {(onEdit || onDelete) && (
           <div className="card-top-actions" onClick={(e) => e.stopPropagation()}>
             {onEdit && <button className="round-button" onClick={onEdit} aria-label="Editar"><Pencil size={15} /></button>}
@@ -1010,7 +1152,7 @@ function ProjectCard({ project, onEdit, onDelete, onOpen, users }: { project: Pr
         )}
       </div>
       <div className="card-title-row">
-        <div><span className="card-category">{project.category}</span>{project.tag && <span className="project-tag">{project.tag}</span>}<h3>{project.name}</h3></div>
+        <div><span className="card-category">{project.category}</span>{project.tag && <span className="project-tag">{project.tag}</span>}<h3><button type="button" className="project-open-button" onClick={onOpen}>{project.name}</button></h3></div>
         <StatusPill status={project.status} />
       </div>
       <div className="card-progress">
@@ -1020,10 +1162,9 @@ function ProjectCard({ project, onEdit, onDelete, onOpen, users }: { project: Pr
       <div className="card-footer">
         <div className="owner"><OwnerAvatar project={project} users={users} /><div><small>Responsável</small><strong>{project.responsible_name}</strong></div></div>
         <div className="deadline">
-          {project.start_date && <><small>Início</small><strong><CalendarDays size={13} /> {formatProjectDate(project.start_date)}</strong></>}
-          {project.start_date && <span style={{margin:'0 4px',color:'#c5cdd8'}}>→</span>}
-          <small>{project.start_date ? 'Prazo final' : 'Prazo final'}</small>
+          <small>Prazo final</small>
           <strong><Clock3 size={13} /> {formatProjectDate(project.deadline)}</strong>
+          {project.start_date && <span className="project-start-date">Desde {formatProjectDate(project.start_date)}</span>}
         </div>
       </div>
       <div className="next-action"><span>Próximo passo</span><strong>{project.next_action}</strong><ArrowUpRight size={15} /></div>
@@ -1039,7 +1180,7 @@ function ProjectListView({ projects, onEdit, onDelete, onOpen, users }: { projec
         <tbody>
           {projects.map((p) => (
             <tr key={p.id} className={`project-list-row ${getStatusRowCls(p.status)}`} onClick={() => onOpen(p)}>
-              <td><div className="project-list-name"><div className={`project-badge tone-${p.accent}`}>{p.code}</div><div><strong>{p.name}</strong><StatusPill status={p.status} /></div></div></td>
+              <td><div className="project-list-name">{p.cover_image ? <img src={p.cover_image} alt={p.code} style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}} /> : <div className={`project-badge tone-${p.accent}`}>{p.code}</div>}<div><strong>{p.name}</strong><StatusPill status={p.status} /></div></div></td>
               <td className="list-cat">{p.category}</td>
               <td><div className="list-owner"><OwnerAvatar project={p} users={users} /><span>{p.responsible_name.split(' ')[0]}</span></div></td>
               <td><div className="list-progress"><div className="progress-track"><div className={`progress-fill fill-${p.accent}`} style={{ width: `${p.progress}%` }} /></div><span>{p.progress}%</span></div></td>
