@@ -24,7 +24,7 @@ const coreColumns = {
   chat_conversations: ['id', 'type', 'name', 'pinned_message_id', 'broadcast_mode'],
   chat_participants: ['conversation_id', 'user_id', 'role', 'is_muted', 'is_pinned', 'last_read_at'],
 };
-const runtimeTables = ['ti_projects', 'ti_tasks', 'ti_task_history', 'training_progress', 'nav_settings', 'task_observers','chat_conversation_archives','task_template_recipients','task_checklist_item_people','chat_attention_requests','browser_push_subscriptions','browser_push_deliveries','chat_message_reactions'];
+const runtimeTables = ['ti_projects', 'ti_tasks', 'ti_task_history', 'training_progress', 'nav_settings', 'task_observers','chat_conversation_archives','task_template_recipients','task_checklist_item_people','chat_attention_requests','browser_push_subscriptions','browser_push_deliveries','chat_message_reactions','password_vaults'];
 export async function checkDatabase(client, { beforeMigrations = false } = {}) {
   const app = await identity(client); requireSafeRole(app);
   const tables = [...coreTables, ...(beforeMigrations ? [] : runtimeTables)];
@@ -41,6 +41,8 @@ export async function checkDatabase(client, { beforeMigrations = false } = {}) {
     if (!result.ok) throw new Error('Sem SELECT em public.' + table);
   }
   if (!beforeMigrations) {
+    const deliveryColumn=(await client.query("SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='chat_messages' AND column_name='client_message_id'")).rowCount;
+    if (!deliveryColumn) throw new Error('Aplique a migração de confirmação de envio do chat');
     const templateColumns=(await client.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='task_templates'")).rows;
     if(!templateColumns.some(column=>column.column_name==='task_snapshot')) throw new Error('Aplique a migração de modelos completos de tarefas');
     const employeeColumns = (await client.query("SELECT column_name FROM information_schema.columns WHERE table_schema='nex_hr' AND table_name='employees'")).rows;
@@ -55,6 +57,8 @@ export async function checkDatabase(client, { beforeMigrations = false } = {}) {
       const found = hr.find(row => row.relname === table);
       if (!found || !found.relrowsecurity || !found.relforcerowsecurity || !found.privileges) throw new Error('RH sem tabela, RLS forçada ou privilégios: ' + table);
     }
+    const vault = (await client.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.password_vaults'::regclass")).rows[0];
+    if (!vault?.relrowsecurity || !vault?.relforcerowsecurity) throw new Error('Password vault RLS is required');
     await client.query("SELECT nex_hr.actor_id(), nex_hr.allowed('rh.view')");
   }
   return { database: app.name, role: app.role, tablesChecked: tables.length, hr: beforeMigrations ? 'pending check after migrations' : 'RLS enabled and forced' };

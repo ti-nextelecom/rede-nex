@@ -6,10 +6,12 @@ import { getNotifications, markNotificationRead } from '../lib/notificationsApi'
 import { useAuth } from '../lib/auth';
 import { wsEventBus } from '../lib/wsEventBus';
 import './global-notifications.css';
+import { chatMessageLink, chatNotificationTarget } from '../../shared/chatMessageLinks.mjs';
+import { playNotificationSound } from '../lib/notificationSound';
 
 interface Popup {
-  id: string; kind: 'chat' | 'task' | 'project' | 'attention'; title: string; actor: string;
-  photo?: string; preview: string; link: string; count: number; notificationId?: string;
+  id: string; kind: 'chat' | 'task' | 'project' | 'attention' | 'mention'; title: string; actor: string;
+  photo?: string; preview: string; link: string; count: number; notificationId?: string; expiresAt?: number;
 }
 function preview(text: string) {
   if (text.startsWith('[IMAGE]')) return 'Enviou uma foto';
@@ -38,39 +40,42 @@ export function GlobalNotifications() {
     let lastMessages = new Map<string, string>();
     const knownNotifications = new Set<string>();
     const show = (popup: Popup) => {
-      if (alive) setPopups(current => [popup, ...current.filter(item => item.id !== popup.id)].slice(0, 3));
+      if (alive) { playNotificationSound(userId); setPopups(current => [{...popup, expiresAt: Date.now() + 3000}, ...current.filter(item => item.id !== popup.id)].slice(0, 3)); }
     };
     async function poll() {
       if (busy || !alive) return;
       busy = true;
       const [chats, notifications] = await Promise.allSettled([getConversations(), getNotifications()]);
       if (!alive) return;
+      const newMentions = notifications.status === 'fulfilled' ? notifications.value.filter(item => !item.read && !knownNotifications.has(item.id) && chatNotificationTarget(item.link)?.mention) : [];
+      const mentionedChats = new Set(newMentions.map(item => chatNotificationTarget(item.link)?.conversationId));
       if (chats.status === 'fulfilled') {
         for (const conversation of chats.value) {
           const last = conversation.last_message;
           const current = route.current === '/bate-papo' && activeConversation.current === conversation.id;
           if (chatReady && last && lastMessages.get(conversation.id) !== last.id
-            && conversation.unread_count > 0 && !conversation.is_muted && last.sender?.id !== userId && !current) {
+            && conversation.unread_count > 0 && !conversation.is_muted && last.sender?.id !== userId && !current && !mentionedChats.has(conversation.id)) {
             show({ id: `chat:${conversation.id}`, kind: 'chat',
               title: conversation.type === 'group' ? conversation.name || 'Conversa em grupo' : last.sender?.name || conversation.name || 'Nova mensagem',
               actor: last.sender?.name || 'Colaborador', photo: last.sender?.photo_url || conversation.other_participant?.photo_url,
               preview: preview(last.content || ''), count: conversation.unread_count,
-              link: `/bate-papo?conversa=${encodeURIComponent(conversation.id)}` });
+              link: chatMessageLink(conversation.id, last.id) });
           }
-          if (current || conversation.is_muted || !conversation.unread_count) setPopups(items => items.filter(item => item.id !== `chat:${conversation.id}`));
+          if (current || conversation.is_muted || !conversation.unread_count) setPopups(items => items.filter(item => item.id !== `chat:${conversation.id}` || (item.kind === 'mention' && !conversation.is_muted)));
         }
         lastMessages = new Map(chats.value.map(conversation => [conversation.id, conversation.last_message?.id || '']));
         chatReady = true;
       }
       if (notifications.status === 'fulfilled') {
         for (const item of [...notifications.value].reverse()) {
-          const kind = item.link?.includes('atencao=') ? 'attention' : item.type === 'task' || item.link?.startsWith('/tarefas') ? 'task'
+          const kind = chatNotificationTarget(item.link)?.mention ? 'mention' : item.link?.includes('atencao=') ? 'attention' : item.type === 'task' || item.link?.startsWith('/tarefas') ? 'task'
             : item.type === 'project' || item.link?.startsWith('/projetos') ? 'project' : null;
+          const mutedMention = kind === 'mention' && chats.status === 'fulfilled' && chats.value.some(conversation => conversation.id === chatNotificationTarget(item.link)?.conversationId && conversation.is_muted);
           const inConversation=kind==='attention' && route.current==='/bate-papo' && !document.hidden && document.hasFocus()
             && new URL(item.link || '/',window.location.origin).searchParams.get('conversa')===activeConversation.current;
-          if ((notificationsReady || kind==='attention') && kind && !item.read && !knownNotifications.has(item.id) && !inConversation) {
+          if ((notificationsReady || kind==='attention' || kind==='mention') && kind && !item.read && !knownNotifications.has(item.id) && !inConversation && !mutedMention) {
             const safeLink = item.link?.startsWith('/') && !item.link.startsWith('//') && !item.link.includes('\\') ? item.link : kind === 'task' ? '/tarefas' : '/projetos';
-            show({ id: item.id, notificationId: item.id, kind, title: item.title, actor: item.actor_name || 'REDE NEX',
+            show({ id: kind === 'mention' ? `chat:${chatNotificationTarget(item.link)?.conversationId}` : item.id, notificationId: item.id, kind, title: item.title, actor: item.actor_name || 'REDE NEX',
               photo: item.actor_photo_url, preview: item.message || 'Uma atualização envolve você.', link: safeLink, count: 1 });
           }
           if (item.read) setPopups(items => items.filter(popup => popup.notificationId !== item.id));
@@ -98,6 +103,11 @@ export function GlobalNotifications() {
     return () => { alive = false; unsubscribe(); window.clearInterval(interval); window.removeEventListener('focus', onFocus); };
   }, [userId]);
 
+  useEffect(() => {
+    const timers = popups.map(item => window.setTimeout(() => setPopups(current => current.filter(popup => popup !== item)), Math.max(0, (item.expiresAt || 0) - Date.now())));
+    return () => timers.forEach(timer => window.clearTimeout(timer));
+  }, [popups]);
+
   function open(item: Popup) {
     setPopups(items => items.filter(popup => popup.id !== item.id));
     if (item.notificationId) void markNotificationRead(item.notificationId).catch(() => undefined);
@@ -108,10 +118,10 @@ export function GlobalNotifications() {
   return <aside className="nex-popup-stack" aria-label="Novas mensagens e atualizações" aria-live="polite" aria-relevant="additions">
     {popups.map(item => {
       const Icon = item.kind === 'chat' ? MessageCircle : item.kind === 'project' ? FolderKanban : ListTodo;
-      return <article key={item.id} className={`nex-popup is-${item.kind}`}>
+      return <article key={item.id + String(item.expiresAt)} className={`nex-popup is-${item.kind}`}>
         <button className="nex-popup-open" onClick={() => open(item)} aria-label={`Abrir ${item.title}, ${item.count} notificação(ões)`}>
           <span className="nex-popup-avatar">{item.photo ? <img src={item.photo} alt="" /> : <span>{item.actor.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('')}</span>}<i><Icon size={13} /></i>{item.count > 1 && <b>{item.count > 99 ? '99+' : item.count}</b>}</span>
-          <span className="nex-popup-copy"><small>{item.kind==='attention'?'Sua atenção foi solicitada':item.kind === 'chat' ? 'Nova mensagem' : item.kind === 'project' ? 'Projeto • envolve você' : 'Tarefa • envolve você'}</small><strong>{item.title}</strong><span>{item.preview}</span><em>{item.kind !== 'chat' && `${item.actor} • `}{item.kind==='attention'?'Conferir mensagem':'Abrir'} <ArrowUpRight size={12} /></em></span>
+          <span className="nex-popup-copy"><small>{item.kind==='mention'?'Mencionaram você':item.kind==='attention'?'Sua atenção foi solicitada':item.kind === 'chat' ? 'Nova mensagem' : item.kind === 'project' ? 'Projeto • envolve você' : 'Tarefa • envolve você'}</small><strong>{item.title}</strong><span>{item.preview}</span><em>{item.kind !== 'chat' && `${item.actor} • `}{item.kind==='attention'?'Conferir mensagem':'Abrir'} <ArrowUpRight size={12} /></em></span>
         </button>
         <button className="nex-popup-close" onClick={() => setPopups(items => items.filter(popup => popup.id !== item.id))} aria-label={`Dispensar aviso: ${item.title}`}><X size={17} /></button>
       </article>;

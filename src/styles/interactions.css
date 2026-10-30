@@ -1,0 +1,11 @@
+/* Shared transitions keep controls stable under the pointer and preserve existing themes. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :where(button, a, [role="button"]) {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a, [role="button"]) { transition: none !important; }
+}

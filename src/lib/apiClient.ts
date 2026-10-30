@@ -42,12 +42,12 @@ export async function apiGet<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+export async function apiPost<T>(path: string, body: unknown, signal?: AbortSignal, extraHeaders?: Record<string,string>): Promise<T> {
   assertWriteAllowed(path);
   const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
+    method: 'POST', signal,
     credentials: 'include',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    headers: authHeaders({ 'Content-Type': 'application/json', ...extraHeaders }),
     body: JSON.stringify(body),
   });
 

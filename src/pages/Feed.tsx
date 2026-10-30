@@ -1,3 +1,4 @@
+import { editImage } from '../lib/mediaTools';
 import { AchievementAvatar } from '../components/AchievementAvatar';
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -727,7 +728,9 @@ export function Feed() {
     const file = e.target.files?.[0];
     if (!file) return;
     const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
-    const url = await fileToBase64(file);
+    const reviewed = mediaType === 'image' ? await editImage(file) : file;
+    if (!reviewed) return;
+    const url = await fileToBase64(reviewed);
     setPendingMedia({ url, type: mediaType });
     e.target.value = '';
   }, []);

@@ -16,6 +16,8 @@ import { requestChatAttention } from './chat-attention.mjs';
 import { chatReactions } from './chat-reactions.mjs';
 import { avatarFrames } from './avatar-frames.mjs';
 import { userAppearance } from './appearance.mjs';
+import { createVaultRouter } from './password-vault.mjs';
+import { markChatRead } from './chat-read.mjs';
 import { pushConfiguration, savePushSubscription, startPushWorker } from './browser-push.mjs';
 import { createHrRouter } from './hr.js';
 import { jrhUploadsDir, downloadsDir } from './runtimePaths.js';
@@ -307,6 +309,7 @@ function validateRequired(payload, fields) {
   return missing.length ? `Campos obrigatorios: ${missing.join(', ')}` : null;
 }
 
+const handleVaultRoutes = createVaultRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
 
 async function route(req, res) {
@@ -328,6 +331,7 @@ async function route(req, res) {
 
   try {
     if (await handleHrRoutes(req, res, path)) return;
+    if (await handleVaultRoutes(req, res, path)) return;
     if (req.method === 'GET' && path === '/api/health') {
       await pool.query('select 1');
       return sendJson(req, res, 200, { status: 'ok', service: 'rede-nex-api', release: releaseId });
@@ -742,13 +746,14 @@ async function route(req, res) {
               : sendError(req, res, 404, 'NOT_FOUND', 'Conversa não encontrada');
           }
           if (req.method === 'POST') {
+            if (req.headers['x-nex-user-id'] && req.headers['x-nex-user-id'] !== user.id) return sendError(req,res,409,'ACCOUNT_CHANGED','A conta mudou. Entre novamente antes de reenviar.');
             const payload = await readJson(req);
             if (!payload.content?.trim() && !payload.attachment_url) {
               return sendError(req, res, 400, 'VALIDATION_ERROR', 'content ou attachment_url obrigatorio');
             }
-            const message = await sendMessage(user.id, conversationId, payload.content, payload.attachment_url || null, payload.reply_to_id || null);
-            const xpMsg = message ? await awardXP(user.id, 'send_message', message.id).catch(() => null) : null;
-            if (message) {
+            const message = await sendMessage(user.id, conversationId, payload.content, payload.attachment_url || null, payload.reply_to_id || null, payload.client_message_id || null);
+            const xpMsg = message && !message.replayed ? await awardXP(user.id, 'send_message', message.id).catch(() => null) : null;
+            if (message && !message.replayed) {
               const wsNotif = JSON.stringify({
                 type: 'message:incoming',
                 from: user.id,
@@ -821,11 +826,11 @@ async function route(req, res) {
       }
 
       if (segments[4] === 'read' && req.method === 'POST') {
-        await pool.query(
-          'update chat_participants set last_read_at = now() where conversation_id = $1 and user_id = $2',
-          [conversationId, user.id]
-        );
-        return sendEmpty(req, res);
+        const ok = await markChatRead(pool.query.bind(pool), user.id, conversationId, (recipient, event) => {
+          const targets = callSessions.get(recipient);
+          if (targets) for (const socket of targets) if (socket.readyState === 1) socket.send(JSON.stringify(event));
+        });
+        return ok ? sendEmpty(req, res) : sendError(req, res, 403, 'FORBIDDEN', 'Sem acesso a esta conversa');
       }
 
       if (segments[4] === 'mute' && req.method === 'POST') {

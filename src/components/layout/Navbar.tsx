@@ -15,6 +15,8 @@ import { useNavigationFavorites } from '../../hooks/useNavigationFavorites';
 import { NavigationFavoritesDialog } from './NavigationFavoritesDialog';
 import { BrowserNotificationSettings } from '../BrowserNotificationSettings';
 import './navbar.css';
+import { chatNotificationTarget } from '../../../shared/chatMessageLinks.mjs';
+import { playNotificationSound } from '../../lib/notificationSound';
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -24,25 +26,6 @@ function timeAgo(dateStr: string) {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
-}
-
-function playNotificationSound() {
-  const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextCtor) return;
-  const audio = new AudioContextCtor();
-  const gain = audio.createGain();
-  const oscillator = audio.createOscillator();
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(740, audio.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(1040, audio.currentTime + 0.09);
-  gain.gain.setValueAtTime(0.0001, audio.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.12, audio.currentTime + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.2);
-  oscillator.connect(gain);
-  gain.connect(audio.destination);
-  oscillator.start();
-  oscillator.stop(audio.currentTime + 0.22);
-  window.setTimeout(() => audio.close(), 350);
 }
 
 export function Navbar() {
@@ -72,17 +55,17 @@ export function Navbar() {
   const filteredMoreItems = moreItems.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(moreSearch.toLocaleLowerCase('pt-BR')));
 
   const loadNotifications = useCallback(async () => {
-    const next = (await getNotifications().catch(() => [])).filter(item => item.type !== 'chat');
+    const next = (await getNotifications().catch(() => [])).filter(item => item.type !== 'chat' || chatNotificationTarget(item.link)?.mention);
     const unread = new Set(next.filter(item => !item.read).map(item => item.id));
     const newest = next.find(item => unread.has(item.id) && !knownUnread.current.has(item.id));
-    if (!firstLoad.current && newest && !newest.link?.includes('atencao=') && newest.type !== 'task' && newest.type !== 'project' && !newest.link?.startsWith('/tarefas') && !newest.link?.startsWith('/projetos')) {
-      playNotificationSound();
+    if (!firstLoad.current && newest && !chatNotificationTarget(newest.link)?.mention && !newest.link?.includes('atencao=') && newest.type !== 'task' && newest.type !== 'project' && !newest.link?.startsWith('/tarefas') && !newest.link?.startsWith('/projetos')) {
+      playNotificationSound(user?.id);
       setToast(newest);
     }
     firstLoad.current = false;
     knownUnread.current = unread;
     setNotifications(next);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     void loadNotifications();
@@ -101,7 +84,7 @@ export function Navbar() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 6000);
+    const timer = window.setTimeout(() => setToast(null), 3000);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
@@ -243,7 +226,7 @@ export function Navbar() {
           </div>
         </DialogContent>
       </Dialog>
-      {toast && <div className="nex-notification-toast" role="status">
+      {toast && <div key={toast.id} className="nex-notification-toast" role="status">
         <button className="text-left flex-1 min-w-0" onClick={() => { void openNotification(toast); }}><p className="font-semibold text-sm">{toast.title}</p><p className="text-xs text-muted-foreground line-clamp-2">{toast.message}</p></button>
         <button aria-label="Fechar notificação" className="navbar-icon-button" onClick={() => setToast(null)}><X size={16} /></button>
       </div>}

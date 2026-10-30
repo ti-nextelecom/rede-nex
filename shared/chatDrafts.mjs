@@ -7,6 +7,8 @@ export function createChatDraftStore({ ownerId, storage }) {
   const key = ownerId ? `nex:chat-drafts:v1:${encodeURIComponent(ownerId)}` : null;
   let drafts = Object.create(null);
   const listeners = new Set();
+  let timer;
+  let dirty = false;
   try {
     const saved = key && JSON.parse(storage?.getItem(key) || 'null');
     if (saved?.version === 1 && saved.ownerId === ownerId && saved.drafts && typeof saved.drafts === 'object') {
@@ -16,8 +18,10 @@ export function createChatDraftStore({ ownerId, storage }) {
     }
   } catch { /* Unavailable or invalid storage must not block composing. */ }
 
-  function publish(next) {
-    drafts = next;
+  function flush() {
+    clearTimeout(timer);
+    if (!dirty) return;
+    dirty = false;
     try {
       if (key) {
         const texts = Object.fromEntries(Object.entries(drafts).map(([id, draft]) => [id, draft.text]));
@@ -25,10 +29,15 @@ export function createChatDraftStore({ ownerId, storage }) {
         else storage?.removeItem(key);
       }
     } catch { /* Keep this session's drafts if storage is full or disabled. */ }
+  }
+  function publish(next) {
+    drafts = next; dirty = true;
+    clearTimeout(timer); timer = setTimeout(flush, 250);
     for (const listener of listeners) listener();
   }
 
   return {
+    flush,
     getSnapshot: () => drafts,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     capture: id => drafts[id],
@@ -47,6 +56,7 @@ export function createChatDraftStore({ ownerId, storage }) {
       const next = Object.assign(Object.create(null), drafts);
       delete next[id];
       publish(next);
+      flush();
       return true;
     },
   };

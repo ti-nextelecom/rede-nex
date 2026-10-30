@@ -1,3 +1,4 @@
+import { ImageLightbox } from '../components/ui/ImageLightbox';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LinkText } from '../components/LinkText';
@@ -1457,12 +1458,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
           </div>
         </div>,
       document.body)}
-      {lightboxSrc && (
-        <div className="lightbox-overlay" onClick={() => setLightboxSrc(null)}>
-          <button className="lightbox-close" onClick={() => setLightboxSrc(null)}>✕</button>
-          <img src={lightboxSrc} alt="" className="lightbox-img" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   ChevronRight, File, FileText, Film, FolderOpen, FolderPlus, Image,
   Music, Trash2, Upload, X,
 } from 'lucide-react';
+import { openMedia, reviewImageUploads } from '../lib/mediaTools';
 import { apiDelete, apiGet, apiPost } from '../lib/apiClient';
 import { cn } from '../lib/utils';
 
@@ -89,7 +90,8 @@ export function DrivePage() {
     if (!files.length) return;
     setUploading(true);
     try {
-      await Promise.all(files.map(f => uploadFile(f, currentFolder)));
+      const reviewed = await reviewImageUploads(files);
+      await Promise.all(reviewed.map(f => uploadFile(f, currentFolder)));
       await load();
     } finally {
       setUploading(false);
@@ -187,7 +189,7 @@ export function DrivePage() {
                 {data.files.map(f => (
                   <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 group transition-colors">
                     <FileIcon type={f.file_type} />
-                    <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0">
+                    <a href={f.file_url} target="_blank" rel="noopener noreferrer" onClick={event => { event.preventDefault(); openMedia({url:f.file_url,name:f.name,type:f.file_type}); }} className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 hover:text-orange-600 truncate transition-colors">{f.name}</p>
                       <p className="text-xs text-slate-400">
                         {formatBytes(f.file_size)} · {new Date(f.created_at).toLocaleDateString('pt-BR')}

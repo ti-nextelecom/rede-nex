@@ -1,3 +1,4 @@
+import './styles/interactions.css';
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
@@ -14,6 +15,7 @@ import { Layout } from './components/layout/Layout';
 const Dashboard   = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Feed        = lazy(() => import('./pages/Feed').then(m => ({ default: m.Feed })));
 const Training    = lazy(() => import('./pages/Training').then(m => ({ default: m.Training })));
+const PasswordVault = lazy(() => import('./pages/PasswordVault').then(m => ({ default: m.PasswordVault })));
 const Wiki        = lazy(() => import('./pages/Wiki').then(m => ({ default: m.Wiki })));
 const Users       = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const Permissions = lazy(() => import('./pages/Permissions').then(m => ({ default: m.Permissions })));
@@ -126,6 +128,7 @@ function App() {
               <Route path="/jrh" element={<Suspense fallback={<PageFallback />}><JRHPage /></Suspense>} />
               <Route path="/rh" element={<Suspense fallback={<PageFallback />}><HrPage /></Suspense>} />
               <Route path="/treinamentos" element={<Suspense fallback={<PageFallback />}><Training /></Suspense>} />
+              <Route path="/senhas" element={<Suspense fallback={<PageFallback />}><PasswordVault /></Suspense>} />
               <Route path="/wiki" element={<Suspense fallback={<PageFallback />}><Wiki /></Suspense>} />
               <Route path="/colaboradores" element={<Suspense fallback={<PageFallback />}><Users /></Suspense>} />
               <Route path="/bate-papo" element={<Suspense fallback={<PageFallback />}><Chat /></Suspense>} />

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { useAuth } from '../lib/auth';
+import { chatMessageLink, chatNotificationTarget } from '../../shared/chatMessageLinks.mjs';
 
 export function PushManager() {
   const { user } = useAuth();
@@ -22,7 +23,8 @@ export function PushManager() {
     });
     PushNotifications.addListener('pushNotificationActionPerformed', action => {
       const cid = action.notification.data?.conversationId;
-      if (cid) window.location.href = '/bate-papo?conversa=' + cid;
+      const data = action.notification.data;
+      if (typeof cid === 'string') { const target = chatNotificationTarget(data?.link); window.location.href = chatMessageLink(cid, typeof data?.messageId === 'string' ? data.messageId : target?.messageId, target?.mention); }
     });
     return () => { PushNotifications.removeAllListeners(); };
   }, [user?.id]);

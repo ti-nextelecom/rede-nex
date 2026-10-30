@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AvatarFramesProvider } from '../AvatarFramesProvider';
+import { MediaToolsHost } from '../media/MediaToolsHost';
 import { Navbar } from './Navbar';
 import { PasswordChangeGate } from './PasswordChangeGate';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -27,6 +28,7 @@ export function Layout() {
     <AvatarFramesProvider><div className="nex-app">
       <a href="#conteudo-principal" className="nex-skip-link">Pular para o conteúdo</a>
 
+      <MediaToolsHost />
       <JarvesWidget />
       <Navbar />
       <PasswordChangeGate />

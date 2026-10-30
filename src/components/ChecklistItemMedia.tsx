@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Loader2, Paperclip, Upload } from 'lucide-react';
 import { TASK_UPLOAD_ACCEPT, type TaskMediaFile } from '../../shared/taskMedia.mjs';
+import { reviewImageUploads } from '../lib/mediaTools';
 import { TaskFileCard } from './TaskFileCard';
 
 export function ChecklistItemMedia({ title, files, editable, disabled, onUpload, onRemove }: {
@@ -12,7 +13,7 @@ export function ChecklistItemMedia({ title, files, editable, disabled, onUpload,
   async function upload(items: File[]) {
     if (!items.length || !editable || disabled || uploading.current) return;
     uploading.current = true; setOpen(true); setBusy(true); setError('');
-    try { await onUpload(items); }
+    try { const reviewed = await reviewImageUploads(items); if (reviewed.length) await onUpload(reviewed); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível anexar a mídia. Tente novamente.'); }
     finally { uploading.current = false; setBusy(false); if (input.current) input.current.value = ''; }
   }

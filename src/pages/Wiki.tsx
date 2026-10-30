@@ -1,3 +1,4 @@
+import { openMedia, editImage } from '../lib/mediaTools';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import DOMPurify from 'dompurify';
@@ -1839,6 +1840,7 @@ function PdfViewer({ url }: { url: string }) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      <button type="button" className="absolute top-2 right-2 z-20 rounded-lg bg-slate-900/80 text-white px-3 py-2 text-xs" onClick={() => openMedia({url,name:'Documento PDF',type:'application/pdf'})}>Ampliar PDF</button>
       <div className="flex-1 relative overflow-hidden">
         <div ref={containerRef} className="h-full overflow-auto flex justify-center bg-slate-800 p-4">
           <Document
@@ -2556,7 +2558,9 @@ Your content here`;
     if (!file || uploading) return;
     setUploading(true);
     try {
-      const media = await onUploadMedia(file);
+      const reviewed = await editImage(file);
+      if (!reviewed) return;
+      const media = await onUploadMedia(reviewed);
       const isVideo = media.file_type?.startsWith('video/');
       const isImage = media.file_type?.startsWith('image/');
 

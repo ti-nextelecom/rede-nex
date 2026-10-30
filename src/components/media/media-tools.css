@@ -1,0 +1,38 @@
+.nex-media-backdrop { position: fixed; inset: 0; z-index: 14990; background: #050913df; }
+.nex-media-dialog { position: fixed; inset: 16px; z-index: 15000; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #111a28; color: #edf3ff; border: 1px solid #425269; border-radius: 16px; box-shadow: 0 20px 100px #0008; overflow: hidden; outline: none; }
+.nex-media-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #334155; flex-shrink: 0; }
+.nex-media-toolbar h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 15px; }
+.nex-media-toolbar > div { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.nex-media-toolbar button,.nex-media-toolbar a { width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 9px; color: inherit; background: #ffffff0b; }
+.nex-media-toolbar output { min-width: 44px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.nex-media-toolbar :disabled { opacity: .3; }
+.nex-media-help { padding: 7px 14px; font-size: 11px; color: #aab8cd; flex-shrink: 0; }
+.nex-media-stage { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: auto; overscroll-behavior: contain; background: #080e17; }
+.nex-media-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; pointer-events: none; }
+.nex-media-stage.is-image { touch-action: none; cursor: grab; }
+.nex-media-stage.is-image:active { cursor: grabbing; }
+.nex-image-space { display: grid; place-items: center; }
+.nex-image-space img { display: block; max-width: none !important; max-height: none !important; object-fit: contain; user-select: none; }
+.nex-media-stage > video { width: 100%; height: 100%; object-fit: contain; }
+.nex-media-stage > audio { display: block; margin: 40px auto; max-width: 90%; }
+.nex-media-fallback { display: grid; place-content: center; gap: 16px; height: 100%; text-align: center; }
+.nex-media-fallback a { color: #80b9ff; text-decoration: underline; }
+.nex-pdf-preview { height: 100%; display: flex; flex-direction: column; }
+.nex-pdf-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+.nex-pdf-scroll .react-pdf__Document { width: max-content; min-width: 100%; display: grid; justify-items: center; }
+.nex-pdf-pages { display: flex; justify-content: center; align-items: center; gap: 20px; padding: 8px; font-size: 13px; border-top: 1px solid #334155; }
+.nex-pdf-pages button { min-height: 36px; padding: 0 12px; border-radius: 8px; background: #27364a; }
+.nex-media-dialog button:focus-visible,.nex-media-dialog a:focus-visible { outline: 2px solid #ff9b45; outline-offset: 2px; }
+@media (max-width: 767px) { .nex-media-dialog { inset: 5px; border-radius: 10px; } .nex-media-toolbar { flex-wrap: wrap; gap: 4px; padding: 8px; } .nex-media-toolbar > h2 { width: 100%; } .nex-media-toolbar > div { margin-left: auto; } .nex-media-help { font-size: 10px; } }
+.nex-editor-tools { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px; border-bottom:1px solid #334155; }
+.nex-editor-tools button { display:inline-flex; align-items:center; gap:5px; padding:8px 10px; min-height:36px; border:1px solid #43546c; border-radius:8px; font-size:12px; }
+.nex-editor-tools button[aria-pressed=true] { background:#b45309; border-color:#f59e0b; }
+.nex-editor-tools label { display:flex; align-items:center; gap:5px; font-size:12px; }
+.nex-editor-tools input[type=color] { width:30px; height:30px; background:none; }
+.nex-editor-tools input[type=range] { width:75px; }
+.nex-editor-canvas-area { flex:1; min-height:0; min-width:0; overflow:auto; display:grid; place-items:center; padding:18px; background:#080e17; }
+.nex-editor-canvas-area canvas { max-width:100%; max-height:calc(100dvh - 290px); width:auto; height:auto; touch-action:none; cursor:crosshair; }
+.nex-editor-footer { display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:12px; border-top:1px solid #334155; }
+.nex-editor-footer button { min-height:40px; padding:8px 16px; background:#334155; border-radius:9px; font-size:13px; }
+.nex-editor-footer button:last-child { background:#f97316; color:#111827; font-weight:700; }
+.nex-editor-error { padding:8px 16px; font-size:13px; color:#ff9c9c; }

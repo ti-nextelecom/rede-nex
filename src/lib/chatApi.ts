@@ -37,6 +37,8 @@ export interface ChatConversation {
   is_archived?: boolean;
   pinned_message?: { id: string; content: string; sender?: { id: string; name: string } } | null;
   last_message?: {
+    recipient_count?: number;
+    read_count?: number;
     id: string;
     content: string;
     created_at: string;
@@ -46,6 +48,8 @@ export interface ChatConversation {
 }
 
 export interface ChatMessage {
+  client_message_id?: string;
+  delivery_state?: 'sending' | 'failed';
   id: string;
   conversation_id: string;
   sender_id?: string;
@@ -110,14 +114,18 @@ export async function getMessages(conversationId: string, beforeId?: string) {
 }
 
 export async function markConversationRead(conversationId: string): Promise<void> {
-  try { await apiPost(`/chat/conversations/${conversationId}/read`, {}); } catch {}
+  await apiPost(`/chat/conversations/${conversationId}/read`, {});
 }
 
-export async function sendChatMessage(conversationId: string, content: string, replyToId?: string) {
-  const response = await apiPost<{ data?: ChatMessage; gamification?: unknown }>(`/chat/conversations/${conversationId}/messages`, { content, reply_to_id: replyToId ?? null });
-  dispatchXPEvent(response.gamification);
-  if (!response.data) throw new Error('Mensagem não enviada');
-  return response.data;
+export async function sendChatMessage(conversationId: string, content: string, replyToId?: string, clientMessageId: string = crypto.randomUUID(), expectedUserId?: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25000);
+  try {
+    const response = await apiPost<{ data?: ChatMessage; gamification?: unknown }>(`/chat/conversations/${conversationId}/messages`, { content, reply_to_id: replyToId ?? null, client_message_id: clientMessageId }, controller.signal, expectedUserId ? {'X-Nex-User-Id':expectedUserId} : undefined);
+    dispatchXPEvent(response.gamification);
+    if (!response.data) throw new Error('Mensagem não enviada');
+    return response.data;
+  } finally { clearTimeout(timer); }
 }
 
 export async function deleteChatMessage(conversationId: string, messageId: string): Promise<boolean> {

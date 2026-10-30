@@ -35,6 +35,8 @@ Não crie outro processo com nome diferente se já houver um atendendo a mesma p
 
 ## Atualização normal (depois da preparação única)
 
+As melhorias de mídias/envio de 30/10 exigem API, frontend e a migração aditiva `20261104_chat_message_delivery.sql` juntos. Ela permite confirmar e repetir um envio sem duplicar a mensagem. A migração `20261103_password_vault.sql` também é necessária para o cofre de senhas. Veja [detalhes e validações locais](docs/midias-editor-envio-2026-10-30.md). Nenhuma dessas instruções indica que o banco da VM já foi atualizado.
+
 Gere o pacote na máquina de desenvolvimento com `npm run release:build` (`npm.cmd` no PowerShell). Ele exige TypeScript, testes e build Vite aprovados. Saída: `.cache/releases/rede-nex-<data>.tar.gz` e `.sha256`. Leve somente esses dois arquivos à VM, por canal seguro, e extraia em pasta privada **diferente da instalação atual**, nunca dentro de `dist` nem de uploads.
 
 ```bash
