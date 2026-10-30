@@ -1,12 +1,14 @@
 import { createPortal } from 'react-dom';
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
-import { Camera, Eye, Plus, X } from 'lucide-react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { layoutStoryText, STORY_WIDTH, STORY_HEIGHT } from '../../../shared/storyTextLayout.mjs';
+import { Camera, ChevronLeft, ChevronRight, Eye, Pause, Play, Plus, Volume2, VolumeX, X } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import {
   createStory, getStoryViewers, listStories, recordStoryView,
   type Story, type StoryViewer,
 } from '../../lib/storiesApi';
 import { cn } from '../../lib/utils';
+import './stories.css';
 
 function storyAvatar(name?: string | null, photoUrl?: string | null, size = 80) {
   return photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&size=${size * 2}&background=ff7a00&color=fff`;
@@ -45,6 +47,7 @@ function buildGroups(stories: Story[], myId?: string): StoryGroup[] {
     g.stories.push(s);
     if (!s.viewed_by_me) g.allViewed = false;
   }
+  for (const group of map.values()) group.stories.sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
   return [...map.values()].sort((a, b) => {
     if (a.userId === myId) return -1;
     if (b.userId === myId) return 1;
@@ -65,61 +68,102 @@ function StoryViewer({
 }) {
   const { user } = useAuth();
   const [gIdx, setGIdx] = useState(startIdx);
-  const [sIdx, setSIdx] = useState(0);
+  const [sIdx, setSIdx] = useState(()=>Math.max(0,groups[startIdx]?.stories.findIndex(story=>!story.viewed_by_me) ?? 0));
   const [progress, setProgress] = useState(0);
   const [viewers, setViewers] = useState<StoryViewer[]>([]);
   const [showViewers, setShowViewers] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const [hidden, setHidden] = useState(document.hidden);
+  const [ready, setReady] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [viewerError, setViewerError] = useState('');
+  const elapsedRef = useRef(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const pointerRef = useRef({ x: 0, y: 0, time: 0 });
+  const recordedRef = useRef(new Set<string>());
+  const viewersRequestRef = useRef(0);
   const rafRef = useRef<number | null>(null);
-  const DURATION = 5000;
 
   const group = groups[gIdx];
   const story = group?.stories[sIdx];
+  const duration=story && !story.image_url && !story.video_url ? Math.min(20000,Math.max(5500,(story.content?.match(/\S+/g)?.length || 0)*280)) : 5500;
+  const stopped = paused || holding || hidden || showViewers || ready !== story.id || failed;
+
+  const goNext = useCallback(() => {
+    if (sIdx < group.stories.length - 1) setSIdx(i => i + 1);
+    else if (gIdx < groups.length - 1) { setGIdx(i => i + 1); setSIdx(0); }
+    else onClose();
+  }, [sIdx, gIdx, group.stories.length, groups.length, onClose]);
+
+  const goPrev = useCallback(() => {
+    if (sIdx > 0) setSIdx(i => i - 1);
+    else if (gIdx > 0) { setGIdx(i => i - 1); setSIdx(groups[gIdx - 1].stories.length - 1); }
+  }, [sIdx, gIdx, groups]);
 
   useEffect(() => {
     if (!story) return;
-    recordStoryView(story.id).catch(() => {});
-    onViewed(story.id);
     setProgress(0);
+    elapsedRef.current = 0;
+    setReady(!story.image_url && !story.video_url ? story.id : null);
+    setFailed(false);
+    setPaused(false);
+    setHolding(false);
     setShowViewers(false);
     setViewers([]);
+    setViewerError('');
+    viewersRequestRef.current += 1;
+  }, [story?.id]);
 
-    if (story.video_url) return;
-    const start = Date.now();
+  useEffect(() => {
+    if (!story || ready !== story.id || failed || recordedRef.current.has(story.id)) return;
+    recordedRef.current.add(story.id);
+    recordStoryView(story.id).then(() => onViewed(story.id)).catch(() => { recordedRef.current.delete(story.id); });
+  }, [story, ready, failed, onViewed]);
+
+  useEffect(() => {
+    if (stopped || story.video_url) return;
+    let previous = performance.now();
     const tick = () => {
-      const p = Math.min((Date.now() - start) / DURATION, 1);
+      const now = performance.now();
+      elapsedRef.current += now - previous;
+      previous = now;
+      const p = Math.min(elapsedRef.current / duration, 1);
       setProgress(p);
       if (p < 1) rafRef.current = requestAnimationFrame(tick);
       else goNext();
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [gIdx, sIdx]);
+  }, [story.id, story.video_url, stopped, goNext,duration]);
 
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (stopped) video.pause();
+    else video.play().catch(() => setPaused(true));
+  }, [stopped, story.id]);
+
+  useEffect(() => {
+    const overflow = document.body.style.overflow;
+    const focused = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    dialogRef.current?.focus();
+    const visibility = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', visibility);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener('visibilitychange', visibility); focused?.focus(); };
   }, []);
 
-  function goNext() {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (sIdx < group.stories.length - 1) setSIdx(i => i + 1);
-    else if (gIdx < groups.length - 1) { setGIdx(i => i + 1); setSIdx(0); }
-    else onClose();
-  }
-
-  function goPrev() {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (sIdx > 0) setSIdx(i => i - 1);
-    else if (gIdx > 0) { setGIdx(i => i - 1); setSIdx(0); }
-  }
-
   async function loadViewers() {
+    setShowViewers(true);
+    setViewerError('');
+    const request = ++viewersRequestRef.current;
     try {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       const v = await getStoryViewers(story.id);
-      setViewers(v);
-      setShowViewers(true);
-    } catch {}
+      if (request === viewersRequestRef.current) setViewers(v);
+    } catch { if (request === viewersRequestRef.current) setViewerError('Não foi possível carregar as visualizações.'); }
   }
 
   if (!group || !story) return null;
@@ -127,10 +171,24 @@ function StoryViewer({
   const hasMedia = !!(story.image_url || story.video_url);
 
   const viewer = (
-    <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center" onClick={onClose}>
-      <div className="relative h-full w-full sm:max-w-sm md:w-auto md:max-w-none md:aspect-[9/16]" onClick={e => e.stopPropagation()}>
+    <div ref={dialogRef} tabIndex={-1} role='dialog' aria-modal='true' aria-label='Stories da equipe' className='nex-story-overlay' onClick={onClose}
+      onKeyDown={e => {
+        if (e.key === 'Escape') { e.stopPropagation(); if (showViewers) setShowViewers(false); else onClose(); }
+        const reading = (e.target as HTMLElement).closest('.nex-story-caption');
+        if (e.key === 'ArrowRight' && !reading) { e.preventDefault(); goNext(); }
+        if (e.key === 'ArrowLeft' && !reading) { e.preventDefault(); goPrev(); }
+        if (e.code === 'Space' && e.target === dialogRef.current) { e.preventDefault(); setPaused(v => !v); }
+        if (e.key === 'Tab') {
+          const buttons = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),[tabindex="0"]') || [])].filter(el => el.getClientRects().length);
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { e.preventDefault(); last?.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+        }
+      }}>
+      <button className='nex-story-desktop-nav' aria-label='Story anterior' disabled={gIdx === 0 && sIdx === 0} onClick={e => { e.stopPropagation(); goPrev(); }}><ChevronLeft /></button>
+      <div className='nex-story-stage' onClick={e => e.stopPropagation()}>
         {/* Progress bars */}
-        <div className="absolute top-3 left-3 right-3 z-30 flex gap-1">
+        <div className='nex-story-progress'>
           {group.stories.map((s, i) => (
             <div key={s.id} className="flex-1 h-0.5 bg-white/30 rounded-full overflow-hidden">
               <div
@@ -145,7 +203,7 @@ function StoryViewer({
         </div>
 
         {/* Header */}
-        <div className="absolute top-8 left-3 right-3 z-30 flex items-center justify-between">
+        <div className='nex-story-header'>
           <div className="flex items-center gap-2">
             <img
               src={storyAvatar(group.name, group.photoUrl, 32)}
@@ -154,16 +212,18 @@ function StoryViewer({
             />
             <div>
               <p className="text-sm font-bold text-white leading-tight">{group.name}</p>
-              <p className="text-xs text-white/70">{timeAgo(story.created_at)}</p>
+              <p className="text-xs text-white/70">{timeAgo(story.created_at)} · {sIdx+1} de {group.stories.length}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button aria-label={paused ? 'Reproduzir story' : 'Pausar story'} onClick={() => setPaused(v => !v)}>{paused ? <Play size={20} /> : <Pause size={20} />}</button>
+            {story.video_url && <button aria-label={muted ? 'Ativar som' : 'Silenciar vídeo'} onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={20} /> : <Volume2 size={20} />}</button>}
             {isOwn && (
-              <button onClick={loadViewers} className="flex items-center gap-2 p-2 rounded-xl text-white/80 hover:text-white active:bg-white/20">
+              <button aria-label={`Ver ${story.view_count} visualizações do story`} onClick={loadViewers} className="flex items-center gap-2 p-2 rounded-xl text-white/80 hover:text-white active:bg-white/20">
                 <Eye size={20} /><span className="text-sm font-medium">{story.view_count}</span>
               </button>
             )}
-            <button onClick={onClose} className="text-white/70 hover:text-white"><X size={20} /></button>
+            <button aria-label='Fechar stories' onClick={onClose} className="text-white/70 hover:text-white"><X size={20} /></button>
           </div>
         </div>
 
@@ -171,11 +231,16 @@ function StoryViewer({
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {story.video_url ? (
             <video
+              ref={videoRef}
               key={story.id}
               src={story.video_url}
-              className="h-full w-full object-cover"
-              controls
-              autoPlay
+              className='nex-story-media'
+              playsInline muted={muted}
+              onLoadedData={() => setReady(story.id)}
+              onWaiting={() => setReady(null)}
+              onCanPlay={() => setReady(story.id)}
+              onError={() => setFailed(true)}
+              onTimeUpdate={e => { const v = e.currentTarget; if (v.duration) setProgress(v.currentTime / v.duration); }}
               onEnded={goNext}
             />
           ) : story.image_url ? (
@@ -183,28 +248,41 @@ function StoryViewer({
               key={story.id}
               src={story.image_url}
               alt="Story"
-              className="h-full w-full object-cover"
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              className='nex-story-media'
+              onLoad={() => setReady(story.id)}
+              onError={() => setFailed(true)}
             />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-rose-600 to-purple-800" />
+            <div className="nex-story-text-backdrop absolute inset-0" />
           )}
 
           {story.content && (
-            <div className={cn(
-              'relative z-10 px-8 text-white font-bold text-2xl text-center leading-snug',
-              hasMedia
-                ? 'absolute bottom-20 left-0 right-0 z-10 bg-black/50 backdrop-blur-sm py-3'
-                : 'py-6',
-            )}>
+            <div tabIndex={0} className={cn('nex-story-caption', hasMedia && 'has-media')}
+              onFocus={() => setPaused(true)} onPointerDown={() => setPaused(true)} onWheel={() => setPaused(true)}>
               {story.content}
             </div>
           )}
         </div>
 
         {/* Tap zones */}
-        <button className="absolute left-0 top-0 h-full w-1/3 z-20 opacity-0" onClick={goPrev} />
-        <button className="absolute right-0 top-0 h-full w-1/3 z-20 opacity-0" onClick={goNext} />
+        {['previous', 'next'].map(direction => <button key={direction} className={`nex-story-tap ${direction}`} aria-label={direction === 'next' ? 'Próximo story; segure para pausar' : 'Story anterior; segure para pausar'}
+          onPointerDown={e => { pointerRef.current = { x: e.clientX, y: e.clientY, time: performance.now() }; setHolding(true); e.currentTarget.setPointerCapture(e.pointerId); }}
+          onPointerUp={e => {
+            const { x, y, time } = pointerRef.current;
+            setHolding(false);
+            const dx = e.clientX - x, dy = e.clientY - y;
+            if (dy > 100 && Math.abs(dy) > Math.abs(dx)) { onClose(); return; }
+            if (Math.abs(dx) > 60) {
+              const nextGroup = gIdx + (dx < 0 ? 1 : -1);
+              if (nextGroup >= 0 && nextGroup < groups.length) { setGIdx(nextGroup); setSIdx(0); }
+              else if (dx < 0) onClose();
+            } else if (performance.now() - time < 250) { if (direction === 'next') goNext(); else goPrev(); }
+          }}
+          onPointerCancel={() => setHolding(false)} onLostPointerCapture={() => setHolding(false)}
+          onClick={e => { if (e.detail === 0) { if (direction === 'next') goNext(); else goPrev(); } }} />)}
+        {ready !== story.id && !failed && <p className='nex-story-status' role='status'>Carregando story…</p>}
+        {failed && <div className='nex-story-status' role='alert'><p>Não foi possível carregar esta mídia.</p><button onClick={goNext}>Próximo story</button></div>}
+        {paused && !showViewers && <span className='nex-story-paused'>Pausado</span>}
 
         {/* Viewers drawer */}
         {showViewers && (
@@ -215,6 +293,7 @@ function StoryViewer({
                 <X size={16} />
               </button>
             </div>
+            {viewerError && <p role='alert' className='text-sm text-white'>{viewerError}</p>}
             {viewers.map(v => (
               <div key={v.user_id} className="flex items-center gap-2 py-1">
                 <img src={storyAvatar(v.name, v.photo_url, 24)} alt={v.name}
@@ -226,6 +305,7 @@ function StoryViewer({
           </div>
         )}
       </div>
+      <button className='nex-story-desktop-nav' aria-label='Próximo story' onClick={e => { e.stopPropagation(); goNext(); }}><ChevronRight /></button>
     </div>
   );
   return createPortal(viewer, document.body);
@@ -262,10 +342,37 @@ function CreateStoryModal({
   const imgScaleRef    = useRef(1);
 
   const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState('');
+  const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileRef   = useRef<HTMLInputElement>(null);
+  const [previewWidth, setPreviewWidth] = useState(360);
+  const textLayouts = useMemo(() => {
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    return texts.map(text => ({ ...text, layout: layoutStoryText(text, (line, size) => {
+      ctx.font = `bold ${size}px Arial`;
+      return ctx.measureText(line).width;
+    }) }));
+  }, [texts]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const observer = new ResizeObserver(() => setPreviewWidth(canvas.clientWidth));
+    observer.observe(canvas);
+    setPreviewWidth(canvas.clientWidth);
+    return () => observer.disconnect();
+  }, []);
 
   const COLORS = ['#ffffff', '#000000', '#ff7a00', '#ffdd00', '#ff3b78', '#00bfff', '#00e676'];
+
+  useEffect(() => {
+    const overflow = document.body.style.overflow;
+    const focused = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    editorRef.current?.focus();
+    return () => { document.body.style.overflow = overflow; focused?.focus(); };
+  }, []);
 
   // Keep imgScaleRef in sync for pinch start capture
   useEffect(() => { imgScaleRef.current = imgScale; }, [imgScale]);
@@ -293,6 +400,9 @@ function CreateStoryModal({
   function onFile(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (!f.type.startsWith('image/') && !f.type.startsWith('video/')) { setPostError('Escolha uma imagem ou um vídeo.'); return; }
+    if (f.size > 25 * 1024 * 1024) { setPostError('Use uma mídia com até 25 MB.'); return; }
+    setPostError('');
     const type: 'image' | 'video' = f.type.startsWith('video') ? 'video' : 'image';
     const reader = new FileReader();
     reader.onload = ev => {
@@ -322,10 +432,10 @@ function CreateStoryModal({
   // ── Mouse handlers ─────────────────────────────────────────────────────────
   function onTextMouseDown(e: React.MouseEvent, id: string) {
     e.stopPropagation();
-    const t = texts.find(t => t.id === id);
+    const t = textLayouts.find(t => t.id === id);
     if (!t) return;
     textMovedRef.current = false;
-    setTextDragging({ id, sx: e.clientX, sy: e.clientY, ox: t.x, oy: t.y });
+    setTextDragging({ id, sx: e.clientX, sy: e.clientY, ox: t.layout.x / STORY_WIDTH * 100, oy: t.layout.y / STORY_HEIGHT * 100 });
   }
 
   function onCanvasMouseDown(e: React.MouseEvent) {
@@ -367,10 +477,10 @@ function CreateStoryModal({
   // ── Touch handlers ─────────────────────────────────────────────────────────
   function onTextTouchStart(e: React.TouchEvent, id: string) {
     e.stopPropagation();
-    const t = texts.find(t => t.id === id);
+    const t = textLayouts.find(t => t.id === id);
     if (!t) return;
     textMovedRef.current = false;
-    setTextDragging({ id, sx: e.touches[0].clientX, sy: e.touches[0].clientY, ox: t.x, oy: t.y });
+    setTextDragging({ id, sx: e.touches[0].clientX, sy: e.touches[0].clientY, ox: t.layout.x / STORY_WIDTH * 100, oy: t.layout.y / STORY_HEIGHT * 100 });
   }
 
   function onCanvasTouchStart(e: React.TouchEvent) {
@@ -418,6 +528,7 @@ function CreateStoryModal({
   // ── Post ───────────────────────────────────────────────────────────────────
   async function post() {
     if (posting || (!bgMedia && texts.length === 0)) return;
+    setPostError('');
     setPosting(true);
     try {
       let imageUrl: string | undefined;
@@ -428,7 +539,7 @@ function CreateStoryModal({
         videoUrl = bgMedia.url;
         textContent = texts.map(t => t.text).join(' ') || undefined;
       } else {
-        const W = 720, H = 1280;
+        const W = STORY_WIDTH, H = STORY_HEIGHT;
         const el = canvasRef.current;
         const cw = el?.clientWidth  || W;
         const ch = el?.clientHeight || H;
@@ -438,7 +549,7 @@ function CreateStoryModal({
 
         if (bgMedia?.type === 'image') {
           const img = new Image();
-          await new Promise<void>(res => { img.onload = () => res(); img.src = bgMedia.url; });
+          await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(new Error('Imagem inválida')); img.src = bgMedia.url; });
           const cssBase    = Math.max(cw / img.width, ch / img.height);
           const canvasBase = Math.max(W  / img.width, H  / img.height);
           const ratio      = canvasBase / cssBase;
@@ -456,15 +567,16 @@ function CreateStoryModal({
           ctx.fillRect(0, 0, W, H);
         }
 
-        for (const t of texts) {
+        for (const t of textLayouts) {
           ctx.save();
-          ctx.font = `bold ${t.size * 2}px Arial`;
+          const {fontSize, lines, x, y, lineHeight} = t.layout;
+          ctx.font = `bold ${fontSize}px Arial`;
           ctx.fillStyle = t.color;
           ctx.shadowColor = 'rgba(0,0,0,0.8)';
           ctx.shadowBlur = 10;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(t.text, (t.x / 100) * W, (t.y / 100) * H);
+          lines.forEach((line, index) => ctx.fillText(line, x, y + (index - (lines.length - 1) / 2) * lineHeight));
           ctx.restore();
         }
 
@@ -474,16 +586,25 @@ function CreateStoryModal({
       const s = await createStory({ content: textContent, image_url: imageUrl, video_url: videoUrl });
       onCreated(s);
       onClose();
-    } catch {} finally { setPosting(false); }
+    } catch { setPostError('Não foi possível publicar. Sua edição foi mantida; tente novamente.'); } finally { setPosting(false); }
   }
 
   const canPost = !posting && (!!bgMedia || texts.length > 0);
 
   return createPortal(
-    <div className="fixed inset-0 z-[210] bg-black flex flex-col" style={{ userSelect: 'none' }}>
+    <div ref={editorRef} tabIndex={-1} className='nex-story-editor' role='dialog' aria-modal='true' aria-label='Criar story' style={{ userSelect: 'none' }} onKeyDown={e => {
+      if (e.key === 'Escape' && !addingText && !posting) { e.stopPropagation(); onClose(); }
+      if (e.key === 'Tab') {
+        const controls = [...(editorRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not([type="file"])') || [])].filter(el => el.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === editorRef.current)) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    }}>
+      {postError && <p role='alert' className='nex-story-editor-error'>{postError}</p>}
       <div
         ref={canvasRef}
-        className="relative flex-1 overflow-hidden bg-gradient-to-br from-orange-500 via-rose-600 to-purple-800"
+        className='nex-story-editor-canvas bg-gradient-to-br from-orange-500 via-rose-600 to-purple-800'
         style={{ cursor: bgMedia?.type === 'image' ? (bgDragging ? 'grabbing' : 'grab') : 'default' }}
         onMouseDown={onCanvasMouseDown}
         onMouseMove={onCanvasMouseMove}
@@ -509,14 +630,16 @@ function CreateStoryModal({
         )}
 
         {/* Text overlays */}
-        {texts.map(t => (
+        {textLayouts.map(t => (
           <div
             key={t.id}
-            className="absolute px-2 py-0.5 rounded"
+            className="nex-story-editor-text absolute rounded"
             style={{
-              left: `${t.x}%`, top: `${t.y}%`,
+              left: `${t.layout.x / STORY_WIDTH * 100}%`, top: `${t.layout.y / STORY_HEIGHT * 100}%`,
+              width: `${t.layout.width / STORY_WIDTH * 100}%`,
+              height: `${t.layout.height / STORY_HEIGHT * 100}%`,
               transform: 'translate(-50%, -50%)',
-              color: t.color, fontSize: `${t.size}px`, fontWeight: 'bold',
+              color: t.color, fontSize: `${t.layout.fontSize * previewWidth / STORY_WIDTH}px`, fontWeight: 'bold', fontFamily: 'Arial, sans-serif',
               textShadow: '0 1px 6px rgba(0,0,0,0.8)',
               touchAction: 'none', cursor: 'grab',
               outline: t.id === selectedId ? '2px dashed rgba(255,255,255,0.85)' : 'none',
@@ -525,7 +648,7 @@ function CreateStoryModal({
             onMouseDown={e => { e.stopPropagation(); onTextMouseDown(e, t.id); }}
             onTouchStart={e => { e.stopPropagation(); onTextTouchStart(e, t.id); }}
           >
-            {t.text}
+            {t.layout.lines.map((line, index) => <span key={index} style={{ display: 'block', whiteSpace: 'pre', height: '1.5em', textAlign: 'center' }}>{line || '\u00a0'}</span>)}
           </div>
         ))}
 
@@ -647,18 +770,43 @@ export function StoriesBar() {
   const { user } = useAuth();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewer, setViewer] = useState<number | null>(null);
+  // Freeze order while open: marking someone viewed must not switch the author.
+  const [viewer, setViewer] = useState<{ groups: StoryGroup[]; index: number } | null>(null);
   const [creating, setCreating] = useState(false);
+  const [loadError,setLoadError]=useState(false);
+  const [retry,setRetry]=useState(0);
+  const stripRef=useRef<HTMLDivElement>(null);
+  const [scrollable,setScrollable]=useState({left:false,right:false});
+  useEffect(()=>{
+    const strip=stripRef.current;if(!strip)return;
+    const update=()=>{
+      const next={left:strip.scrollLeft>1,right:strip.scrollLeft+strip.clientWidth<strip.scrollWidth-1};
+      setScrollable(previous=>previous.left===next.left && previous.right===next.right?previous:next);
+    };
+    update();const observer=new ResizeObserver(update);observer.observe(strip);strip.addEventListener('scroll',update,{passive:true});
+    return()=>{observer.disconnect();strip.removeEventListener('scroll',update);};
+  },[loading,stories.length]);
 
   useEffect(() => {
-    listStories().then(setStories).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    let active=true,busy=false;
+    setLoading(true);setLoadError(false);
+    const refresh=async()=>{
+      if(busy || document.hidden)return;busy=true;
+      try{const next=await listStories();if(active){setStories(next);setLoadError(false);}}
+      catch{if(active)setLoadError(true);}
+      finally{busy=false;if(active)setLoading(false);}
+    };
+    void refresh();const timer=window.setInterval(()=>void refresh(),60000);
+    window.addEventListener('focus',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+  }, [user?.id,retry]);
 
   const groups = buildGroups(stories, user?.id);
 
   function handleMyClick() {
     const myIdx = groups.findIndex(g => g.userId === user?.id);
-    if (myIdx >= 0) setViewer(myIdx);
+    if (myIdx >= 0) setViewer({ groups, index: myIdx });
     else setCreating(true);
   }
 
@@ -673,81 +821,39 @@ export function StoriesBar() {
   const myHasStories = stories.some(s => s.user_id === user?.id);
   const others = groups.filter(g => g.userId !== user?.id);
 
-  if (loading) {
-    return (
-      <div className="flex gap-3 px-4 py-3 overflow-x-auto border-b border-slate-100 bg-white">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-            <div className="h-14 w-14 rounded-full bg-slate-100 animate-pulse" />
-            <div className="h-2 w-10 bg-slate-100 rounded animate-pulse" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   return (
     <>
-      <div className="flex gap-3 px-4 py-3 overflow-x-auto border-b border-slate-100 flex-shrink-0 bg-white">
-        {/* My bubble */}
-        <div className="relative flex-shrink-0">
-        <button onClick={handleMyClick} className="flex flex-col items-center gap-1.5">
-          <div className="relative">
-            <div className={cn(
-              'h-14 w-14 rounded-full p-0.5',
-              myHasStories ? 'bg-gradient-to-br from-orange-400 to-rose-500' : 'bg-slate-200',
-            )}>
-              <div className="h-full w-full rounded-full overflow-hidden ring-2 ring-white">
-                <img
-                  src={storyAvatar(user?.name, (user as any)?.photo_url, 56)}
-                  alt={user?.name ?? 'Eu'}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </div>
-          </div>
-          <span className="text-[11px] text-slate-600 font-medium w-14 text-center truncate leading-tight">
-            Minha story
-          </span>
-        </button>
-        <button type="button" aria-label="Criar story" onClick={() => setCreating(true)} className="story-add-button absolute top-6 -right-3 h-11 w-11 flex items-center justify-center">
-          <span className="h-6 w-6 rounded-full bg-orange-500 border-2 border-white flex items-center justify-center"><Plus size={14} className="text-white" /></span>
-        </button>
-        </div>
-
-        {/* Others */}
-        {others.map(g => {
-          const absIdx = groups.indexOf(g);
-          return (
-            <button
-              key={g.userId}
-              onClick={() => setViewer(absIdx)}
-              className="flex flex-col items-center gap-1.5 flex-shrink-0"
-            >
-              <div className={cn(
-                'h-14 w-14 rounded-full p-0.5',
-                g.allViewed ? 'bg-slate-300' : 'bg-gradient-to-br from-orange-400 to-rose-500',
-              )}>
-                <div className="h-full w-full rounded-full overflow-hidden ring-2 ring-white">
-                  <img
-                    src={storyAvatar(g.name, g.photoUrl, 56)}
-                    alt={g.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-              <span className="text-[11px] text-slate-600 font-medium w-14 text-center truncate leading-tight">
-                {g.name.split(' ')[0]}
-              </span>
+      <section className='nex-stories-section' aria-label='Stories dos colaboradores'>
+        <header className='nex-stories-heading'><div><strong>Stories</strong><span>{loading?'Carregando…':others.some(group=>!group.allViewed)?'Novidades da equipe':'Da sua equipe'}</span></div>
+          <nav aria-label='Navegar pelos stories'>
+            <button type='button' disabled={!scrollable.left} aria-label='Rolar stories para a esquerda' onClick={()=>stripRef.current?.scrollBy({left:-200,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}><ChevronLeft size={17}/></button>
+            <button type='button' disabled={!scrollable.right} aria-label='Rolar stories para a direita' onClick={()=>stripRef.current?.scrollBy({left:200,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}><ChevronRight size={17}/></button>
+          </nav>
+        </header>
+        <div ref={stripRef} className='nex-stories-strip' aria-busy={loading}>
+          <div className='nex-story-person is-own'>
+            <button type='button' onClick={handleMyClick} className='nex-story-person-open' aria-label={myHasStories?'Ver meus stories':'Criar meu primeiro story'}>
+              <span className={cn('nex-story-ring',myHasStories?'is-new':'is-empty')}><img src={storyAvatar(user?.name,user?.photo_url,72)} alt='' draggable={false}/></span>
+              <span className='nex-story-person-name'>Seu story</span>
             </button>
-          );
-        })}
-      </div>
+            <button type='button' aria-label='Criar story' className='story-add-button' onClick={()=>setCreating(true)}><Plus size={15}/></button>
+          </div>
+          {loading?Array.from({length:3},(_,index)=><div className='nex-story-skeleton' key={index}><i/><span/></div>):others.map(group=>{const unread=group.stories.filter(story=>!story.viewed_by_me).length;return <div key={group.userId} className='nex-story-person'>
+            <button type='button' className='nex-story-person-open' title={group.name} aria-label={`Ver stories de ${group.name}${group.allViewed?', já vistos':', novidades'}`} onClick={()=>setViewer({groups,index:groups.indexOf(group)})}>
+              <span className={cn('nex-story-ring',group.allViewed?'is-viewed':'is-new')}><img src={storyAvatar(group.name,group.photoUrl,72)} alt='' draggable={false}/></span>
+              <span className='nex-story-person-name'>{group.name.split(' ')[0]}</span>
+              <span className='nex-story-person-status'>{group.allViewed?'Visto':`${unread} ${unread===1?'novo':'novos'}`}</span>
+            </button>
+          </div>;})}
+          {!loading && !others.length && !loadError && <p className='nex-stories-empty'>Compartilhe um momento<br/>com sua equipe.</p>}
+        </div>
+        {loadError && <div className='nex-stories-error' role='status'>Não foi possível atualizar os stories. <button type='button' onClick={()=>setRetry(value=>value+1)}>Tentar novamente</button></div>}
+      </section>
 
       {viewer !== null && (
         <StoryViewer
-          groups={groups}
-          startIdx={viewer}
+          groups={viewer.groups}
+          startIdx={viewer.index}
           onClose={() => setViewer(null)}
           onViewed={handleViewed}
         />

@@ -48,6 +48,7 @@ import { useAuth } from '../lib/auth';
 import { clearAssistantIntent, readAssistantIntent } from '../lib/assistantIntent';
 import './projetos.css';
 import './projects-refinement.css';
+import './projects-native-dark.css';
 
 type Tab = 'Visão geral' | 'Projetos' | 'Solicitações' | 'Novo projeto' | 'Apresentação';
 
@@ -125,7 +126,7 @@ function StatusSubPicker({ value, onChange, radioNamePrefix }: { value: Status; 
   );
 }
 
-function UserSearchSelectControlled({ users, value, onChangeVal, required }: { users: ProjectUser[]; value: string; onChangeVal: (val: string, user: ProjectUser | undefined) => void; required?: boolean }) {
+function UserSearchSelectControlled({ users, value, onChangeVal }: { users: ProjectUser[]; value: string; onChangeVal: (val: string, user: ProjectUser | undefined) => void; required?: boolean }) {
   const [inputText, setInputText] = useState(value);
   const [open, setOpen] = useState(false);
   useEffect(() => { setInputText(value); }, [value]);
@@ -136,9 +137,9 @@ function UserSearchSelectControlled({ users, value, onChangeVal, required }: { u
     <div style={{position:'relative'}}>
       <input type="text" value={inputText} onChange={handleChange} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder="Buscar responsável…" autoComplete="off" style={{width:'100%',boxSizing:'border-box',fontSize:13,padding:'4px 8px',borderRadius:6,border:'1px solid #e2e8f0'}} />
       {open && suggestions.length > 0 && (
-        <div style={{position:'absolute',zIndex:9,background:'#fff',border:'1px solid #e2e8f0',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
+        <div style={{position:'absolute',zIndex:9,background:'var(--project-raised, #1b2736)',color:'var(--project-text, #e5edf7)',border:'1px solid var(--project-border, #304054)',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
           {suggestions.slice(0, 8).map(u => (
-            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid #f1f5f9',cursor:'pointer',fontSize:13}}>
+            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid var(--project-border, #304054)',cursor:'pointer',fontSize:13}}>
               {u.photo_url ? <img src={u.photo_url} alt={u.name} style={{width:26,height:26,borderRadius:'50%',objectFit:'cover',flexShrink:0}} /> : <div style={{width:26,height:26,borderRadius:'50%',background:'#304363',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{getInitials(u.name)}</div>}
               <span>{u.name}{u.role_name ? ` · ${u.role_name}` : ''}</span>
             </button>
@@ -149,7 +150,7 @@ function UserSearchSelectControlled({ users, value, onChangeVal, required }: { u
   );
 }
 
-function UserSearchSelectUncontrolled({ users, selectName, required, emptyLabel }: { users: ProjectUser[]; selectName: string; required?: boolean; emptyLabel?: string }) {
+function UserSearchSelectUncontrolled({ users, selectName, emptyLabel }: { users: ProjectUser[]; selectName: string; required?: boolean; emptyLabel?: string }) {
   const [inputText, setInputText] = useState('');
   const [selectedName, setSelectedName] = useState('');
   const [open, setOpen] = useState(false);
@@ -161,9 +162,9 @@ function UserSearchSelectUncontrolled({ users, selectName, required, emptyLabel 
       <input type="text" value={inputText} onChange={handleChange} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={emptyLabel || 'Buscar responsável…'} autoComplete="off" style={{width:'100%',boxSizing:'border-box',fontSize:13,padding:'4px 8px',borderRadius:6,border:'1px solid #e2e8f0'}} />
       <input type="hidden" name={selectName} value={selectedName} />
       {open && suggestions.length > 0 && (
-        <div style={{position:'absolute',zIndex:9,background:'#fff',border:'1px solid #e2e8f0',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
+        <div style={{position:'absolute',zIndex:9,background:'var(--project-raised, #1b2736)',color:'var(--project-text, #e5edf7)',border:'1px solid var(--project-border, #304054)',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
           {suggestions.slice(0, 8).map(u => (
-            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid #f1f5f9',cursor:'pointer',fontSize:13}}>
+            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid var(--project-border, #304054)',cursor:'pointer',fontSize:13}}>
               {u.photo_url ? <img src={u.photo_url} alt={u.name} style={{width:26,height:26,borderRadius:'50%',objectFit:'cover',flexShrink:0}} /> : <div style={{width:26,height:26,borderRadius:'50%',background:'#304363',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{getInitials(u.name)}</div>}
               <span>{u.name}{u.role_name ? ` · ${u.role_name}` : ''}</span>
             </button>

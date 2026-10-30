@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './apiClient';
+import { apiDelete, apiDeleteJson, apiGet, apiPatch, apiPost, apiPut } from './apiClient';
 import { dispatchXPEvent } from './xpEvents';
 
 export interface OtherParticipant {
@@ -34,6 +34,7 @@ export interface ChatConversation {
   my_role?: 'owner' | 'admin' | 'member';
   is_muted?: boolean;
   is_pinned?: boolean;
+  is_archived?: boolean;
   pinned_message?: { id: string; content: string; sender?: { id: string; name: string } } | null;
   last_message?: {
     id: string;
@@ -55,13 +56,40 @@ export interface ChatMessage {
   edited_at?: string;
   reply_to_id?: string;
   is_deleted?: boolean;
+  reactions?: ChatReaction[];
   reply_to?: { id: string; content: string; sender?: { id: string; name: string } } | null;
   sender?: { id: string; name: string; photo_url?: string; position?: string };
+}
+
+export interface ChatReaction { emoji:string; count:number; mine:boolean; users:{id:string;name:string}[] }
+export async function getChatReactions(conversationId:string,messageId:string) {
+  const response=await apiGet<{data:ChatReaction[]}>(`/chat/conversations/${conversationId}/messages/${messageId}/reaction`);
+  return response.data;
+}
+export async function setChatReaction(conversationId:string,messageId:string,emoji:string|null) {
+  const path=`/chat/conversations/${conversationId}/messages/${messageId}/reaction`;
+  const response=emoji===null?await apiDeleteJson<{data:ChatReaction[]}>(path):await apiPut<{data:ChatReaction[]}>(path,{emoji});
+  return response.data;
 }
 
 export interface MessageEdit {
   content: string;
   edited_at: string;
+}
+
+export async function requestChatAttention(conversationId: string, messageId?: string) {
+  const response=await apiPost<{data:{id:string;recipient_count:number;message_id:string}}>(`/chat/conversations/${conversationId}/attention`,{message_id:messageId});
+  return response.data;
+}
+export async function getChatMessageContext(conversationId:string,messageId:string) {
+  const response=await apiGet<{data:ChatMessage[]}>(`/chat/conversations/${conversationId}/messages/${messageId}/context`);
+  return response.data;
+}
+
+export async function setConversationArchived(conversationId: string, archived: boolean) {
+  const path = `/chat/conversations/${conversationId}/archive`;
+  if (archived) await apiPut(path, {});
+  else await apiDelete(path);
 }
 
 export async function getConversations() {
@@ -200,4 +228,10 @@ export async function getNotes(conversationId: string): Promise<{ content: strin
 
 export async function saveNotes(conversationId: string, content: string): Promise<void> {
   await apiPut(`/chat/conversations/${conversationId}/notes`, { content });
+}
+
+export async function getSelfConversation(): Promise<ChatConversation> {
+  const response = await apiGet<{ data?: ChatConversation }>('/chat/self-conversation');
+  if (!response.data) throw new Error('Conversa pessoal não encontrada');
+  return response.data;
 }

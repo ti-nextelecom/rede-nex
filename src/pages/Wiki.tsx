@@ -2881,31 +2881,35 @@ function ArticleRow({
   onEdit: () => void;
 }) {
   return (
-    <div className="wiki-article-row group" onClick={onOpen}>
-      <div className="wiki-article-icon" style={{ color: article.categories?.color || '#0057b8', backgroundColor: `${article.categories?.color || '#0057b8'}14` }}>
-        <FileText size={18} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-2">
-          <h4>{article.title}</h4>
-          {article.categories?.name && <span className="wiki-row-category">{article.categories.name}</span>}
+    <div className="wiki-article-row group">
+      <button type="button" className="wiki-article-open" onClick={onOpen} aria-label={`Abrir artigo: ${article.title}`}>
+        <span className="wiki-article-icon" style={{ color: article.categories?.color || '#0057b8', backgroundColor: `${article.categories?.color || '#0057b8'}14` }}>
+          <FileText size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <h4>{article.title}</h4>
+            {article.categories?.name && <span className="wiki-row-category">{article.categories.name}</span>}
+          </div>
+          <p>{stripMarkdown(article.content).slice(0, 150) || 'Sem resumo disponível.'}</p>
+          <div className="wiki-row-meta">
+            {article.users?.name && <span>{article.users.name}</span>}
+            <span>Atualizado {timeAgo(article.updated_at)}</span>
+            <span>{article.view_count ?? 0} visualizações</span>
+            <span>{article.like_count ?? 0} validações</span>
+            {article.tags?.slice(0, 2).map(tag => <span key={tag}>#{tag}</span>)}
+          </div>
         </div>
-        <p>{stripMarkdown(article.content).slice(0, 150) || 'Sem resumo disponível.'}</p>
-        <div className="wiki-row-meta">
-          {article.users?.name && <span>{article.users.name}</span>}
-          <span>Atualizado {timeAgo(article.updated_at)}</span>
-          <span>{article.view_count ?? 0} visualizações</span>
-          <span>{article.like_count ?? 0} validações</span>
-          {article.tags?.slice(0, 2).map(tag => <span key={tag}>#{tag}</span>)}
-        </div>
-      </div>
+      </button>
       <button
+        type="button"
         onClick={event => {
           event.stopPropagation();
           onEdit();
         }}
         className="wiki-row-edit"
         title="Editar artigo"
+        aria-label={`Editar artigo: ${article.title}`}
       >
         <Edit3 size={16} />
       </button>

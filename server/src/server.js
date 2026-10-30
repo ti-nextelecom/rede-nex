@@ -11,16 +11,27 @@ import { searchKnowledge } from './copiloto.js';
 import { buildCopilotoSystem, loadCopilotoContext, operationalBriefing, safeCopilotoHistory } from './copilotoContext.js';
 import { notifyTaskActivity, notifyProjectActivity } from './workNotifications.js';
 import { pool } from './db.js';
+import { conversationArchives } from './chat-conversation-archives.mjs';
+import { requestChatAttention } from './chat-attention.mjs';
+import { chatReactions } from './chat-reactions.mjs';
+import { avatarFrames } from './avatar-frames.mjs';
+import { userAppearance } from './appearance.mjs';
+import { pushConfiguration, savePushSubscription, startPushWorker } from './browser-push.mjs';
 import { createHrRouter } from './hr.js';
 import { jrhUploadsDir, downloadsDir } from './runtimePaths.js';
 import { releaseId } from './release.js';
+import { runAuthorizedTaskAction } from './task-actions.mjs';
+import { parseRequestCookies, requestOriginAllowed, passwordResetOrigin, createRateLimiter } from './http-security.mjs';
 import { changePassword, createPasswordResetToken, getUserByToken, heartbeat, listOnlineUsers, login, logout, resetPasswordByToken, updateMyProfile } from './auth.repository.js';
 import { fetchBitrixUsers } from './bitrix.client.js';
 import { importBitrixUsers, listBitrixImports, listBitrixUsers } from './bitrix.repository.js';
 import { getMediaContent, getMediaByPath, saveChatAvatar, saveChatMedia, saveUserAvatar, saveUserCover, saveWikiMedia, saveProjectCover } from './media.repository.js';
+import { canAccessTaskFiles, safeTaskFileUrl } from '../../shared/taskMedia.mjs';
+import { canManageTask, canRemoveTaskFile, checklistItemBelongsToTask, taskPeopleInputError } from '../../shared/taskCollaboration.mjs';
+import { blueprintFromTask, blueprintFromTemplate } from '../../shared/taskBlueprint.mjs';
 import {
   addParticipants, createConversation, deleteMessage, editMessage, getMessageEditHistory,
-  getNotes, listConversations, listGroupParticipants,
+  getNotes, getOrCreateSelfConversation, listConversations, listGroupParticipants,
   listMessages, pinConversation, pinMessage, removeParticipant, saveNotes, sendMessage,
   toggleMuteConversation, updateConversation, updateParticipantRole,
 } from './chat.repository.js';
@@ -28,7 +39,7 @@ import {
   addChecklist, addChecklistItem, addTaskComment, createTask, deleteChecklist,
   deleteChecklistItem, deleteTask, getTask, getTaskByProtocol, listTasks, updateChecklist, updateChecklistItem, updateTask,
   listCustomLists, createCustomList, renameCustomList, deleteCustomList,
-  listTaskTemplates, createTaskTemplate, deleteTaskTemplate,
+  listTaskTemplates, getTaskTemplate, createTaskTemplate, shareTaskTemplate, deleteTaskTemplate,
   listTaskFiles, addTaskFile, deleteTaskFile,
 } from './tasks.repository.js';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, notifyUsers } from './notifications.repository.js';
@@ -139,8 +150,8 @@ const allowedOrigins = new Set((process.env.CORS_ORIGINS || 'http://127.0.0.1:51
 
 function getRealIP(req) {
   const remote = req.socket.remoteAddress || '0.0.0.0';
-  const isTrustedProxy = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1'
-    || remote.startsWith('10.') || remote.startsWith('172.') || remote.startsWith('192.168.');
+  // Canonical deployment: Nginx is on loopback. Do not trust headers from arbitrary LAN clients.
+  const isTrustedProxy = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
   if (isTrustedProxy) {
     const forwarded = req.headers['x-real-ip'] || req.headers['x-forwarded-for'];
     if (forwarded) return String(forwarded).split(',')[0].trim();
@@ -154,7 +165,7 @@ function responseHeaders(req, contentType = 'application/json; charset=utf-8') {
   const corsHeaders = corsOrigin ? {
     'Access-Control-Allow-Origin': corsOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Nex-User-Id',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
@@ -173,15 +184,7 @@ function responseHeaders(req, contentType = 'application/json; charset=utf-8') {
 }
 
 function parseCookies(req) {
-  const cookies = {};
-  (req.headers.cookie || '').split(';').forEach(pair => {
-    const idx = pair.indexOf('=');
-    if (idx < 0) return;
-    const k = pair.slice(0, idx).trim();
-    const v = decodeURIComponent(pair.slice(idx + 1).trim());
-    if (k) cookies[k] = v;
-  });
-  return cookies;
+  return parseRequestCookies(req.headers.cookie);
 }
 
 function sessionCookieHeader(token) {
@@ -293,22 +296,11 @@ async function requireAdmin(req, res) {
 }
 
 // Simple in-memory brute-force guard for login (max 10 attempts per IP per 15min)
-const loginAttempts = new Map();
-setInterval(() => loginAttempts.clear(), 30 * 1000);
-function checkLoginRateLimit(ip) {
-  const count = (loginAttempts.get(ip) || 0) + 1;
-  loginAttempts.set(ip, count);
-  return count <= 10;
-}
+const checkLoginRateLimit = createRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 });
+const checkResetRateLimit = createRateLimiter({ limit: 5, windowMs: 15 * 60 * 1000 });
 
 // General API rate limit (max 300 req/min per IP)
-const apiRateMap = new Map();
-setInterval(() => apiRateMap.clear(), 60 * 1000);
-function checkApiRateLimit(ip) {
-  const count = (apiRateMap.get(ip) || 0) + 1;
-  apiRateMap.set(ip, count);
-  return count <= 300;
-}
+const checkApiRateLimit = createRateLimiter({ limit: 3000, windowMs: 60 * 1000 });
 
 function validateRequired(payload, fields) {
   const missing = fields.filter(field => !payload[field]);
@@ -318,6 +310,9 @@ function validateRequired(payload, fields) {
 const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
 
 async function route(req, res) {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !requestOriginAllowed(req.headers.origin, allowedOrigins)) {
+    return sendError(req, res, 403, 'INVALID_ORIGIN', 'Origem da solicitação não permitida');
+  }
   if (req.method === 'OPTIONS') return sendEmpty(req, res);
 
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -368,12 +363,17 @@ async function route(req, res) {
 
     if (path === '/api/auth/login' && req.method === 'POST') {
       const ip = getRealIP(req);
-      if (!checkLoginRateLimit(ip)) {
-        return sendError(req, res, 429, 'RATE_LIMITED', 'Muitas tentativas de login. Aguarde alguns minutos.');
-      }
       const payload = await readJson(req);
       const error = validateRequired(payload, ['email', 'password']);
       if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+      if (typeof payload.email !== 'string' || payload.email.length > 320 || typeof payload.password !== 'string' || payload.password.length > 128) {
+        return sendError(req, res, 400, 'VALIDATION_ERROR', 'E-mail ou senha inválidos');
+      }
+      // Per-(email,IP) rate limit: NAT users don't share a bucket; brute force on single email still capped.
+      const loginKey = (payload.email || '').trim().toLowerCase() + ':' + ip;
+      if (!checkLoginRateLimit(loginKey)) {
+        return sendError(req, res, 429, 'RATE_LIMITED', 'Muitas tentativas de login. Aguarde alguns minutos.');
+      }
       const data = await login({
         email: payload.email,
         password: payload.password,
@@ -386,13 +386,13 @@ async function route(req, res) {
     }
 
     if (path === '/api/auth/forgot-password' && req.method === 'POST') {
+      if (!checkResetRateLimit(getRealIP(req))) return sendError(req, res, 429, 'RATE_LIMITED', 'Aguarde antes de solicitar outro link');
       const payload = await readJson(req);
-      if (!payload.email) return sendError(req, res, 400, 'VALIDATION_ERROR', 'E-mail obrigatorio');
+      if (typeof payload.email !== 'string' || !payload.email.trim() || payload.email.length > 320) return sendError(req, res, 400, 'VALIDATION_ERROR', 'E-mail obrigatório');
+      const origin = passwordResetOrigin(allowedOrigins, process.env.NODE_ENV === 'production');
       const result = await createPasswordResetToken(payload.email);
       if (result) {
-        const proto = req.headers['x-forwarded-proto'] || 'http';
-        const host = req.headers['x-forwarded-host'] || req.headers.host || '170.84.39.232';
-        const resetUrl = proto + '://' + host + '/redefinir-senha?token=' + result.token;
+        const resetUrl = origin + '/redefinir-senha?token=' + encodeURIComponent(result.token);
         sendPasswordResetEmail({ to: result.user.email, name: result.user.name, resetUrl }).catch(() => {});
       }
       return sendJson(req, res, 200, { data: { sent: true } });
@@ -422,6 +422,27 @@ async function route(req, res) {
       return data
         ? sendJson(req, res, 200, { data })
         : sendError(req, res, 401, 'UNAUTHORIZED', 'Sessao invalida');
+    }
+
+    if (path === '/api/users/me/appearance' && ['GET','PUT'].includes(req.method)) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (req.method === 'PUT' && req.headers['x-nex-user-id'] !== user.id) return sendError(req,res,409,'ACCOUNT_CHANGED','Sua conta mudou. Recarregue antes de personalizar.');
+      const appearance = userAppearance(pool);
+      const data = req.method === 'GET' ? await appearance.get(user.id) : await appearance.set(user.id, await readJson(req));
+      return sendJson(req, res, 200, { data });
+    }
+    if (path === '/api/users/avatar-frames' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await avatarFrames(pool).list() });
+    }
+    if (path === '/api/users/me/avatar-frame' && ['GET', 'PUT'].includes(req.method)) {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const frames = avatarFrames(pool);
+      const data = req.method === 'GET' ? await frames.get(user.id) : await frames.set(user.id, await readJson(req));
+      return sendJson(req, res, 200, { data });
     }
 
     if (path === '/api/users/me' && req.method === 'PUT') {
@@ -609,11 +630,50 @@ async function route(req, res) {
       }
     }
 
-    if (path === '/api/chat/media' && req.method === 'POST') {
+    if (path === '/api/notifications/push/config' && req.method === 'GET') {
+      const user=await requireUser(req,res); if(!user) return;
+      const config=pushConfiguration();
+      return sendJson(req,res,200,{data:{enabled:Boolean(config),publicKey:config?.publicKey || null}});
+    }
+    if (path === '/api/notifications/push/subscription') {
+      const user=await requireUser(req,res); if(!user) return;
+      if(req.method==='POST') {
+        if(!pushConfiguration()) return sendError(req,res,503,'PUSH_UNAVAILABLE','Notificações do computador ainda não configuradas na VM');
+        await savePushSubscription(pool,user,await readJson(req));
+        return sendJson(req,res,200,{data:{enabled:true}});
+      }
+      if(req.method==='DELETE') {
+        await pool.query('DELETE FROM browser_push_subscriptions WHERE user_id=$1 AND session_id=$2',[user.id,user.session_id]);
+        return sendEmpty(req,res);
+      }
+    }
+
+
+    if (path === '/api/devices/fcm-token' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const { token } = await readJson(req);
+      if (!token) return sendError(req, res, 400, 'VALIDATION_ERROR', 'token required');
+      await pool.query(
+        `INSERT INTO device_fcm_tokens (user_id, token)
+         VALUES ($1, $2)
+         ON CONFLICT (token) DO UPDATE SET user_id = $1, updated_at = now()`,
+        [user.id, token]
+      );
+      return sendJson(req, res, 200, { data: { ok: true } });
+    }
+
+        if (path === '/api/chat/media' && req.method === 'POST') {
       const user = await requireUser(req, res);
       if (!user) return;
       const media = await saveChatMedia(user.id, await readJson(req));
       return sendJson(req, res, 201, { data: { public_url: media.public_url } });
+    }
+
+    if (path === '/api/chat/self-conversation' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(req, res, 200, { data: await getOrCreateSelfConversation(user.id) });
     }
 
     if (path === '/api/chat/conversations') {
@@ -632,6 +692,45 @@ async function route(req, res) {
       const user = await requireUser(req, res);
       if (!user) return;
       const conversationId = segments[3];
+
+      if(segments[4]==='messages' && segments[5] && segments[6]==='reaction' && !segments[7]) {
+        const reactions=chatReactions(pool);
+        if(req.method==='GET')return sendJson(req,res,200,{data:await reactions.list(user.id,conversationId,segments[5])});
+        if(req.method==='PUT' || req.method==='DELETE') {
+          const emoji=req.method==='DELETE'?null:(await readJson(req)).emoji;
+          const data=await reactions.set(user.id,conversationId,segments[5],emoji);
+          const recipients=await pool.query('SELECT user_id FROM chat_participants WHERE conversation_id=$1',[conversationId]);
+          for(const row of recipients.rows) for(const socket of callSessions.get(row.user_id) || []) {
+            if(socket.readyState===1)socket.send(JSON.stringify({type:'message:reaction',conversationId,messageId:segments[5]}));
+          }
+          return sendJson(req,res,200,{data});
+        }
+      }
+
+      if (segments[4] === 'attention' && !segments[5] && req.method === 'POST') {
+        const result=await requestChatAttention(pool,user,conversationId,await readJson(req));
+        for(const notification of result.notifications) {
+          for(const socket of callSessions.get(notification.user_id) || []) {
+            if(socket.readyState===1) socket.send(JSON.stringify({type:'notification:new'}));
+          }
+        }
+        const {notifications:_,...data}=result;
+        return sendJson(req,res,201,{data});
+      }
+
+      if(segments[4]==='messages' && segments[5] && segments[6]==='context' && req.method==='GET') {
+        const allowed=(await pool.query(`SELECT m.id,m.created_at FROM chat_messages m JOIN chat_participants cp
+          ON cp.conversation_id=m.conversation_id AND cp.user_id=$3
+          WHERE m.id=$2 AND m.conversation_id=$1 AND m.is_deleted=false`,[conversationId,segments[5],user.id])).rows[0];
+        if(!allowed) return sendError(req,res,404,'NOT_FOUND','Mensagem indisponível');
+        const rows=(await pool.query(`SELECT m.*,json_build_object('id',u.id,'name',u.name,'photo_url',u.photo_url) sender
+          FROM chat_messages m LEFT JOIN users u ON u.id=m.sender_id
+          WHERE m.id IN (
+            (SELECT id FROM chat_messages WHERE conversation_id=$1 AND (created_at,id)<=($2,$3::uuid) ORDER BY created_at DESC,id DESC LIMIT 25)
+            UNION (SELECT id FROM chat_messages WHERE conversation_id=$1 AND (created_at,id)>($2,$3::uuid) ORDER BY created_at,id LIMIT 25)
+          ) ORDER BY m.created_at,m.id`,[conversationId,allowed.created_at,allowed.id])).rows;
+        return sendJson(req,res,200,{data:await chatReactions(pool).attach(pool.query.bind(pool),rows,user.id)});
+      }
 
       if (segments[4] === 'messages') {
         if (!segments[5]) {
@@ -715,6 +814,12 @@ async function route(req, res) {
         }
       }
 
+      if (segments[4] === 'archive' && !segments[5] && (req.method === 'PUT' || req.method === 'DELETE')) {
+        const archived = req.method === 'PUT';
+        const ok = await conversationArchives(pool.query.bind(pool)).set(user.id, conversationId, archived);
+        return ok ? sendJson(req, res, 200, { data: { is_archived: archived } }) : sendError(req, res, 403, 'FORBIDDEN', 'Sem acesso a esta conversa');
+      }
+
       if (segments[4] === 'read' && req.method === 'POST') {
         await pool.query(
           'update chat_participants set last_read_at = now() where conversation_id = $1 and user_id = $2',
@@ -795,11 +900,30 @@ async function route(req, res) {
         if (req.method === 'GET') return sendJson(req, res, 200, { data: await listTaskTemplates(user.id) });
         if (req.method === 'POST') {
           const payload = await readJson(req);
-          if (!payload.title?.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title obrigatorio');
+          if (typeof payload.title !== 'string' || !payload.title.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title obrigatorio');
+          if (payload.source_task_id) {
+            const source = await getTask(payload.source_task_id);
+            if (!canAccessTaskFiles(source, user, ADMIN_ROLES)) return sendError(req,res,403,'FORBIDDEN','Sem acesso à tarefa original');
+            payload.task_snapshot = blueprintFromTask(source, await listTaskFiles(source.id));
+          } else if (payload.source_template_id) {
+            const source = await getTaskTemplate(payload.source_template_id, user.id);
+            if (!source) return sendError(req,res,403,'FORBIDDEN','Sem acesso ao modelo original');
+            payload.task_snapshot = { ...(payload.task_snapshot || blueprintFromTemplate(source)), files: blueprintFromTemplate(source).files };
+          }
           return sendJson(req, res, 201, { data: await createTaskTemplate(user.id, payload) });
         }
       }
-      if (segments[3] && req.method === 'DELETE') { await deleteTaskTemplate(segments[3], user.id); return sendJson(req, res, 200, {}); }
+      if (segments[3] && !segments[4] && req.method === 'GET') {
+        const template = await getTaskTemplate(segments[3],user.id);
+        return template ? sendJson(req,res,200,{data:template}) : sendError(req,res,404,'NOT_FOUND','Modelo indisponível');
+      }
+      if (segments[3] && segments[4] === 'sharing' && req.method === 'PUT') {
+        const template = await shareTaskTemplate(segments[3],user.id,await readJson(req));
+        return template ? sendJson(req,res,200,{data:template}) : sendError(req,res,403,'FORBIDDEN','Somente o criador pode compartilhar este modelo');
+      }
+      if (segments[3] && !segments[4] && req.method === 'DELETE') {
+        return await deleteTaskTemplate(segments[3],user.id) ? sendJson(req,res,200,{}) : sendError(req,res,403,'FORBIDDEN','Somente o criador pode excluir este modelo');
+      }
     }
     // Tasks routes
     // Custom task lists
@@ -830,10 +954,7 @@ async function route(req, res) {
       if (segments[2] === 'by-protocol' && segments[3] && req.method === 'GET') {
         const task = await getTaskByProtocol(segments[3].toUpperCase());
         if (!task) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
-        const isAdmin = ADMIN_ROLES.includes(user.role_name);
-        const isRelated = task.created_by === user.id || task.owner_id === user.id ||
-          (Array.isArray(task.assignees) && task.assignees.some(a => a.id === user.id));
-        if (!isRelated && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        if (!canAccessTaskFiles(task, user, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
         return sendJson(req, res, 200, { data: task });
       }
 
@@ -843,6 +964,13 @@ async function route(req, res) {
           const payload = await readJson(req);
           const error = validateRequired(payload, ['title']);
           if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
+          const peopleError = taskPeopleInputError(payload);
+          if (peopleError) return sendError(req, res, 400, 'VALIDATION_ERROR', peopleError);
+          if (payload.template_id) {
+            const template = await getTaskTemplate(payload.template_id,user.id);
+            if (!template) return sendError(req,res,403,'FORBIDDEN','Modelo indisponível ou compartilhamento removido');
+            payload.files = blueprintFromTemplate(template).files;
+          }
           const task = await createTask(user.id, payload);
           await notifyTaskActivity(task, user, 'Você foi envolvido em uma tarefa', notifyUsers).catch(error => console.error('[Task notification]', error.message));
           return sendJson(req, res, 201, { data: task });
@@ -855,10 +983,7 @@ async function route(req, res) {
         if (req.method === 'GET') {
           const task = await getTask(taskId);
           if (!task) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
-          const isTaskAdmin = ADMIN_ROLES.includes(user.role_name);
-          const isTaskRelated = task.created_by === user.id || task.owner_id === user.id ||
-            (Array.isArray(task.assignees) && task.assignees.some(a => a.id === user.id));
-          if (!isTaskRelated && !isTaskAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+          if (!canAccessTaskFiles(task, user, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
           return sendJson(req, res, 200, { data: task });
         }
         if (req.method === 'PUT') {
@@ -868,6 +993,8 @@ async function route(req, res) {
           const isAdmin = ADMIN_ROLES.includes(user.role_name);
           if (!isOwner && !isAdmin) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissao para editar esta tarefa');
           const taskPayload = await readJson(req);
+          const peopleError = taskPeopleInputError(taskPayload);
+          if (peopleError) return sendError(req, res, 400, 'VALIDATION_ERROR', peopleError);
           const task = await updateTask(taskId, taskPayload);
           if (task) await notifyTaskActivity(task, user, task.status === 'done' && existing.status !== 'done' ? 'Tarefa concluída' : 'Atualização em uma tarefa sua', notifyUsers).catch(error => console.error('[Task notification]', error.message));
           let xpTask = null;
@@ -890,8 +1017,7 @@ async function route(req, res) {
       if (segments[3] === 'comments' && req.method === 'POST') {
         const existing = await getTask(taskId);
         if (!existing) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
-        const related = existing.created_by === user.id || existing.owner_id === user.id || existing.assignees?.some(person => person.id === user.id);
-        if (!related && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        if (!canAccessTaskFiles(existing, user, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
         const payload = await readJson(req);
         const error = validateRequired(payload, ['content']);
         if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
@@ -915,6 +1041,8 @@ async function route(req, res) {
         }
 
         const checklistId = segments[4];
+        if (checklistId && !taskForCl.checklists.some(list => list.id === checklistId)) return sendError(req, res, 404, 'NOT_FOUND', 'Checklist não pertence a esta tarefa');
+        if (segments[6] && !checklistItemBelongsToTask(taskForCl, segments[6], checklistId)) return sendError(req, res, 404, 'NOT_FOUND', 'Etapa não pertence a este checklist');
         if (checklistId && !segments[5] && req.method === 'PATCH') {
           const payload = await readJson(req);
           if (payload.title) await updateChecklist(checklistId, payload.title);
@@ -930,7 +1058,7 @@ async function route(req, res) {
             const payload = await readJson(req);
             const error = validateRequired(payload, ['content']);
             if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
-            await addChecklistItem(checklistId, payload.content);
+            await addChecklistItem(checklistId, payload.content, payload);
             return sendJson(req, res, 201, { data: await getTask(taskId) });
           }
           const itemId = segments[6];
@@ -946,15 +1074,27 @@ async function route(req, res) {
       }
 
       if (segments[3] === 'files') {
+        const task = await getTask(taskId);
+        if (!task) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+        if (!canAccessTaskFiles(task, user, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para os arquivos desta tarefa');
         if (!segments[4] && req.method === 'GET') {
           return sendJson(req, res, 200, { data: await listTaskFiles(taskId) });
         }
         if (!segments[4] && req.method === 'POST') {
           const payload = await readJson(req);
           if (!payload.name || !payload.file_url) return sendError(req, res, 400, 'VALIDATION_ERROR', 'name e file_url são obrigatórios');
+          if (!safeTaskFileUrl(payload.file_url)) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Endereço de arquivo inválido');
+          if (payload.checklist_item_id) {
+            if (!canManageTask(task, user, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para alterar o checklist');
+            if (!checklistItemBelongsToTask(task, payload.checklist_item_id)) return sendError(req, res, 404, 'NOT_FOUND', 'Etapa não pertence a esta tarefa');
+          }
           return sendJson(req, res, 201, { data: await addTaskFile(taskId, payload, user.id) });
         }
         if (segments[4] && req.method === 'DELETE') {
+          const files = await listTaskFiles(taskId);
+          const file = files.find(file => file.id === segments[4]);
+          if (!file) return sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não pertence a esta tarefa');
+          if (!canRemoveTaskFile(task, user, file, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão para remover este arquivo');
           const deleted = await deleteTaskFile(segments[4]);
           return deleted ? sendEmpty(req, res) : sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
         }
@@ -2510,8 +2650,9 @@ async function route(req, res) {
       const user = await requireUser(req, res);
       if (!user) return;
 
-      const { messages, voice_mode } = await readJson(req);
-      if (!Array.isArray(messages) || !messages.length) {
+      const { messages: rawMessages, voice_mode } = await readJson(req);
+      const messages = safeCopilotoHistory(rawMessages);
+      if (!messages.length) {
         return sendError(req, res, 400, 'BAD_REQUEST', 'messages é obrigatório');
       }
 
@@ -2843,11 +2984,11 @@ Instruções:
         }
         if (name === 'atualizar_tarefa') {
           const { id, ...input } = args;
-          const result = await updateTask(id, input);
+          const result = await runAuthorizedTaskAction('update', user, id, input, { getTask, updateTask }, ADMIN_ROLES);
           return { sucesso: true, tarefa: { id: result?.id, title: result?.title, status: result?.status, priority: result?.priority } };
         }
         if (name === 'comentar_tarefa') {
-          await addTaskComment(args.id, user.id, args.comentario);
+          await runAuthorizedTaskAction('comment', user, args.id, { content: args.comentario }, { getTask, addTaskComment }, ADMIN_ROLES);
           return { sucesso: true };
         }
         if (name === 'listar_projetos') {
@@ -3001,19 +3142,41 @@ Instruções:
   }
 }
 
-const httpServer = createServer(route);
+const httpServer = createServer((req, res) => {
+  // Catch failures before the route's inner try (e.g. malformed request URL/headers).
+  route(req, res).catch(error => {
+    console.error('[HTTP] request failed:', error.message);
+    if (!res.headersSent) sendError(req, res, 400, 'INVALID_REQUEST', 'Solicitação inválida');
+    else res.destroy();
+  });
+});
 
 // WebSocket signaling for WebRTC voice calls
-const wss = new WebSocketServer({ server: httpServer });
+const wss = new WebSocketServer({
+  server: httpServer,
+  path: '/ws',
+  maxPayload: 64 * 1024,
+  perMessageDeflate: false,
+  verifyClient: ({ req }, done) => done(requestOriginAllowed(req.headers.origin, allowedOrigins), 403, 'Origin not allowed'),
+});
 const callSessions = new Map(); // userId -> Set<WebSocket>
 
 wss.on('connection', async (ws, req) => {
+  ws.on('error', error => console.error('[WS] connection error:', error.message));
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
   // Authenticate at connection time via session cookie
-  const cookies = parseCookies(req);
-  const user = cookies.session ? await getUserByToken(cookies.session) : null;
+  let user;
+  try {
+    const cookies = parseCookies(req);
+    user = cookies.session ? await getUserByToken(cookies.session) : null;
+  } catch (error) {
+    console.error('[WS] authentication unavailable:', error.message);
+    ws.close(1011, 'Authentication unavailable');
+    return;
+  }
+  if (ws.readyState !== 1) return;
   if (!user) {
     ws.send(JSON.stringify({ type: 'call:auth_error' }));
     ws.close(1008, 'Unauthorized');
@@ -3030,6 +3193,21 @@ wss.on('connection', async (ws, req) => {
       let msg;
       try { msg = JSON.parse(String(data)); } catch { return; }
       if (msg.type === 'ping') { ws.send(JSON.stringify({ type: 'pong' })); return; }
+
+      if (msg.type === 'chat:typing' && msg.conversationId) {
+        const { rows: participants } = await pool.query(
+          'SELECT user_id FROM chat_participants WHERE conversation_id = $1 AND user_id != $2',
+          [msg.conversationId, wsUserId]
+        );
+        const { rows: userRows } = await pool.query('SELECT name FROM users WHERE id = $1', [wsUserId]);
+        const senderName = userRows[0]?.name || 'Alguém';
+        const payload = JSON.stringify({ type: 'chat:typing', conversationId: msg.conversationId, from: wsUserId, name: senderName });
+        for (const p of participants) {
+          const targets = callSessions.get(p.user_id);
+          if (targets) { for (const s of targets) { if (s.readyState === 1) s.send(payload); } }
+        }
+        return;
+      }
 
       const { to, ...rest } = msg;
       if (!to) return;
@@ -3064,6 +3242,7 @@ const wsPingInterval = setInterval(() => {
 httpServer.listen(port, process.env.HOST || '127.0.0.1', () => {
   console.log(`Rede Nex API listening on port ${port}`);
 });
+const stopPushWorker=startPushWorker(pool);
 
 // Daily cleanup of expired sessions
 const cleanupInterval = setInterval(() => {
@@ -3074,6 +3253,7 @@ let shuttingDown = false;
 function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  stopPushWorker();
   clearInterval(wsPingInterval);
   clearInterval(cleanupInterval);
   for (const client of wss.clients) client.close(1001, 'Atualização do servidor');

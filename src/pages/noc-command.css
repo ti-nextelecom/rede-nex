@@ -1,0 +1,87 @@
+/* Repeat tokens on portaled dialogs; storage and incident calculations are unchanged. */
+.noc-page, .noc-dialog {
+  --noc-panel: hsl(var(--card)); --noc-border: hsl(var(--foreground) / 0.125); --noc-muted: hsl(var(--muted-foreground));
+  color-scheme: inherit; color: hsl(var(--foreground));
+}
+.noc-page { gap: 24px; min-width: 0; }
+.noc-page .noc-hero { padding: 32px; border-color: hsl(var(--foreground) / 0.145); background: radial-gradient(ellipse at 0 0, hsl(var(--accent) / 0.106), transparent 65%), linear-gradient(115deg, hsl(var(--muted)), hsl(var(--card))); box-shadow: none; }
+.noc-page .noc-eyebrow { font-size: 11px; letter-spacing: .14em; color: #f8a36f; }
+.noc-page .noc-hero h1 { margin: 14px 0 12px; font-size: clamp(30px, 3vw, 40px); }
+.noc-page .noc-hero h1 span { color: hsl(var(--muted-foreground)); font-size: .74em; }
+.noc-page .noc-hero p { font-size: 14px; line-height: 1.7; }
+.noc-page .noc-local-badge { font-size: 12px; padding: 9px 13px; border-color: hsl(var(--foreground) / 0.188); color: hsl(var(--muted-foreground)); }
+.noc-storage-note { display: flex; align-items: flex-start; gap: 9px; margin: -9px 4px 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.7; }
+.noc-storage-note svg { flex-shrink: 0; margin-top: 2px; }
+.noc-page :is(.noc-primary, .noc-secondary), .noc-dialog :is(.noc-primary, .noc-secondary) { min-height: 44px; font-size: 13px; padding: 0 17px; border-radius: 11px; }
+.noc-page .noc-primary { background: #e96b23; box-shadow: none; }
+.noc-page .noc-primary:hover { background: #f27a35; transform: none; }
+.noc-page .noc-tabs { padding: 5px; border-radius: 13px; background: hsl(var(--card)); }
+.noc-page .noc-tabs button { min-height: 44px; font-size: 13px; padding-inline: 18px; }
+.noc-page .noc-tabs button.active { background: #e7843930; color: #ffc18f; box-shadow: inset 0 0 0 1px #ed9b5935; }
+.noc-page .noc-panel { padding: 25px; border-radius: 19px; background: hsl(var(--card)); border-color: hsl(var(--foreground) / 0.125); }
+.noc-page .noc-kpi { min-height: 165px; padding: 23px; border-radius: 18px; background: linear-gradient(135deg, hsl(var(--muted)), hsl(var(--card))); }
+.noc-page .noc-kpi:hover { transform: none; border-color: hsl(var(--foreground) / 0.29); }
+.noc-page .noc-kpi-label { font-size: 13px; }
+.noc-page .noc-kpi > strong { font-size: 38px; letter-spacing: -.9px; }
+.noc-page :is(.noc-kpi-link, .noc-legend, .noc-period-note, .noc-panel-heading p) { font-size: 12px; line-height: 1.6; }
+.noc-page .noc-period-panel { padding: 17px 20px; border-radius: 14px; background: hsl(var(--card)); }
+.noc-page :is(.noc-period-options button, .noc-filter-pills button, .noc-team-tabs button, .noc-inline-clear, .noc-team-all) { min-height: 38px; font-size: 12px; }
+.noc-page .noc-panel-heading { flex-wrap: wrap; }
+.noc-page .noc-panel-heading > div { min-width: 0; }
+.noc-page .noc-section-kicker { font-size: 10px; }
+.noc-page .noc-period-intro strong { font-size: 13px; }
+.noc-page .noc-period-intro small { font-size: 12px; }
+.noc-page .noc-custom-dates input { min-height: 40px; font-size: 13px; }
+.noc-page .noc-panel-heading h2 { font-size: 17px; letter-spacing: -.25px; }
+.noc-page .noc-recent-row { gap: 14px; padding-block: 14px; flex-wrap: wrap; }
+.noc-page .noc-recent-row strong { font-size: 13px; line-height: 1.6; }
+.noc-page :is(.noc-recent-row small, .noc-person small) { font-size: 12px; line-height: 1.6; }
+.noc-page .noc-person strong { font-size: 13px; }
+.noc-page .noc-team-row { padding: 12px 8px; }
+.noc-page .noc-performance-options span { font-size: 12px; }
+.noc-page :is(.noc-search input, .noc-filters select, .noc-catalog input) { min-height: 42px; font-size: 13px; }
+.noc-page :is(.noc-search, .noc-type-filter) { min-height: 46px; height: auto; max-width: 100%; }
+.noc-page .noc-type-filter { min-width: 0; }
+.noc-page .noc-search input, .noc-page .noc-bi-search input { background: transparent !important; }
+.noc-page .noc-incident-row.noc-incident-card { padding: 20px; gap: 16px; border-radius: 15px; background: hsl(var(--card)); }
+.noc-page :is(.noc-incident-id, .noc-incident-sequence strong) { font-size: 13px; }
+.noc-page :is(.noc-incident-date, .noc-incident-foot-info) { font-size: 12px; line-height: 1.7; }
+.noc-page .noc-incident-sequence > span { padding: 12px; border-radius: 10px; }
+.noc-page .noc-incident-sequence small { font-size: 10px; }
+.noc-page .noc-incident-sequence strong { white-space: normal; overflow-wrap: anywhere; }
+.noc-page .noc-incident-description { font-size: 14px; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
+.noc-page .noc-incident-foot-info { flex-wrap: wrap; gap: 10px; }
+.noc-page .noc-sla strong, .noc-page .noc-recent-row .noc-sla strong { font-size: 12px; }
+.noc-page :is(.noc-breakdown-name strong, .noc-breakdown-column-title strong) { font-size: 13px; }
+.noc-page :is(.noc-breakdown-content small, .noc-breakdown-counts, .noc-breakdown-column-title span, .noc-classification-toolbar > span) { font-size: 11px; line-height: 1.7; }
+.noc-page .noc-breakdown-row { padding: 13px 10px; }
+.noc-page .noc-catalog h3 { font-size: 16px; }
+.noc-page .noc-catalog-item { min-height: 46px; }
+.noc-page :is(.noc-catalog-item > button:first-child, .noc-cause-name) { font-size: 13px; }
+.noc-page :is(.noc-catalog-item .noc-edit, .noc-catalog-item .noc-delete) { min-height: 36px; min-width: 36px; }
+.noc-page .noc-catalog-title strong { font-size: 14px; }
+.noc-page .noc-catalog-hint { font-size: 12px; line-height: 1.7; }
+.noc-dialog { border-radius: 20px; border-color: hsl(var(--foreground) / 0.157); background: hsl(var(--card)); padding: 26px; }
+.noc-dialog h2 { font-size: 21px; letter-spacing: -.4px; }
+.noc-dialog :is(p, label, input, select, textarea) { font-size: 13px; line-height: 1.7; }
+.noc-dialog :is(input, select) { min-height: 44px; border-radius: 10px; }
+.noc-dialog .noc-form-section { padding: 18px; border-radius: 13px; }
+.noc-dialog .noc-step-heading strong { font-size: 14px; }
+.noc-dialog :is(.noc-step-heading small, .noc-sla-note, .noc-detail-classification small) { font-size: 12px; }
+.noc-dialog .noc-detail-classification strong { font-size: 13px; white-space: normal; overflow-wrap: anywhere; }
+.noc-dialog .noc-comments p { font-size: 14px; }
+.noc-page .noc-bi-intro { border-color: hsl(var(--foreground) / 0.208); background: linear-gradient(120deg, hsl(var(--muted)), hsl(var(--card))); border-radius: 19px; }
+.noc-page .noc-bi-intro p { font-size: 13px; line-height: 1.7; }
+.noc-page :is(.noc-bi-controls select, .noc-bi-search input, .noc-bi-reset) { min-height: 42px; font-size: 13px; }
+.noc-page .noc-bi-card { padding: 23px; border-radius: 18px; }
+.noc-page .noc-bi-metric { padding: 18px; min-height: 115px; border-radius: 15px; }
+.noc-page .noc-bi-metric-copy em { font-size: 11px; white-space: normal; line-height: 1.6; }
+.noc-page .noc-bi-metric-copy small { font-size: 11px; white-space: normal; }
+.noc-page :is(.noc-bi-ranking-list strong, .noc-bi-person strong, .noc-bi-record-list strong) { font-size: 13px; }
+.noc-page :is(.noc-bi-ranking-list small, .noc-bi-record-list small, .noc-bi-card-heading p, .noc-bi-person button, .noc-bi-insights small, .noc-bi-insights span) { font-size: 12px; }
+.noc-page .noc-bi-ranking-list button { padding-block: 10px; }
+.noc-page .noc-bi-card-heading h3 { font-size: 17px; }
+.noc-page :is(button, input, select):focus-visible, .noc-dialog :is(button, input, select, textarea):focus-visible { outline: 2px solid #ffb47d; outline-offset: 3px; }
+@media (max-width: 1000px) { .noc-page .noc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .noc-page .noc-kpi { min-height: 155px; padding: 18px; } }
+@media (max-width: 700px) { .noc-page .noc-hero { padding: 23px; } .noc-page .noc-panel { padding: 18px; } .noc-page .noc-tabs { width: 100%; } .noc-page .noc-tabs button { font-size: 12px; padding-inline: 13px; flex-shrink: 0; } .noc-page .noc-kpis { grid-template-columns: minmax(0, 1fr); } .noc-page .noc-kpi { min-height: 140px; } .noc-page .noc-incident-sequence { grid-template-columns: minmax(0, 1fr); } .noc-page .noc-incident-card-foot .noc-sla { margin-left: 0; } .noc-page .noc-recent-row > * { max-width: 100%; } .noc-page .noc-period-note { width: 100%; margin-left: 0; } .noc-page :is(.noc-search input, .noc-bi-search input), .noc-dialog :is(input, select, textarea) { font-size: 16px; } .noc-page .noc-incident-row.noc-incident-card { padding: 15px; } .noc-page .noc-bi-card { padding: 17px; } }
+@media (prefers-reduced-motion: reduce) { .noc-page button { transition: none; } }

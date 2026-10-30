@@ -1,0 +1,4 @@
+.nex-text-link { color: #87c7ff; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; overflow-wrap: anywhere; word-break: break-word; }
+.nex-text-link:hover { color: #b8deff; text-decoration-thickness: 2px; }
+.nex-text-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }
+.chat-message-row.justify-end .nex-text-link { color: inherit; }

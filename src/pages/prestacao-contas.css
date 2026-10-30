@@ -86,7 +86,7 @@
   white-space: nowrap;
 }
 .pc-btn:disabled { opacity: .5; cursor: not-allowed; }
-.pc-btn-primary { background: var(--pc-primary); color: #fff; }
+.pc-btn-primary { background: var(--pc-primary); color: hsl(var(--foreground)); }
 .pc-btn-primary:hover:not(:disabled) { opacity: .88; }
 .pc-btn-ghost {
   background: var(--pc-surface2);
@@ -94,7 +94,7 @@
   border-color: var(--pc-border);
 }
 .pc-btn-ghost:hover:not(:disabled) { opacity: .8; }
-.pc-btn-danger { background: var(--pc-danger); color: #fff; }
+.pc-btn-danger { background: var(--pc-danger); color: var(--nex-danger-ink); }
 .pc-btn-danger:hover:not(:disabled) { opacity: .85; }
 .pc-btn-sm { padding: 5px 10px; font-size: 12px; }
 

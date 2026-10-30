@@ -1,3 +1,4 @@
+import { AchievementAvatar } from '../components/AchievementAvatar';
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,6 +14,7 @@ import { Textarea } from '../components/ui/textarea';
 import type { Post } from '../types';
 import { cn } from '../lib/utils';
 import { StoriesBar } from '../components/stories/StoriesBar';
+import { LinkText } from '../components/LinkText';
 import { ImageLightbox } from '../components/ui/ImageLightbox';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import './feed.css';
@@ -81,10 +83,6 @@ function wikiExcerpt(content: string): string {
 function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: () => void }) {
   const author = item.users;
   const categoryColor = item.categories?.color || '#4f46e5';
-  const avatarUrl = author?.photo_url || (author?.name
-    ? `https://ui-avatars.com/api/?name=${encodeURIComponent(author.name)}&size=56&background=4f46e5&color=fff`
-    : `https://ui-avatars.com/api/?name=W&size=56&background=4f46e5&color=fff`
-  );
   const verb = item.was_edited ? 'atualizou' : 'publicou';
   const preview = wikiExcerpt(item.content || '');
 
@@ -94,7 +92,7 @@ function WikiFeedCard({ item, onNavigate }: { item: WikiFeedItem; onNavigate: ()
       <div className="feed-card-body">
         <header className="feed-card-header mb-4 flex items-start gap-4">
           <div className="relative flex-shrink-0">
-            <img src={avatarUrl} alt={author?.name || 'Wiki'} className="feed-avatar rounded-full object-cover" />
+            <AchievementAvatar userId={author?.id} name={author?.name || "Wiki"} photo={author?.photo_url} size={46} />
             <span className="social-author-type" style={{ color: '#4f46e5' }}>
               <BookOpen size={12} />
             </span>
@@ -327,11 +325,7 @@ function CommentItem({
 
   return (
     <div className="feed-comment-item flex items-start gap-2.5 group">
-      <img
-        src={userAvatar(author?.name, author?.photo_url, 32)}
-        alt={author?.name || 'Usuário'}
-        className="h-8 w-8 rounded-full object-cover ring-1 ring-white flex-shrink-0 mt-0.5"
-      />
+      <AchievementAvatar userId={author?.id} name={author?.name || 'Rede Nex'} photo={author?.photo_url} size={32} />
       <div className="flex-1 min-w-0">
         {actionError && <p role="alert" className="feed-action-error">{actionError}</p>}
         {editMode ? (
@@ -352,7 +346,7 @@ function CommentItem({
           <>
             <div className="feed-comment-bubble rounded-2xl bg-slate-50 px-3.5 py-2.5">
               <p className="text-sm font-bold text-slate-800">{author?.name || 'Usuário'}</p>
-              <p className="mt-0.5 text-base text-slate-700 leading-relaxed">{comment.content}</p>
+              <p className="mt-0.5 text-base text-slate-700 leading-relaxed"><LinkText text={comment.content} /></p>
             </div>
             <div className="mt-1 flex items-center gap-3 pl-1">
               <span className="text-sm text-slate-400">{smartDate(comment.created_at)}</span>
@@ -464,11 +458,7 @@ function SocialPost({
         {actionError && <p role="alert" className="feed-action-error">{actionError}</p>}
         <header className="feed-card-header mb-4 flex items-start gap-4">
           <div className="relative flex-shrink-0">
-            <img
-              src={userAvatar(author?.name, author?.photo_url, 56)}
-              alt={author?.name || 'Rede Nex'}
-              className="feed-avatar rounded-full object-cover"
-            />
+            <AchievementAvatar userId={author?.id} name={author?.name || 'Rede Nex'} photo={author?.photo_url} size={46} />
             <span className="social-author-type" style={{ color: config.bar }}>
               <TypeIcon size={12} />
             </span>
@@ -540,7 +530,7 @@ function SocialPost({
             <p className="text-xs text-slate-400">{pollVotes.length} {pollVotes.length === 1 ? 'voto' : 'votos'}{votedOption === null ? ' · clique para votar' : ''}</p>
           </div>
         ) : (
-          <p className="feed-post-content whitespace-pre-wrap text-slate-700">{post.content}</p>
+          <p className="feed-post-content whitespace-pre-wrap text-slate-700"><LinkText text={post.content} /></p>
         )}
 
         <MediaDisplay imageUrl={post.image_url} videoUrl={post.video_url} />
@@ -587,11 +577,7 @@ function SocialPost({
           )}
 
           <div className="flex items-center gap-2 pt-1">
-            <img
-              src={currentUserAvatar || userAvatar(undefined, undefined, 32)}
-              alt="Eu"
-              className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-            />
+            <AchievementAvatar userId={currentUserId} name="Eu" photo={currentUserAvatar} size={32} />
             <div className="flex-1 flex items-center gap-1.5 bg-slate-50 rounded-full border border-slate-200 px-3 focus-within:border-orange-400 transition-colors">
               <input
                 ref={commentInputRef}
@@ -789,7 +775,7 @@ export function Feed() {
         <form onSubmit={submitPost} className="social-composer feed-composer">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <img src={myAvatar} alt={user?.name || 'Usuário'} className="h-11 w-11 rounded-full object-cover" />
+              <AchievementAvatar userId={user?.id} name={user?.name || "Usuário"} photo={user?.photo_url} size={44} />
               <div>
                 <p className="text-sm font-bold text-slate-900">{user?.name || 'Usuário'}</p>
                 <p className="text-xs text-slate-500">{TYPE_CONFIG[composeType]?.label}</p>
@@ -982,7 +968,7 @@ export function Feed() {
           </div>
           <div className="feed-profile-content">
             <div className="feed-profile-top">
-              <img src={myAvatar} alt={user?.name || 'Usuário'} className="feed-profile-avatar" />
+              <AchievementAvatar userId={user?.id} name={user?.name || "Usuário"} photo={user?.photo_url} size={58} className="feed-profile-avatar" />
               <div>
                 <p className="feed-side-eyebrow">Seu espaço</p>
                 <h2>{user?.name || 'Usuário'}</h2>
@@ -993,7 +979,7 @@ export function Feed() {
             {gamification && (
               <div className="feed-rank">
                 <div className="feed-rank-label">
-                  <span style={{ color: gamification.rank.color }}>{gamification.rank.emoji} {gamification.rank.name}</span>
+                  <span className="gamification-level-label" style={{ color: gamification.rank.color }}>{gamification.rank.emoji} {gamification.rank.name}</span>
                   {myRankPosition != null && <span>#{myRankPosition} no ranking</span>}
                 </div>
                 <div className="feed-rank-track"><div style={{ width: `${gamification.progress_pct}%`, backgroundColor: gamification.rank.color }} /></div>

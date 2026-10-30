@@ -1,6 +1,8 @@
 import React, { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { AppearanceProvider } from './components/AppearanceProvider';
+import { useAppearance } from './lib/appearance';
 import { AuthProvider, useAuth } from './lib/auth';
 import { HrAccessProvider } from './lib/hrAccess';
 import { GamificationToast } from './components/GamificationToast';
@@ -54,10 +56,10 @@ class RouteErrorBoundary extends React.Component<{ children: React.ReactNode }, 
   render() {
     if (this.state.error) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8">
+        <div role="alert" className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8 bg-slate-950 text-slate-100">
           <div className="text-4xl">⚠️</div>
-          <p className="text-slate-700 font-semibold text-center">Erro ao carregar o chat</p>
-          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-3 max-w-lg text-center font-mono break-all whitespace-pre-wrap">{this.state.error?.message || String(this.state.error)}</p>
+          <p className="font-semibold text-center">Não foi possível carregar esta página</p>
+          <p className="text-sm text-slate-400 max-w-lg text-center">O sistema pode ter sido atualizado. Recarregue para abrir a versão mais recente. Se houver um texto em edição, copie-o antes.</p>
           <button onClick={() => { this.setState({ error: null }); window.location.reload(); }}
             className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">
             Recarregar
@@ -67,6 +69,11 @@ class RouteErrorBoundary extends React.Component<{ children: React.ReactNode }, 
     }
     return this.props.children;
   }
+}
+
+function PageErrorBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <RouteErrorBoundary key={pathname}>{children}</RouteErrorBoundary>;
 }
 
 function PageFallback() {
@@ -79,7 +86,8 @@ function PageFallback() {
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) {
+  const { status: appearanceStatus } = useAppearance();
+  if (loading || (user && appearanceStatus === 'loading')) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center gap-4">
         <img src="/assets/images/favicon_copa.png" alt="Rede Nex" className="h-16 w-16 rounded-2xl animate-pulse" />
@@ -99,12 +107,14 @@ function GlobalNotificationsMount() {
 function App() {
   return (
     <AuthProvider>
+      <AppearanceProvider>
       <HrAccessProvider>
       <GamificationToast />
       <BrowserRouter>
         <WsManager />
         <GlobalNotificationsMount />
         <GlobalCallOverlay />
+        <PageErrorBoundary>
         <Suspense fallback={null}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -118,7 +128,7 @@ function App() {
               <Route path="/treinamentos" element={<Suspense fallback={<PageFallback />}><Training /></Suspense>} />
               <Route path="/wiki" element={<Suspense fallback={<PageFallback />}><Wiki /></Suspense>} />
               <Route path="/colaboradores" element={<Suspense fallback={<PageFallback />}><Users /></Suspense>} />
-              <Route path="/bate-papo" element={<RouteErrorBoundary><Suspense fallback={<PageFallback />}><Chat /></Suspense></RouteErrorBoundary>} />
+              <Route path="/bate-papo" element={<Suspense fallback={<PageFallback />}><Chat /></Suspense>} />
               <Route path="/tarefas" element={<Suspense fallback={<PageFallback />}><Tasks /></Suspense>} />
               <Route path="/perfil" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
               <Route path="/permissoes" element={<Suspense fallback={<PageFallback />}><Permissions /></Suspense>} />
@@ -144,8 +154,10 @@ function App() {
             </Route>
           </Routes>
         </Suspense>
+        </PageErrorBoundary>
       </BrowserRouter>
       </HrAccessProvider>
+      </AppearanceProvider>
     </AuthProvider>
   );
 }

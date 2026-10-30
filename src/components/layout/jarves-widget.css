@@ -1,0 +1,12 @@
+.jarves-widget-fab { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.jarves-widget-fab.is-dragging { cursor: grabbing; transition: none; transform: scale(1.04); box-shadow: 0 10px 32px #0007; }
+.jarves-widget-fab:focus-visible,.jarves-position-toolbar button:focus-visible { outline: 3px solid #8ac9f4; outline-offset: 4px; }
+.jarves-widget-movable-panel.jarves-widget-panel { position: fixed; max-width: calc(100vw - 24px); border: 1px solid hsl(var(--foreground) / 0.169); border-radius: 18px; background: hsl(var(--card)); color: hsl(var(--foreground)); }
+.jarves-position-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-bottom: 1px solid hsl(var(--foreground) / 0.082); flex-shrink: 0; }
+.jarves-position-toolbar button { min-height: 36px; min-width: 36px; display: inline-flex; justify-content: center; align-items: center; color: hsl(var(--muted-foreground)); border-radius: 8px; }
+.jarves-position-toolbar button:hover { background: hsl(var(--foreground) / 0.035); color: hsl(var(--foreground)); }
+.jarves-position-toolbar .jarves-drag-handle { touch-action: none; cursor: grab; flex: 1; justify-content: flex-start; gap: 6px; font-size: 12px; }
+.jarves-drag-handle:active { cursor: grabbing; }
+.jarves-widget-movable-panel > .dashboard-copilot-chat { min-height: 0; overflow-y: auto; border-radius: 0; }
+.jarves-widget-movable-panel .dashboard-copilot-history { min-height: 120px; height: clamp(120px,25dvh,300px); }
+@media(prefers-reduced-motion:reduce){.jarves-widget-fab { transition:none; }}

@@ -3,18 +3,18 @@
    ============================================= */
 
 .jarves-panel {
-  background: var(--card-bg, #fff);
-  border: 1.5px solid #f97316;
+  background: var(--card-bg, hsl(var(--card)));
+  border: 1.5px solid hsl(var(--primary));
   border-radius: 12px;
   overflow: hidden;
   margin-top: 1.5rem;
-  box-shadow: 0 0 0 1px rgba(249,115,22,0.12), 0 4px 24px rgba(249,115,22,0.08);
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.122), 0 4px 24px hsl(var(--primary) / 0.078);
 }
 
 html.dark .jarves-panel {
-  background: var(--card-bg, #1e1e2e);
-  border-color: #f97316;
-  box-shadow: 0 0 0 1px rgba(249,115,22,0.22), 0 4px 28px rgba(249,115,22,0.16);
+  background: var(--card-bg, hsl(var(--muted)));
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.22), 0 4px 28px hsl(var(--primary) / 0.161);
 }
 
 /* Header */
@@ -23,8 +23,8 @@ html.dark .jarves-panel {
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1.25rem;
-  background: linear-gradient(135deg, #0f0c1e 0%, #1e1245 55%, #7c3aed 100%);
-  border-bottom: 2px solid rgba(249,115,22,0.78);
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--muted)) 55%, #7c3aed 100%);
+  border-bottom: 2px solid hsl(var(--primary) / 0.78);
   color: #fff;
   cursor: pointer;
   user-select: none;
@@ -51,7 +51,7 @@ html.dark .jarves-panel {
 .jarves-toggle {
   background: transparent;
   border: none;
-  color: #fff;
+  color: hsl(var(--foreground));
   cursor: pointer;
   padding: 0.25rem;
   display: flex;
@@ -61,7 +61,7 @@ html.dark .jarves-panel {
 }
 
 .jarves-toggle:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: hsl(var(--foreground) / 0.15);
 }
 
 .jarves-toggle-icon {
@@ -81,12 +81,12 @@ html.dark .jarves-panel {
 .jarves-preview p {
   margin: 0 0 0.75rem;
   font-size: 0.875rem;
-  color: var(--text-primary, #374151);
+  color: var(--text-primary, hsl(var(--foreground)));
   line-height: 1.55;
 }
 
 html.dark .jarves-preview p {
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text-primary, hsl(var(--foreground)));
 }
 
 /* Messages */
@@ -97,12 +97,12 @@ html.dark .jarves-preview p {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background: var(--bg-subtle, #f9fafb);
+  background: var(--bg-subtle, hsl(var(--card)));
   scroll-behavior: smooth;
 }
 
 html.dark .jarves-messages {
-  background: var(--bg-subtle, #111120);
+  background: var(--bg-subtle, hsl(var(--card)));
 }
 
 .jarves-message {
@@ -120,7 +120,7 @@ html.dark .jarves-messages {
   height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg, #7c3aed, #9333ea);
-  box-shadow: 0 0 0 2px #f97316, 0 0 8px rgba(249,115,22,0.45);
+  box-shadow: 0 0 0 2px hsl(var(--primary)), 0 0 8px hsl(var(--primary) / 0.451);
   color: #fff;
   display: flex;
   align-items: center;
@@ -138,21 +138,21 @@ html.dark .jarves-messages {
 }
 
 .is-assistant .jarves-bubble {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
-  color: var(--text-primary, #374151);
+  background: var(--card-bg, hsl(var(--card)));
+  border: 1px solid var(--border-color, hsl(var(--border)));
+  color: var(--text-primary, hsl(var(--foreground)));
   border-bottom-left-radius: 4px;
 }
 
 html.dark .is-assistant .jarves-bubble {
-  background: var(--card-bg, #1e1e2e);
-  border-color: var(--border-color, #2d2d3f);
-  color: var(--text-primary, #e2e8f0);
+  background: var(--card-bg, hsl(var(--muted)));
+  border-color: var(--border-color, hsl(var(--border)));
+  color: var(--text-primary, hsl(var(--foreground)));
 }
 
 .is-user .jarves-bubble {
-  background: linear-gradient(135deg, #ea580c, #f97316);
-  color: #fff;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary)));
+  color: hsl(var(--foreground));
   border-bottom-right-radius: 4px;
 }
 
@@ -169,7 +169,7 @@ html.dark .is-assistant .jarves-bubble {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f97316;
+  background: hsl(var(--primary));
   animation: jarves-bounce 1.2s infinite ease-in-out;
   display: inline-block;
 }
@@ -196,19 +196,19 @@ html.dark .is-assistant .jarves-bubble {
   gap: 0.35rem;
   padding: 0.35rem 0.75rem;
   border-radius: 20px;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color, hsl(var(--border)));
   background: transparent;
   font-size: 0.78rem;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary, hsl(var(--muted-foreground)));
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
 }
 
 .jarves-quick-btn:hover:not(:disabled) {
-  background: #f97316;
-  border-color: #f97316;
-  color: #fff;
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: var(--nex-on-accent);
 }
 
 .jarves-quick-btn:disabled {
@@ -217,14 +217,14 @@ html.dark .is-assistant .jarves-bubble {
 }
 
 html.dark .jarves-quick-btn {
-  border-color: var(--border-color, #2d2d3f);
-  color: var(--text-secondary, #94a3b8);
+  border-color: var(--border-color, hsl(var(--border)));
+  color: var(--text-secondary, hsl(var(--muted-foreground)));
 }
 
 html.dark .jarves-quick-btn:hover:not(:disabled) {
-  background: #f97316;
-  border-color: #f97316;
-  color: #fff;
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: var(--nex-on-accent);
 }
 
 /* Input row */
@@ -232,22 +232,22 @@ html.dark .jarves-quick-btn:hover:not(:disabled) {
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  background: var(--card-bg, #fff);
+  border-top: 1px solid var(--border-color, hsl(var(--border)));
+  background: var(--card-bg, hsl(var(--card)));
 }
 
 html.dark .jarves-input-row {
-  border-top-color: var(--border-color, #2d2d3f);
-  background: var(--card-bg, #1e1e2e);
+  border-top-color: var(--border-color, hsl(var(--border)));
+  background: var(--card-bg, hsl(var(--muted)));
 }
 
 .jarves-input {
   flex: 1;
   padding: 0.5rem 0.875rem;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color, hsl(var(--border)));
   border-radius: 20px;
-  background: var(--bg-subtle, #f9fafb);
-  color: var(--text-primary, #374151);
+  background: var(--bg-subtle, hsl(var(--card)));
+  color: var(--text-primary, hsl(var(--foreground)));
   font-size: 0.875rem;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -255,26 +255,26 @@ html.dark .jarves-input-row {
 }
 
 .jarves-input:focus {
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.149);
 }
 
 html.dark .jarves-input {
-  background: var(--bg-subtle, #111120);
-  border-color: var(--border-color, #2d2d3f);
-  color: var(--text-primary, #e2e8f0);
+  background: var(--bg-subtle, hsl(var(--card)));
+  border-color: var(--border-color, hsl(var(--border)));
+  color: var(--text-primary, hsl(var(--foreground)));
 }
 
 html.dark .jarves-input:focus {
-  border-color: #f97316;
+  border-color: hsl(var(--primary));
 }
 
 .jarves-send {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ea580c, #f97316);
-  color: #fff;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary)));
+  color: hsl(var(--foreground));
   border: none;
   cursor: pointer;
   display: flex;
@@ -297,7 +297,7 @@ html.dark .jarves-input:focus {
 .jarves-bubble strong { font-weight: 700; }
 .jarves-bubble em { font-style: italic; }
 .jarves-bubble code {
-  background: rgba(249,115,22,0.1);
+  background: hsl(var(--primary) / 0.102);
   padding: 0.1em 0.35em;
   border-radius: 4px;
   font-size: 0.85em;
@@ -305,7 +305,7 @@ html.dark .jarves-input:focus {
 }
 
 .is-user .jarves-bubble code {
-  background: rgba(255, 255, 255, 0.2);
+  background: hsl(var(--foreground) / 0.2);
 }
 
 /* Mobile */

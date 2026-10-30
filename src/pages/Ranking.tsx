@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Trophy, Medal, Crown } from 'lucide-react';
 import { getRanking, type RankingEntry } from '../lib/gamificationApi';
 import { useAuth } from '../lib/auth';
+import { AchievementAvatar } from '../components/AchievementAvatar';
 import { RankBadge } from '../components/Gamification';
 
 function Podium({ entries }: { entries: RankingEntry[] }) {
@@ -9,17 +10,10 @@ function Podium({ entries }: { entries: RankingEntry[] }) {
 
   const podiumEntry = (entry: RankingEntry | undefined, pos: number, height: string, medal: string) => {
     if (!entry) return <div className={`flex-1 ${height}`} />;
-    const avatar = entry.photo_url
-      || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.name)}&size=80&background=0057b8&color=fff`;
     return (
       <div className="flex-1 flex flex-col items-center gap-2">
         <div className="text-2xl">{medal}</div>
-        <div className="relative">
-          <div className="rounded-full p-0.5" style={{ background: `linear-gradient(135deg, ${entry.rank.color}, ${entry.rank.color}88)` }}>
-            <img src={avatar} alt={entry.name} className="w-14 h-14 rounded-full object-cover ring-2 ring-white" />
-          </div>
-          <span className="absolute -bottom-1 -right-1 text-lg leading-none">{entry.rank.emoji}</span>
-        </div>
+        <AchievementAvatar userId={entry.id} name={entry.name} photo={entry.photo_url} size={64} />
         <p className="text-white font-bold text-sm text-center leading-tight max-w-[80px] truncate">{entry.name}</p>
         <p className="text-white/60 text-xs">{entry.total_xp.toLocaleString()} XP</p>
         <div className={`w-full ${height} rounded-t-2xl flex items-start justify-center pt-2`}
@@ -40,8 +34,6 @@ function Podium({ entries }: { entries: RankingEntry[] }) {
 }
 
 function RankingRow({ entry, isMe }: { entry: RankingEntry; isMe: boolean }) {
-  const avatar = entry.photo_url
-    || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.name)}&size=48&background=0057b8&color=fff`;
 
   const posStyle = entry.rank_position <= 3
     ? entry.rank_position === 1 ? 'text-yellow-500' : entry.rank_position === 2 ? 'text-slate-400' : 'text-amber-600'
@@ -58,12 +50,7 @@ function RankingRow({ entry, isMe }: { entry: RankingEntry; isMe: boolean }) {
       <span className={`w-8 text-center font-black text-sm flex-shrink-0 ${posStyle}`}>
         {entry.rank_position <= 3 ? ['🥇','🥈','🥉'][entry.rank_position - 1] : `#${entry.rank_position}`}
       </span>
-      <div className="relative flex-shrink-0">
-        <div className="rounded-full p-0.5" style={{ background: `linear-gradient(135deg, ${entry.rank.color}, ${entry.rank.color}55)` }}>
-          <img src={avatar} alt={entry.name} className="w-10 h-10 rounded-full object-cover ring-1 ring-white" />
-        </div>
-        <span className="absolute -bottom-0.5 -right-0.5 text-sm leading-none">{entry.rank.emoji}</span>
-      </div>
+      <AchievementAvatar userId={entry.id} name={entry.name} photo={entry.photo_url} size={44} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className={`font-bold text-sm truncate ${isMe ? 'text-blue-700' : 'text-slate-800'}`}>{entry.name}</p>
@@ -75,7 +62,7 @@ function RankingRow({ entry, isMe }: { entry: RankingEntry; isMe: boolean }) {
         </div>
       </div>
       <div className="text-right flex-shrink-0">
-        <p className="font-black text-sm" style={{ color: entry.rank.color }}>{entry.total_xp.toLocaleString()}</p>
+        <p className="gamification-level-label font-black text-sm" style={{ color: entry.rank.color }}>{entry.total_xp.toLocaleString()}</p>
         <p className="text-[10px] text-slate-400">XP</p>
       </div>
     </div>

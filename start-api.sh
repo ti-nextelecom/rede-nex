@@ -1,4 +1,5 @@
 ﻿#!/usr/bin/env bash
 set -euo pipefail
-npm ci --omit=dev
-npm run api
+cd -- "$(dirname -- "$0")"
+export NODE_ENV="${NODE_ENV:-production}"
+exec node server/src/server.js

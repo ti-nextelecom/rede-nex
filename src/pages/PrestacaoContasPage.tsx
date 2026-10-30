@@ -1,5 +1,6 @@
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, Building2, ChartNoAxesCombined, Clock3, CreditCard, History, Plus, ReceiptText, Search, ShieldCheck, Trash2, TriangleAlert, Wallet } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { apiGet } from '../lib/apiClient';
 import {
@@ -18,20 +19,13 @@ import {
 } from '../lib/prestacaoContasApi';
 import type { Setor, Periodo, Lancamento, Comentario, Anexo, FaturaData, PcPermissao, ComentarioPeriodo } from '../lib/prestacaoContasApi';
 import './prestacao-contas.css';
+import './prestacao-contas-next.css';
 
-const SETOR_ICONS = ['🏢', '💼', '🖥️', '📦', '🔧', '📊', '🏗️', '🎯', '💡', '🌐'];
 const SETOR_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#84cc16', '#ef4444'];
-const BI_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#84cc16'];
+const PrestacaoFinanceCharts = lazy(() => import('../components/PrestacaoFinanceCharts'));
 
 const fmt = (v: string | number) =>
   'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-
-const fmtShort = (v: string | number) => {
-  const n = Number(v);
-  if (n >= 1_000_000) return 'R$ ' + (n / 1_000_000).toFixed(1).replace('.', ',') + 'M';
-  if (n >= 1_000) return 'R$ ' + (n / 1_000).toFixed(1).replace('.', ',') + 'k';
-  return fmt(v);
-};
 
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return '—';
@@ -53,35 +47,23 @@ const readAsDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file);
   });
 
-function useChartJs(): boolean {
-  const [loaded, setLoaded] = useState(!!(window as unknown as Record<string, unknown>).Chart);
-  useEffect(() => {
-    if ((window as unknown as Record<string, unknown>).Chart) { setLoaded(true); return; }
-    const s = document.createElement('script');
-    s.src = '/prestacao-contas/chart.min.js';
-    s.onload = () => setLoaded(true);
-    document.head.appendChild(s);
-  }, []);
-  return loaded;
-}
-
 const statusStyle = (status: string): React.CSSProperties => {
   const map: Record<string, React.CSSProperties> = {
-    pendente: { background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 },
-    aprovado: { background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 },
-    inconsistente: { background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 },
+    pendente: { background: '#fbbf2417', color: '#f6cc71', padding: '4px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600 },
+    aprovado: { background: '#34d39917', color: '#7ce0b5', padding: '4px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600 },
+    inconsistente: { background: '#fb718517', color: '#fda4af', padding: '4px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600 },
   };
-  return map[status] || { background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 4, fontSize: 12 };
+  return map[status] || { background: '#94a3b817', color: '#b1bfd0', padding: '4px 10px', borderRadius: 99, fontSize: 12 };
 };
 
 const periodoStatusInfo = (status: string) => {
   const map: Record<string, { label: string; color: string; bg: string; dot: string }> = {
-    aberto:               { label: 'Aberto',               color: '#16a34a', bg: '#dcfce7', dot: '#22c55e' },
-    aguardando_validacao: { label: 'Aguard. Validação',    color: '#92400e', bg: '#fef3c7', dot: '#f59e0b' },
-    atrasado:             { label: 'Atrasado',             color: '#991b1b', bg: '#fee2e2', dot: '#ef4444' },
-    validado:             { label: 'Validado',             color: '#166534', bg: '#dcfce7', dot: '#16a34a' },
-    inconsistencia:       { label: 'Inconsistência',       color: '#7c2d12', bg: '#ffedd5', dot: '#f97316' },
-    fechado:              { label: 'Fechado',              color: '#64748b', bg: '#f1f5f9', dot: '#94a3b8' },
+    aberto:               { label: 'Aberto',               color: '#7ce0b5', bg: '#34d39917', dot: '#34d399' },
+    aguardando_validacao: { label: 'Aguard. Validação',    color: '#f6cc71', bg: '#fbbf2417', dot: '#fbbf24' },
+    atrasado:             { label: 'Atrasado',             color: '#fda4af', bg: '#fb718517', dot: '#fb7185' },
+    validado:             { label: 'Validado',             color: '#7ce0b5', bg: '#34d39917', dot: '#34d399' },
+    inconsistencia:       { label: 'Inconsistência',       color: '#fdb98a', bg: '#fb923c17', dot: '#fb923c' },
+    fechado:              { label: 'Fechado',              color: '#b1bfd0', bg: '#94a3b817', dot: '#94a3b8' },
   };
   return map[status] || map.fechado;
 };
@@ -105,6 +87,8 @@ export function PrestacaoContasPage() {
   const [setor, setSetor] = useState<Setor | null>(null);
   const [periodo, setPeriodo] = useState<Periodo | null>(null);
   const [setores, setSetores] = useState<Setor[]>([]);
+  const [setorSearch, setSetorSearch] = useState('');
+  const [setorFilter, setSetorFilter] = useState<'todos' | 'atencao'>('todos');
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [fatura, setFatura] = useState<FaturaData | null>(null);
@@ -112,8 +96,6 @@ export function PrestacaoContasPage() {
   const [biPeriodos, setBiPeriodos] = useState<BiPeriodo[]>([]);
   const [biLancs, setBiLancs] = useState<BiLanc[]>([]);
   const [biReady, setBiReady] = useState(false);
-  const chartJsLoaded = useChartJs();
-  const biChartRefs = useRef<{ destroy(): void }[]>([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,84 +205,6 @@ export function PrestacaoContasPage() {
   }, []);
 
   useEffect(() => { if (!pcLoading && pcPapel !== null) loadSetores(); }, [pcLoading, pcPapel, loadSetores]);
-
-  // Destroy BI charts when leaving BI view
-  useEffect(() => {
-    if (view !== 'bi') {
-      biChartRefs.current.forEach(c => { try { c.destroy(); } catch { /**/ } });
-      biChartRefs.current = [];
-    }
-  }, [view]);
-
-  // Render BI charts when data is ready
-  useEffect(() => {
-    if (view !== 'bi' || !biReady || !chartJsLoaded || !biLancs.length) return;
-    type ChartCtor = new (el: HTMLCanvasElement, cfg: unknown) => { destroy(): void };
-    const C = (window as unknown as Record<string, unknown>).Chart as ChartCtor;
-    biChartRefs.current.forEach(c => { try { c.destroy(); } catch { /**/ } });
-    biChartRefs.current = [];
-    const refs: { destroy(): void }[] = [];
-
-    const ttFmt = { callbacks: { label: (c: { raw: number }) => fmt(c.raw) } };
-    const ttFmtH = { callbacks: { label: (c: { parsed: { x: number } }) => fmt(c.parsed.x) } };
-    const xMoney = {
-      ticks: { callback: (v: number) => v >= 1000 ? 'R$' + (v / 1000).toFixed(0) + 'k' : fmt(v) },
-      grid: { color: 'rgba(128,128,128,.15)' },
-    };
-
-    const mk = (id: string, cfg: unknown) => {
-      const el = document.getElementById(id) as HTMLCanvasElement | null;
-      if (!el) return;
-      refs.push(new C(el, cfg));
-    };
-
-    const porSetor: Record<string, number> = {};
-    biSetores.forEach(s => { porSetor[s.nome] = 0; });
-    biLancs.forEach(l => { porSetor[l.setor_nome] = (porSetor[l.setor_nome] || 0) + parseFloat(l.valor); });
-    const setorE = Object.entries(porSetor).sort((a, b) => b[1] - a[1]);
-    if (setorE.length) mk('pc-chart-setor', {
-      type: 'bar',
-      data: { labels: setorE.map(([k]) => k), datasets: [{ data: setorE.map(([, v]) => v), backgroundColor: BI_COLORS.slice(0, setorE.length).map(c => c + 'bb'), borderColor: BI_COLORS.slice(0, setorE.length), borderWidth: 1, borderRadius: 5 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: ttFmtH }, scales: { x: xMoney, y: { grid: { color: 'rgba(128,128,128,.1)' } } } },
-    });
-
-    const porForma: Record<string, number> = {};
-    biLancs.forEach(l => { const f = l.forma_pagamento || 'Não informado'; porForma[f] = (porForma[f] || 0) + parseFloat(l.valor); });
-    const formaE = Object.entries(porForma).sort((a, b) => b[1] - a[1]);
-    if (formaE.length) mk('pc-chart-forma', {
-      type: 'doughnut',
-      data: { labels: formaE.map(([k]) => k), datasets: [{ data: formaE.map(([, v]) => v), backgroundColor: BI_COLORS.map(c => c + 'cc'), borderColor: 'transparent', borderWidth: 3, hoverOffset: 8 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 12 } }, tooltip: ttFmt }, cutout: '62%' },
-    });
-
-    const porMes: Record<string, number> = {};
-    biLancs.forEach(l => { if (!l.data) return; const m = l.data.slice(0, 7); porMes[m] = (porMes[m] || 0) + parseFloat(l.valor); });
-    const mesE = Object.entries(porMes).sort((a, b) => a[0].localeCompare(b[0]));
-    const mesLabel = ([k]: [string, number]) => { const [y, m] = k.split('-'); return new Date(+y, +m - 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }); };
-    if (mesE.length) mk('pc-chart-mes', {
-      type: 'line',
-      data: { labels: mesE.map(mesLabel), datasets: [{ label: 'Gastos', data: mesE.map(([, v]) => v), borderColor: '#3b82f6', backgroundColor: '#3b82f610', fill: true, tension: 0.4, pointRadius: 5, pointHoverRadius: 8 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: ttFmt }, scales: { y: xMoney, x: { grid: { color: 'rgba(128,128,128,.1)' } } } },
-    });
-
-    const porForn: Record<string, number> = {};
-    biLancs.forEach(l => { if (!l.fornecedor) return; porForn[l.fornecedor] = (porForn[l.fornecedor] || 0) + parseFloat(l.valor); });
-    const topForn = Object.entries(porForn).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    if (topForn.length) mk('pc-chart-forn', {
-      type: 'bar',
-      data: { labels: topForn.map(([k]) => k), datasets: [{ data: topForn.map(([, v]) => v), backgroundColor: '#22c55e44', borderColor: '#22c55e', borderWidth: 1, borderRadius: 4 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: ttFmtH }, scales: { x: xMoney, y: { grid: { color: 'rgba(128,128,128,.1)' } } } },
-    });
-
-    const periSorted = [...biPeriodos].sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
-    if (periSorted.length) mk('pc-chart-periodo', {
-      type: 'bar',
-      data: { labels: periSorted.map(p => `${p.setor_nome.slice(0, 10)} ${p.periodo}`), datasets: [{ data: periSorted.map(p => parseFloat(p.total_gasto || '0')), backgroundColor: BI_COLORS.map((_, i) => BI_COLORS[i % BI_COLORS.length] + '66'), borderColor: BI_COLORS, borderWidth: 1, borderRadius: 4 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: ttFmtH }, scales: { x: xMoney, y: { grid: { color: 'rgba(128,128,128,.1)' } } } },
-    });
-
-    biChartRefs.current = refs;
-  }, [view, biReady, chartJsLoaded, biLancs, biSetores, biPeriodos]);
 
   // ── Navigation ────────────────────────────────────────────
 
@@ -737,6 +641,14 @@ export function PrestacaoContasPage() {
   const totalSetoresAberto = setores.reduce((s, x) => s + parseFloat(x.saldo_aberto || '0'), 0);
   const totalLancs = lancamentos.reduce((s, l) => s + parseFloat(l.valor), 0);
   const totalBI = biLancs.reduce((s, l) => s + parseFloat(l.valor), 0);
+  const precisaAtencao = (s: Setor) => Number(s.periodos_atrasados) > 0 || Number(s.periodos_inconsistentes) > 0;
+  const setoresAtencao = setores.filter(precisaAtencao).length;
+  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const searchTerm = normalize(setorSearch.trim());
+  const visibleSetores = setores.filter(s =>
+    (setorFilter === 'todos' || precisaAtencao(s)) &&
+    normalize([s.nome, s.responsavel_nome, s.responsavel, s.card_last4].filter(Boolean).join(' ')).includes(searchTerm)
+  );
 
   const usersInPerm = new Set(pcPermList.map(p => p.user_id));
   const availableUsers = users.filter(u => !usersInPerm.has(u.id) && u.id !== user?.id);
@@ -744,15 +656,15 @@ export function PrestacaoContasPage() {
   return (
     <div className="pc-page">
       {/* Breadcrumb */}
-      <nav className="pc-breadcrumb">
+      <nav className="pc-breadcrumb" aria-label="Navegação da prestação de contas">
         <button onClick={navSetores}>Setores</button>
         {setor && <><span>›</span><button onClick={() => navPeriodos(setor)}>{setor.nome}</button></>}
         {periodo && <><span>›</span><button onClick={() => navLancamentos(periodo)}>{periodo.periodo}</button></>}
         {view === 'fatura' && <><span>›</span><span>Fatura</span></>}
         {view === 'bi' && <><span>›</span><span>BI</span></>}
         {view === 'log' && <><span>›</span><span>Log</span></>}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--pc-muted)', padding: '2px 6px', background: '#f1f5f9', borderRadius: 4 }}>
-          {pcPapel === 'admin' ? '👑 Admin' : pcPapel === 'validador' ? '✓ Validador' : '👤 Padrão'}
+        <span className="pc-access-badge">
+          <ShieldCheck size={14} aria-hidden="true" /> {pcPapel === 'admin' ? 'Administrador' : pcPapel === 'validador' ? 'Validador' : 'Colaborador'}
         </span>
       </nav>
 
@@ -772,40 +684,51 @@ export function PrestacaoContasPage() {
       {/* ── SETORES ── */}
       {!loading && !error && view === 'setores' && (
         <div>
-          <div className="pc-page-hd">
+          <div className="pc-page-hd pc-overview-hd">
             <div>
+              <span className="pc-eyebrow"><ReceiptText size={15} aria-hidden="true" /> CONTROLE FINANCEIRO</span>
               <h1>Prestação de Contas</h1>
-              <p>Gerencie gastos por setor e período</p>
+              <p>Despesas organizadas. Cada prestação, no seu lugar.</p>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="pc-btn pc-btn-ghost" onClick={navLog}>📋 Log</button>
-              <button className="pc-btn pc-btn-ghost" onClick={navBI}>📊 BI</button>
+            <div className="pc-actions">
+              <button className="pc-btn pc-btn-ghost" onClick={navLog}><History size={17} aria-hidden="true" /> Histórico</button>
+              <button className="pc-btn pc-btn-ghost" onClick={navBI}><ChartNoAxesCombined size={17} aria-hidden="true" /> Análises</button>
               {isAdmin && (
                 <>
-                  <button className="pc-btn pc-btn-ghost" onClick={() => setModal('permissoes')}>🔑 Permissões</button>
-                  <button className="pc-btn pc-btn-primary" onClick={() => openModal('novo-setor', { nome: '', card: '', card_brand: '', resp_user_id: '', validador_user_id: '' })}>+ Novo Setor</button>
+                  <button className="pc-btn pc-btn-ghost" onClick={() => setModal('permissoes')}><ShieldCheck size={17} aria-hidden="true" /> Permissões</button>
+                  <button className="pc-btn pc-btn-primary" onClick={() => openModal('novo-setor', { nome: '', card: '', card_brand: '', resp_user_id: '', validador_user_id: '' })}><Plus size={18} aria-hidden="true" /> Novo setor</button>
                 </>
               )}
             </div>
           </div>
-          <div className="pc-kpis">
-            <div className="pc-kpi"><span className="pc-kpi-label">Total em Aberto</span><span className="pc-kpi-value">{fmtShort(totalSetoresAberto)}</span></div>
-            <div className="pc-kpi"><span className="pc-kpi-label">Setores Ativos</span><span className="pc-kpi-value">{setores.length}</span></div>
-            <div className="pc-kpi"><span className="pc-kpi-label">Períodos Abertos</span><span className="pc-kpi-value">{setores.reduce((s, x) => s + (Number(x.periodos_abertos) || 0), 0)}</span></div>
+          <div className="pc-kpis pc-overview-kpis" aria-label="Resumo dos setores disponíveis">
+            <div className="pc-kpi pc-kpi-featured"><Wallet className="pc-kpi-icon" size={20} aria-hidden="true" /><span className="pc-kpi-label">Total em aberto</span><span className="pc-kpi-value">{fmt(totalSetoresAberto)}</span><span className="pc-kpi-sub">Saldo dos setores disponíveis</span></div>
+            <div className="pc-kpi"><Building2 className="pc-kpi-icon" size={20} aria-hidden="true" /><span className="pc-kpi-label">Setores</span><span className="pc-kpi-value">{setores.length}</span><span className="pc-kpi-sub">Disponíveis para o seu acesso</span></div>
+            <div className="pc-kpi"><Clock3 className="pc-kpi-icon" size={20} aria-hidden="true" /><span className="pc-kpi-label">Períodos abertos</span><span className="pc-kpi-value">{setores.reduce((s, x) => s + (Number(x.periodos_abertos) || 0), 0)}</span><span className="pc-kpi-sub">Em acompanhamento</span></div>
+            <div className="pc-kpi"><TriangleAlert className="pc-kpi-icon" size={20} aria-hidden="true" /><span className="pc-kpi-label">Precisam de atenção</span><span className="pc-kpi-value">{setoresAtencao}</span><span className="pc-kpi-sub">Setores com atrasos ou inconsistências</span></div>
+          </div>
+          <div className="pc-sector-toolbar">
+            <div><h2>Seus setores <span>{setores.length}</span></h2><p>Selecione um setor para acompanhar os períodos e comprovantes.</p></div>
+            <label className="pc-sector-search"><Search size={18} aria-hidden="true" /><input aria-label="Buscar setores" placeholder="Buscar setor, responsável ou cartão" value={setorSearch} onChange={e => setSetorSearch(e.target.value)} /></label>
+          </div>
+          <div className="pc-sector-filters" aria-label="Filtrar setores">
+            <button aria-pressed={setorFilter === 'todos'} onClick={() => setSetorFilter('todos')}>Todos os setores <span>{setores.length}</span></button>
+            <button aria-pressed={setorFilter === 'atencao'} onClick={() => setSetorFilter('atencao')}><TriangleAlert size={14} aria-hidden="true" /> Precisam de atenção <span>{setoresAtencao}</span></button>
           </div>
           {setores.length === 0
             ? <div className="pc-empty">Nenhum setor cadastrado.{isAdmin ? ' Crie o primeiro!' : ''}</div>
             : (
-              <div className="pc-setores-grid">
-                {setores.map((s, i) => {
+              visibleSetores.length === 0 ? <div className="pc-empty"><Search size={28} aria-hidden="true" /><h3>Nenhum setor encontrado</h3><p>Experimente outro nome ou remova os filtros.</p><button className="pc-btn pc-btn-ghost" onClick={() => { setSetorSearch(''); setSetorFilter('todos'); }}>Limpar filtros</button></div> : <div className="pc-setores-grid">
+                {visibleSetores.map(s => {
+                  const i = setores.indexOf(s);
                   const isKamino = s.card_brand === 'kamino';
                   return (
-                    <div
+                    <article
                       key={s.id}
                       className={`pc-setor-card${isKamino ? ' pc-setor-card--kamino' : ''}`}
                       style={isKamino ? undefined : { '--card-accent': s.periodos_inconsistentes > 0 ? '#ef4444' : SETOR_COLORS[i % SETOR_COLORS.length] } as React.CSSProperties}
-                      onClick={() => navPeriodos(s)}
                     >
+                      <button className="pc-setor-open" onClick={() => navPeriodos(s)} aria-label={`Abrir setor ${s.nome}`}>
                       {isKamino ? (
                         <div className="pc-kamino-header">
                           <span className="pc-kamino-logo">⌘ KAMINO</span>
@@ -815,31 +738,29 @@ export function PrestacaoContasPage() {
                         <div className="pc-setor-card-bar" />
                       )}
                       <div className="pc-setor-card-body">
-                        <div className="pc-setor-icon">{isKamino ? '💳' : SETOR_ICONS[i % SETOR_ICONS.length]}</div>
+                        <div className="pc-setor-icon">{s.card_last4 ? <CreditCard size={25} aria-hidden="true" /> : <Building2 size={25} aria-hidden="true" />}</div>
                         <div className="pc-setor-info">
                           <strong>{s.nome}</strong>
                           {s.card_last4 && <small>{isKamino ? '•••• •••• •••• ' : 'Cartão •••• '}{s.card_last4}</small>}
-                          {(s.responsavel_nome || s.responsavel) && <small>👤 {s.responsavel_nome || s.responsavel}</small>}
+                          <small>{s.responsavel_nome || s.responsavel || 'Responsável não definido'}</small>
                         </div>
                       </div>
                       <div className="pc-setor-card-foot">
                         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                           {s.periodos_inconsistentes > 0 && (
-                            <span style={{ color: '#ef4444', fontWeight: 700, fontSize: 11 }}>⚠ {s.periodos_inconsistentes} inconsistência(s)</span>
+                            <span className="pc-sector-warning">{s.periodos_inconsistentes} inconsistência(s)</span>
                           )}
+                          {Number(s.periodos_atrasados) > 0 && <span className="pc-sector-warning">{s.periodos_atrasados} período(s) atrasado(s)</span>}
+                          {!precisaAtencao(s) && <span className="pc-sector-clear">Sem alertas</span>}
+                          <small>{Number(s.periodos_abertos) || 0} período(s) aberto(s)</small>
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {fmtShort(s.saldo_aberto)}
-                          {isAdmin && (
-                            <button
-                              className="pc-card-delete-btn"
-                              title="Excluir setor"
-                              onClick={ev => deletarSetor(s, ev)}
-                            >🗑️</button>
-                          )}
+                          <span className="pc-sector-balance"><small>Saldo em aberto</small><strong>{fmt(s.saldo_aberto)}</strong></span><ArrowUpRight size={18} aria-hidden="true" />
                         </span>
                       </div>
-                    </div>
+                      </button>
+                      {isAdmin && <button className="pc-card-delete-btn" title={`Excluir setor ${s.nome}`} aria-label={`Excluir setor ${s.nome}`} onClick={ev => deletarSetor(s, ev)}><Trash2 size={15} aria-hidden="true" /></button>}
+                    </article>
                   );
                 })}
               </div>
@@ -943,12 +864,12 @@ export function PrestacaoContasPage() {
               )}
               {periodo.status === 'aguardando_validacao' && canValidate && !incDialogOpen && (
                 <>
-                  <button className="pc-btn" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }} onClick={handleValidarPeriodo}>✓ Validar</button>
-                  <button className="pc-btn" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }} onClick={() => setIncDialogOpen(true)}>⚠ Inconsistência</button>
+                  <button className="pc-btn pc-btn-positive" onClick={handleValidarPeriodo}>✓ Validar</button>
+                  <button className="pc-btn pc-btn-negative" onClick={() => setIncDialogOpen(true)}>⚠ Inconsistência</button>
                 </>
               )}
               {periodo.status === 'aguardando_validacao' && (isAdmin || user?.id === periodo.responsavel_user_id) && (
-                <button className="pc-btn" style={{ background: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }} onClick={cancelarSubmissao}>↩ Cancelar Envio</button>
+                <button className="pc-btn pc-btn-warning" onClick={cancelarSubmissao}>↩ Cancelar Envio</button>
               )}
               {periodo.status === 'inconsistencia' && (
                 <button className="pc-btn pc-btn-primary" onClick={handleCorrigirPeriodo}>🔧 Corrigir e Reenviar</button>
@@ -965,21 +886,21 @@ export function PrestacaoContasPage() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <div style={{
-            background: '#fff', borderRadius: 12, padding: 28, width: 480, maxWidth: '95vw',
+          <div className="pc-modal" role="dialog" aria-modal="true" aria-label="Corrigir e Reenviar" style={{
+            background: 'var(--pc-surface)', borderRadius: 18, padding: 28, width: 480, maxWidth: '95vw',
             boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
           }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700 }}>Corrigir e Reenviar</h3>
-            <p style={{ color: '#64748b', fontSize: 14, margin: '0 0 16px' }}>
+            <p style={{ color: 'var(--pc-muted)', fontSize: 14, margin: '0 0 16px' }}>
               Descreva o que foi corrigido para registrar no histórico do período.
             </p>
-            <textarea
+            <textarea className="pc-correction-input" aria-label="Descreva o que foi corrigido"
               value={corrigirTexto}
               onChange={e => setCorrigirTexto(e.target.value)}
               placeholder="Ex: Nota fiscal ajustada, valor corrigido de R$ X para R$ Y..."
               rows={4}
               style={{
-                width: '100%', borderRadius: 8, border: '1.5px solid #e2e8f0',
+                width: '100%', borderRadius: 10, border: '1px solid var(--pc-border)',
                 padding: '10px 12px', fontSize: 14, resize: 'vertical',
                 fontFamily: 'inherit', boxSizing: 'border-box'
               }}
@@ -1001,9 +922,9 @@ export function PrestacaoContasPage() {
       )}
 
       {incDialogOpen && (
-            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div className="pc-inconsistency">
               <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 600, color: '#9a3412', marginBottom: 8, fontSize: 14 }}>⚠ Descreva a inconsistência encontrada:</p>
+                <p style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>⚠ Descreva a inconsistência encontrada:</p>
                 <textarea
                   value={incDialog}
                   onChange={e => setIncDialog(e.target.value)}
@@ -1013,7 +934,7 @@ export function PrestacaoContasPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 90 }}>
-                <button className="pc-btn pc-btn-sm" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }} onClick={handleInconsistenciaPeriodo} disabled={!incDialog.trim()}>Confirmar</button>
+                <button className="pc-btn pc-btn-sm pc-btn-negative" onClick={handleInconsistenciaPeriodo} disabled={!incDialog.trim()}>Confirmar</button>
                 <button className="pc-btn pc-btn-ghost pc-btn-sm" onClick={() => { setIncDialogOpen(false); setIncDialog(''); }}>Cancelar</button>
               </div>
             </div>
@@ -1050,11 +971,11 @@ export function PrestacaoContasPage() {
                     {periodoComentarios.map(c => {
                       const isInc = c.tipo === 'inconsistencia', isCor = c.tipo === 'correcao';
                       const isSubmit = c.tipo === 'submit', isVal = c.tipo === 'validado', isCan = c.tipo === 'cancelamento';
-                      const cStyle = isInc ? { borderLeft: '3px solid #ef4444', background: '#fff1f2' }
-                        : isCor ? { borderLeft: '3px solid #22c55e', background: '#f0fdf4' }
-                        : isSubmit ? { borderLeft: '3px solid #3b82f6', background: '#eff6ff' }
-                        : isVal ? { borderLeft: '3px solid #16a34a', background: '#dcfce7' }
-                        : isCan ? { borderLeft: '3px solid #f97316', background: '#fff7ed' }
+                      const cStyle = isInc ? { borderLeft: '3px solid #fb7185', background: '#fb71850c' }
+                        : isCor ? { borderLeft: '3px solid #34d399', background: '#34d3990c' }
+                        : isSubmit ? { borderLeft: '3px solid #60a5fa', background: '#60a5fa0c' }
+                        : isVal ? { borderLeft: '3px solid #34d399', background: '#34d3990c' }
+                        : isCan ? { borderLeft: '3px solid #fb923c', background: '#fb923c0c' }
                         : {};
                       return (
                         <div key={c.id} className="pc-comentario" style={cStyle}>
@@ -1091,8 +1012,8 @@ export function PrestacaoContasPage() {
                       <th>Data</th><th>Fornecedor</th><th>Descrição</th><th>Por</th>
                       <th style={{ textAlign: 'right' }}>Valor</th>
                       <th>Status</th><th>Anexos</th><th>Coments</th>
-                      {(periodo.status === 'aberto' && canValidate || isAdmin) && <th>Ações</th>}
                       {(canValidate && periodo.status === 'aguardando_validacao') && <th style={{ whiteSpace: 'nowrap' }}>Validação</th>}
+                      {(periodo.status === 'aberto' && canValidate || isAdmin) && <th>Ações</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1100,7 +1021,7 @@ export function PrestacaoContasPage() {
                       <tr key={l.id} onClick={() => openDrawer(l.id)} style={{ cursor: 'pointer' }}>
                         <td>{fmtDate(l.data)}</td>
                         <td>{l.fornecedor || '—'}</td>
-                        <td>{l.descricao}</td>
+                        <td><button className="pc-entry-open" onClick={e => { e.stopPropagation(); void openDrawer(l.id); }}>{l.descricao}</button></td>
                         <td style={{ fontSize: 12, color: 'var(--pc-muted)' }}>{l.autor_nome || '—'}</td>
                         <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(l.valor)}</td>
                         <td><span style={statusStyle(l.status || 'pendente')}>{l.status || 'pendente'}</span></td>
@@ -1151,8 +1072,9 @@ export function PrestacaoContasPage() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={(periodo.status === 'aberto' && canValidate || isAdmin) ? 8 : (canValidate && periodo.status === 'aguardando_validacao') ? 8 : 7} style={{ textAlign: 'right', fontWeight: 700, color: 'var(--pc-muted)', fontSize: 13 }}>TOTAL</td>
+                      <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700, color: 'var(--pc-muted)', fontSize: 13 }}>TOTAL</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{fmt(totalLancs)}</td>
+                      <td colSpan={3} />
                       {(periodo.status === 'aberto' && canValidate || isAdmin) && <td />}
                       {(canValidate && periodo.status === 'aguardando_validacao') && <td />}
                     </tr>
@@ -1215,8 +1137,9 @@ export function PrestacaoContasPage() {
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700 }}>TOTAL</td>
+                          <td colSpan={6} style={{ textAlign: 'right', fontWeight: 700 }}>TOTAL</td>
                           <td style={{ fontWeight: 700 }}>{fmt(total)}</td>
+                          <td />
                         </tr>
                       </tfoot>
                     </table>
@@ -1245,28 +1168,9 @@ export function PrestacaoContasPage() {
           </div>
           {biReady && biLancs.length === 0 && <div className="pc-empty">Nenhum lançamento encontrado para análise.</div>}
           {biReady && biLancs.length > 0 && (
-            <div className="pc-bi-grid">
-              <div className="pc-bi-chart-wrap" style={{ gridColumn: 'span 2' }}>
-                <h3>Gastos por Setor</h3>
-                <div className="pc-bi-canvas-wrap"><canvas id="pc-chart-setor" /></div>
-              </div>
-              <div className="pc-bi-chart-wrap">
-                <h3>Forma de Pagamento</h3>
-                <div className="pc-bi-canvas-wrap"><canvas id="pc-chart-forma" /></div>
-              </div>
-              <div className="pc-bi-chart-wrap">
-                <h3>Evolução Mensal</h3>
-                <div className="pc-bi-canvas-wrap"><canvas id="pc-chart-mes" /></div>
-              </div>
-              <div className="pc-bi-chart-wrap" style={{ gridColumn: 'span 2' }}>
-                <h3>Top 10 Fornecedores</h3>
-                <div className="pc-bi-canvas-wrap"><canvas id="pc-chart-forn" /></div>
-              </div>
-              <div className="pc-bi-chart-wrap" style={{ gridColumn: 'span 2' }}>
-                <h3>Gastos por Período</h3>
-                <div className="pc-bi-canvas-wrap"><canvas id="pc-chart-periodo" /></div>
-              </div>
-            </div>
+            <Suspense fallback={<div className="pc-empty" role="status">Preparando gráficos…</div>}>
+              <PrestacaoFinanceCharts setores={biSetores} periodos={biPeriodos} lancamentos={biLancs} />
+            </Suspense>
           )}
         </div>
       )}
@@ -1312,7 +1216,7 @@ export function PrestacaoContasPage() {
                         <td>{l.setor_nome}</td>
                         <td>{l.periodo_nome}</td>
                         <td>
-                          <div>{l.descricao}</div>
+                          <button className="pc-entry-open" onClick={e => { e.stopPropagation(); void openDrawer(l.id); }}>{l.descricao}</button>
                           {l.fornecedor && <div style={{ color: 'var(--pc-muted)', fontSize: 11 }}>{l.fornecedor}</div>}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(l.valor)}</td>
@@ -1367,7 +1271,7 @@ export function PrestacaoContasPage() {
                     </span>
                   )}
                   {drawerLanc.validacao_obs && (
-                    <span style={{ fontSize: 11, color: '#991b1b' }}>— {drawerLanc.validacao_obs}</span>
+                    <span style={{ fontSize: 12, color: '#fda4af' }}>— {drawerLanc.validacao_obs}</span>
                   )}
                 </div>
 
@@ -1387,13 +1291,11 @@ export function PrestacaoContasPage() {
                 {canValidate && drawerLanc.status === 'pendente' && (
                   <div className="pc-drawer-actions" style={{ marginTop: 8 }}>
                     <button
-                      className="pc-btn pc-btn-sm"
-                      style={{ background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}
+                      className="pc-btn pc-btn-sm pc-btn-positive"
                       onClick={() => validarLancamento('aprovado')}
                     >✓ Aprovar</button>
                     <button
-                      className="pc-btn pc-btn-sm"
-                      style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}
+                      className="pc-btn pc-btn-sm pc-btn-negative"
                       onClick={async () => {
                         const obs = prompt('Observação sobre inconsistência (opcional):');
                         if (obs === null) return;
@@ -1405,8 +1307,7 @@ export function PrestacaoContasPage() {
                 {canValidate && drawerLanc.status === 'aprovado' && (
                   <div className="pc-drawer-actions" style={{ marginTop: 8 }}>
                     <button
-                      className="pc-btn pc-btn-sm"
-                      style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}
+                      className="pc-btn pc-btn-sm pc-btn-negative"
                       onClick={async () => {
                         const obs = prompt('Observação sobre inconsistência (opcional):');
                         if (obs === null) return;
@@ -1414,8 +1315,7 @@ export function PrestacaoContasPage() {
                       }}
                     >⚠ Marcar Inconsistente</button>
                     <button
-                      className="pc-btn pc-btn-sm"
-                      style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
+                      className="pc-btn pc-btn-sm pc-btn-warning"
                       onClick={() => validarLancamento('pendente')}
                     >↩ Desfazer</button>
                   </div>
@@ -1423,13 +1323,11 @@ export function PrestacaoContasPage() {
                 {canValidate && drawerLanc.status === 'inconsistente' && (
                   <div className="pc-drawer-actions" style={{ marginTop: 8 }}>
                     <button
-                      className="pc-btn pc-btn-sm"
-                      style={{ background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}
+                      className="pc-btn pc-btn-sm pc-btn-positive"
                       onClick={() => validarLancamento('aprovado')}
                     >✓ Aprovar</button>
                     <button
-                      className="pc-btn pc-btn-sm"
-                      style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
+                      className="pc-btn pc-btn-sm pc-btn-warning"
                       onClick={() => validarLancamento('pendente')}
                     >↩ Desfazer</button>
                   </div>
@@ -1712,9 +1610,9 @@ export function PrestacaoContasPage() {
                           <td>
                             <span style={{
                               ...{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 },
-                              ...(p.papel === 'admin' ? { background: '#ede9fe', color: '#5b21b6' } :
-                                p.papel === 'validador' ? { background: '#dbeafe', color: '#1e40af' } :
-                                  { background: '#f1f5f9', color: '#475569' })
+                              ...(p.papel === 'admin' ? { background: '#a78bfa17', color: '#c4b5fd' } :
+                                p.papel === 'validador' ? { background: '#60a5fa17', color: '#93c5fd' } :
+                                  { background: '#94a3b817', color: '#b1bfd0' })
                             }}>
                               {p.papel === 'admin' ? '👑 Admin' : p.papel === 'validador' ? '✓ Validador' : '👤 Padrão'}
                             </span>

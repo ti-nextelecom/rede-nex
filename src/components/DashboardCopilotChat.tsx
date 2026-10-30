@@ -2,7 +2,10 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Plus, Send, Mic, MicOff, Volume2, VolumeX, MessageSquare, Keyboard } from 'lucide-react';
 import type { buildWorkBriefing } from '../../shared/personalWork.mjs';
-import { getAudioContext } from '../hooks/useAudioContext';
+import { initAudioContext } from '../hooks/useAudioContext';
+import { useJarvisSpeech, type JarvisVoiceState } from '../hooks/useJarvisSpeech';
+import { JarvisVoiceVisual } from './JarvisVoiceVisual';
+import { LinkText } from './LinkText';
 import './dashboard-copilot.css';
 
 interface ChatMessage { id: number; role: 'user' | 'assistant'; content: string }
@@ -10,31 +13,23 @@ interface ChatMessage { id: number; role: 'user' | 'assistant'; content: string 
 const welcome: ChatMessage = {
   id: 0,
   role: 'assistant',
-  content: 'Olá! Sou o Jarves, seu assistente pessoal. Como posso ajudar?'
+  content: 'Olá! Sou o Jarvis, seu assistente pessoal. Como posso ajudar?'
 };
 
 const suggestions = ['Minhas tarefas vencidas', 'Abrir projetos', 'O que está atrasado?', 'Criar tarefa'];
-
-function stripMd(text: string): string {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*([^*\n]+?)\*/g, '$1')
-    .replace(/`([^`]+?)`/g, '$1')
-    .replace(/^[ \t]*[-*] /gm, '')
-    .replace(/<[^>]+>/g, '');
-}
 
 const SpeechRecognitionAPI =
   typeof window !== 'undefined'
     ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
     : null;
 
-export function DashboardCopilotChat({ briefing: _briefing, autoStartConversation, autoStartListening, onNavigate, userName}: {
+export function DashboardCopilotChat({ briefing: _briefing, autoStartConversation, autoStartListening, onNavigate, userName, onVoiceStateChange}: {
   briefing?: ReturnType<typeof buildWorkBriefing>;
   autoStartConversation?: boolean;
   autoStartListening?: boolean;
   onNavigate?: () => void;
   userName?: string;
+  onVoiceStateChange?: (state: JarvisVoiceState) => void;
 }) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([welcome]);
@@ -47,8 +42,9 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
   const historyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
-  const currentAudio = useRef<HTMLAudioElement | AudioBufferSourceNode | null>(null);
-  const autoListenRef = useRef(false);
+  const { speechState, speak, stopSpeech, resumeSpeech } = useJarvisSpeech();
+  const voiceState: JarvisVoiceState = listening ? 'listening' : speechState !== 'idle' ? speechState : loading ? 'thinking' : 'idle';
+  useEffect(() => { onVoiceStateChange?.(voiceState); }, [voiceState, onVoiceStateChange]);
   const convModeRef = useRef(false);
   const voiceEnabledRef = useRef(true);
   const inputId = useId();
@@ -59,7 +55,9 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
     if (history) history.scrollTop = history.scrollHeight;
   }, [lastMessageId, loading]);
 
-  useEffect(() => () => { stopSpeech(); }, []);
+  useEffect(() => () => {
+    if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.abort(); }
+  }, []);
 
   // Keep voiceEnabledRef in sync so speak() can read it synchronously
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
@@ -79,88 +77,22 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
           sessionStorage.setItem('jarves_greeted', '1');
           const brt = ((new Date().getUTCHours() - 3) + 24) % 24;
           const greeting = brt < 12 ? 'Bom dia' : brt < 18 ? 'Boa tarde' : 'Boa noite';
-          void sendInternal(greeting + "! Cumprimente o usuário pelo nome " + (userName || "usuário") + ". Uma frase curta — sem perguntas, sem briefing.", true);
+          void sendInternal(greeting + "! Cumprimente o usuário pelo nome " + (userName || "usuário") + ". Uma frase curta — sem perguntas, sem briefing.", true, false);
         }
       }, 600);
       return () => clearTimeout(timer);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function stopSpeech() {
-    const a = currentAudio.current;
-    if (a) {
-      if (typeof (a as AudioBufferSourceNode).stop === 'function') {
-        try { (a as AudioBufferSourceNode).stop(); } catch {}
-      } else {
-        (a as HTMLAudioElement).pause();
-      }
-      currentAudio.current = null;
-    }
-    autoListenRef.current = false;
+  function unlockAudio() {
+    if (voiceEnabledRef.current) { try { initAudioContext(); } catch { /* HTMLAudio fallback. */ } }
   }
 
-  async function speak(text: string, autoListen = false) {
-    stopSpeech();
-    const clean = stripMd(text).slice(0, 1000);
-    autoListenRef.current = autoListen;
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text: clean }),
-      });
-      if (!res.ok) {
-        console.warn('[Jarves TTS] HTTP', res.status);
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const arrayBuf = await res.arrayBuffer();
-
-      const ctx = getAudioContext();
-      if (ctx && ctx.state !== 'closed') {
-        // AudioContext initialized on FAB click (user gesture) — autoplay always allowed
-        const decoded = await ctx.decodeAudioData(arrayBuf.slice(0));
-        const source = ctx.createBufferSource();
-        source.buffer = decoded;
-        source.connect(ctx.destination);
-        source.onended = () => {
-          currentAudio.current = null;
-          if (autoListenRef.current) { autoListenRef.current = false; startListening(); }
-        };
-        source.start(0);
-        currentAudio.current = source;
-      } else {
-        // Fallback: HTMLAudioElement
-        const blob = new Blob([arrayBuf], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        currentAudio.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          if (currentAudio.current === audio) currentAudio.current = null;
-          if (autoListenRef.current) { autoListenRef.current = false; startListening(); }
-        };
-        try {
-          await audio.play();
-        } catch {
-          console.warn('[Jarves TTS] autoplay blocked — queued for next gesture');
-          const playOnGesture = () => { audio.play().catch(() => {}); };
-          document.addEventListener('touchstart', playOnGesture, { once: true, passive: true });
-          document.addEventListener('click', playOnGesture, { once: true });
-        }
-      }
-    } catch (err) {
-      console.warn('[Jarves TTS] error:', err);
-      if (autoListenRef.current) { autoListenRef.current = false; startListening(); }
-    }
-  }
-
-  async function sendInternal(question: string, isVoice = false) {
+  async function sendInternal(question: string, isVoice = false, showQuestion = true) {
     const text = question.trim().slice(0, 2000);
     if (!text || loading) return;
     const userMsg: ChatMessage = { id: nextId.current++, role: 'user', content: text };
-    setMessages(curr => [...curr, userMsg].slice(-81));
+    if(showQuestion)setMessages(curr => [...curr, userMsg].slice(-81));
     setInput('');
     setLoading(true);
     try {
@@ -176,9 +108,9 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
       const data: { reply?: string; navigate_to?: string } = await res.json();
       const reply = data.reply || (res.ok ? 'Não consegui processar.' : `Erro ${res.status}.`);
       setMessages(curr => [...curr, { id: nextId.current++, role: 'assistant', content: reply }]);
-      // Always speak Jarves response when voice is enabled (default: true)
+      // Always speak Jarvis response when voice is enabled (default: true)
       if (voiceEnabledRef.current) {
-        await speak(reply, false);
+        await speak(reply);
       }
       if (data.navigate_to) {
         setTimeout(() => {
@@ -193,13 +125,16 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
     }
   }
 
-  function submit(event: FormEvent) { event.preventDefault(); void sendInternal(input); }
+  function submit(event: FormEvent) { event.preventDefault(); unlockAudio(); void sendInternal(input); }
 
   function toggleVoice() {
-    setVoiceEnabled(prev => { if (prev) stopSpeech(); return !prev; });
+    if (voiceEnabled) stopSpeech();
+    voiceEnabledRef.current = !voiceEnabled;
+    setVoiceEnabled(!voiceEnabled);
   }
 
   function enterConversationMode() {
+    unlockAudio();
     setConversationMode(true);
     convModeRef.current = true;
     if (messages.length <= 1) {
@@ -254,12 +189,12 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
     setListening(false);
   }
 
-  return <section className="dashboard-copilot-chat" aria-labelledby={`${inputId}-title`}>
+  return <section data-voice-state={voiceState} className="dashboard-copilot-chat" aria-labelledby={`${inputId}-title`}>
     <div className="dashboard-copilot-toolbar">
       <div>
         <Bot size={18} />
         <span>
-          <h3 id={`${inputId}-title`}>Jarves</h3>
+          <h3 id={`${inputId}-title`}>Jarvis</h3>
           <small>{conversationMode ? 'Modo conversa ativo' : 'Assistente pessoal de IA'}</small>
         </span>
       </div>
@@ -278,8 +213,9 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
         <button
           type="button"
           className={`dashboard-copilot-voice-btn${voiceEnabled ? ' is-active' : ''}`}
-          title={voiceEnabled ? 'Silenciar Jarves' : 'Ativar voz do Jarves'}
-          aria-label={voiceEnabled ? 'Silenciar Jarves' : 'Ativar voz do Jarves'}
+          title={voiceEnabled ? 'Silenciar Jarvis' : 'Ativar voz do Jarvis'}
+          aria-label={voiceEnabled ? 'Silenciar Jarvis' : 'Ativar voz do Jarvis'}
+          aria-pressed={voiceEnabled}
           onClick={toggleVoice}
         >
           {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -287,6 +223,8 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
         <button
           type="button"
           className="dashboard-copilot-nova-btn"
+          aria-label="Nova conversa com Jarvis"
+          title="Nova conversa"
           onClick={() => {
             setMessages([welcome]); setInput(''); setLoading(false);
             stopSpeech(); stopListening();
@@ -299,19 +237,20 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
       </div>
     </div>
 
-    <div ref={historyRef} className="dashboard-copilot-history" role="log" aria-label="Conversa com Jarves" aria-live="polite" aria-relevant="additions" tabIndex={0}>
+    <div className="jarvis-playback-row"><JarvisVoiceVisual state={voiceState} compact />{speechState === 'blocked' && <button type="button" onClick={() => void resumeSpeech()}>Reproduzir ?udio</button>}{['speaking', 'preparing', 'blocked'].includes(speechState) && <button type="button" onClick={stopSpeech} aria-label="Parar fala do Jarvis">Parar fala</button>}</div>
+    <div ref={historyRef} className="dashboard-copilot-history" role="log" aria-label="Conversa com Jarvis" aria-live="polite" aria-relevant="additions" tabIndex={0}>
       {messages.map(message => (
-        <article key={message.id} className={`dashboard-copilot-message is-${message.role}`} aria-label={message.role === 'user' ? 'Sua mensagem' : 'Resposta do Jarves'}>
+        <article key={message.id} className={`dashboard-copilot-message is-${message.role}`} aria-label={message.role === 'user' ? 'Sua mensagem' : 'Resposta do Jarvis'}>
           <div>
-            <small>{message.role === 'user' ? 'Você' : 'Jarves'}</small>
-            <p>{message.content}</p>
+            <small>{message.role === 'user' ? 'Você' : 'Jarvis'}</small>
+            <p><LinkText text={message.content} /></p>
             {message.role === 'assistant' && message.id > 0 && (
               <button
                 type="button"
                 className="dashboard-copilot-listen-btn"
                 title="Ouvir resposta"
                 aria-label="Ouvir resposta"
-                onClick={() => void speak(message.content)}
+                onClick={() => { unlockAudio(); void speak(message.content); }}
               >
                 <Volume2 size={11} /> ouvir
               </button>
@@ -320,8 +259,8 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
         </article>
       ))}
       {loading && (
-        <article className="dashboard-copilot-message is-assistant" aria-label="Jarves está processando">
-          <div><small>Jarves</small><p>Processando…</p></div>
+        <article className="dashboard-copilot-message is-assistant" aria-label="Jarvis está processando">
+          <div><small>Jarvis</small><p>Processando…</p></div>
         </article>
       )}
     </div>
@@ -329,7 +268,7 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
     {!conversationMode && (
       <div className="dashboard-copilot-suggestions" aria-label="Sugestões">
         {suggestions.map(q => (
-          <button type="button" key={q} disabled={loading} onClick={() => void sendInternal(q)}>{q}</button>
+          <button type="button" key={q} disabled={loading} onClick={() => { unlockAudio(); void sendInternal(q); }}>{q}</button>
         ))}
       </div>
     )}
@@ -355,7 +294,7 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
       </div>
     ) : (
       <form className="dashboard-copilot-compose" onSubmit={submit}>
-        <label className="sr-only" htmlFor={inputId}>Mensagem para o Jarves</label>
+        <label className="sr-only" htmlFor={inputId}>Mensagem para o Jarvis</label>
         <textarea
           ref={inputRef}
           id={inputId}
@@ -364,7 +303,7 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
           value={input}
           disabled={loading || listening}
           onChange={e => setInput(e.target.value)}
-          placeholder={listening ? 'Ouvindo…' : 'Pergunte ao Jarves…'}
+          placeholder={listening ? 'Ouvindo…' : 'Pergunte ao Jarvis…'}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
         />
         {SpeechRecognitionAPI && (
@@ -373,18 +312,18 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
             className={`dashboard-copilot-mic-btn${listening ? ' is-listening' : ''}`}
             onClick={listening ? stopListening : startListening}
             disabled={loading}
-            aria-label={listening ? 'Parar gravação' : 'Falar para o Jarves'}
-            title={listening ? 'Parar gravação' : 'Falar para o Jarves'}
+            aria-label={listening ? 'Parar gravação' : 'Falar para o Jarvis'}
+            title={listening ? 'Parar gravação' : 'Falar para o Jarvis'}
           >
             {listening ? <MicOff size={18} /> : <Mic size={18} />}
           </button>
         )}
-        <button type="submit" disabled={!input.trim() || loading || listening} aria-label="Enviar mensagem ao Jarves">
+        <button type="submit" disabled={!input.trim() || loading || listening} aria-label="Enviar mensagem ao Jarvis">
           <Send size={21} />
         </button>
       </form>
     )}
 
-    <p className="dashboard-copilot-privacy">Jarves acessa seus dados em tempo real.</p>
+    <p className="dashboard-copilot-privacy">Jarvis acessa seus dados em tempo real.</p>
   </section>;
 }

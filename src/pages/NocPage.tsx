@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../compon
 import { getNocDateRange, inNocRange, makeNocBuckets, resolutionHours, type NocBucket, type NocPeriod } from '../lib/nocAnalytics';
 import { NOC_STORAGE_KEY, newNocId, readNocStore, saveNocStore, type NocActivation, type NocIncident, type NocStore, type NocType } from '../lib/nocStore';
 import './noc.css';
+import './noc-command.css';
 
 const NocBI = lazy(() => import('./NocBI').then(module => ({ default: module.NocBI })));
 
@@ -353,9 +354,10 @@ export function NocPage() {
   return <div className="noc-page">
     <div className="noc-hero">
       <div className="noc-hero-copy"><span className="noc-eyebrow"><RadioTower size={15} /> CENTRO DE OPERAÇÕES</span><h1>NOC <span>/ Incidentes</span></h1><p>Registre, acompanhe e conclua ocorrências com contexto e responsáveis claros.</p></div>
-      <div className="noc-hero-actions"><span className="noc-local-badge">Prévia neste navegador</span><button className="noc-primary" onClick={openCreate}><Plus size={18} /> Novo incidente</button></div>
+      <div className="noc-hero-actions"><span className="noc-local-badge">Armazenamento local</span><button className="noc-primary" onClick={openCreate}><Plus size={18} /> Novo incidente</button></div>
     </div>
 
+    <p className="noc-storage-note"><ShieldAlert size={16} aria-hidden="true" />Os registros ficam neste navegador e não são sincronizados com o servidor.</p>
     {saveError && <div className="noc-alert" role="alert"><ShieldAlert size={17} />{saveError}<button aria-label="Fechar aviso" onClick={() => setSaveError('')}><X size={16} /></button></div>}
 
     <div className="noc-tabs" role="tablist" aria-label="Seções do NOC">

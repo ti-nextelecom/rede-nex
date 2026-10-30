@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "214966872694",
+    "project_id": "rede-nex",
+    "storage_bucket": "rede-nex.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:214966872694:android:584146d8887722a964cd57",
+        "android_client_info": {
+          "package_name": "br.com.nextelecom.redenex"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-JSunj9zUBfqmGR-vSdHCXJDRqAR_l2U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -8,7 +8,7 @@ import { wsEventBus } from '../lib/wsEventBus';
 import './global-notifications.css';
 
 interface Popup {
-  id: string; kind: 'chat' | 'task' | 'project'; title: string; actor: string;
+  id: string; kind: 'chat' | 'task' | 'project' | 'attention'; title: string; actor: string;
   photo?: string; preview: string; link: string; count: number; notificationId?: string;
 }
 function preview(text: string) {
@@ -64,9 +64,11 @@ export function GlobalNotifications() {
       }
       if (notifications.status === 'fulfilled') {
         for (const item of [...notifications.value].reverse()) {
-          const kind = item.type === 'task' || item.link?.startsWith('/tarefas') ? 'task'
+          const kind = item.link?.includes('atencao=') ? 'attention' : item.type === 'task' || item.link?.startsWith('/tarefas') ? 'task'
             : item.type === 'project' || item.link?.startsWith('/projetos') ? 'project' : null;
-          if (notificationsReady && kind && !item.read && !knownNotifications.has(item.id)) {
+          const inConversation=kind==='attention' && route.current==='/bate-papo' && !document.hidden && document.hasFocus()
+            && new URL(item.link || '/',window.location.origin).searchParams.get('conversa')===activeConversation.current;
+          if ((notificationsReady || kind==='attention') && kind && !item.read && !knownNotifications.has(item.id) && !inConversation) {
             const safeLink = item.link?.startsWith('/') && !item.link.startsWith('//') && !item.link.includes('\\') ? item.link : kind === 'task' ? '/tarefas' : '/projetos';
             show({ id: item.id, notificationId: item.id, kind, title: item.title, actor: item.actor_name || 'REDE NEX',
               photo: item.actor_photo_url, preview: item.message || 'Uma atualização envolve você.', link: safeLink, count: 1 });
@@ -109,7 +111,7 @@ export function GlobalNotifications() {
       return <article key={item.id} className={`nex-popup is-${item.kind}`}>
         <button className="nex-popup-open" onClick={() => open(item)} aria-label={`Abrir ${item.title}, ${item.count} notificação(ões)`}>
           <span className="nex-popup-avatar">{item.photo ? <img src={item.photo} alt="" /> : <span>{item.actor.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('')}</span>}<i><Icon size={13} /></i>{item.count > 1 && <b>{item.count > 99 ? '99+' : item.count}</b>}</span>
-          <span className="nex-popup-copy"><small>{item.kind === 'chat' ? 'Nova mensagem' : item.kind === 'project' ? 'Projeto • envolve você' : 'Tarefa • envolve você'}</small><strong>{item.title}</strong><span>{item.preview}</span><em>{item.kind !== 'chat' && `${item.actor} • `}Abrir <ArrowUpRight size={12} /></em></span>
+          <span className="nex-popup-copy"><small>{item.kind==='attention'?'Sua atenção foi solicitada':item.kind === 'chat' ? 'Nova mensagem' : item.kind === 'project' ? 'Projeto • envolve você' : 'Tarefa • envolve você'}</small><strong>{item.title}</strong><span>{item.preview}</span><em>{item.kind !== 'chat' && `${item.actor} • `}{item.kind==='attention'?'Conferir mensagem':'Abrir'} <ArrowUpRight size={12} /></em></span>
         </button>
         <button className="nex-popup-close" onClick={() => setPopups(items => items.filter(popup => popup.id !== item.id))} aria-label={`Dispensar aviso: ${item.title}`}><X size={17} /></button>
       </article>;

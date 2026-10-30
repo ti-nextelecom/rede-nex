@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect,useRef } from 'react';
 import { useAuth } from '../lib/auth';
 import { wsEventBus } from '../lib/wsEventBus';
+import { startRealtimeConnection } from '../../shared/realtimeConnection.mjs';
+import { syncDesktopNotifications } from '../lib/browserNotifications';
 
 function getWsUrl() {
   const p = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -9,52 +11,25 @@ function getWsUrl() {
 
 export function WsManager() {
   const { user } = useAuth();
+  const activeConversation=useRef<string|null>(null);
+  useEffect(()=>{
+    const unsubscribe=wsEventBus.subscribe(event=>{if(event.type==='conversation:active')activeConversation.current=typeof event.conversationId==='string'?event.conversationId:null;});
+    const onWorker=(event:MessageEvent)=>{
+      if(event.data?.type==='NEX_READING_CONVERSATION') event.ports[0]?.postMessage({reading:
+        Boolean(user && location.pathname==='/bate-papo' && !document.hidden && document.hasFocus() && activeConversation.current===event.data.conversationId)});
+    };
+    navigator.serviceWorker?.addEventListener('message',onWorker);
+    return()=>{unsubscribe();navigator.serviceWorker?.removeEventListener('message',onWorker);};
+  },[user?.id]);
 
   useEffect(() => {
     if (!user) return;
-    let ws: WebSocket | null = null;
-    let destroyed = false;
-    let pingTimer: ReturnType<typeof setInterval>;
-    let reconnectTimer: ReturnType<typeof setTimeout>;
-
-    function connect() {
-      if (destroyed) return;
-      try {
-        ws = new WebSocket(getWsUrl());
-        wsEventBus._ws = ws;
-      } catch {
-        reconnectTimer = setTimeout(connect, 5000);
-        return;
-      }
-
-      ws.onopen = () => {
-        pingTimer = setInterval(() => {
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 30_000);
-      };
-
-      ws.onmessage = (e: MessageEvent) => {
-        try { wsEventBus.emit(JSON.parse(e.data as string)); } catch {}
-      };
-
-      ws.onerror = () => {};
-      ws.onclose = () => {
-        clearInterval(pingTimer);
-        wsEventBus._ws = null;
-        if (!destroyed) reconnectTimer = setTimeout(connect, 5000);
-      };
-    }
-
-    connect();
-    return () => {
-      destroyed = true;
-      clearTimeout(reconnectTimer);
-      clearInterval(pingTimer);
-      ws?.close();
-      wsEventBus._ws = null;
-    };
+    void syncDesktopNotifications(user.id).catch(()=>undefined);
+    return startRealtimeConnection({
+      url: getWsUrl(),
+      onSocket: socket => { wsEventBus._ws = socket; },
+      onMessage: message => wsEventBus.emit(message),
+    });
   }, [user?.id]);
 
   return null;

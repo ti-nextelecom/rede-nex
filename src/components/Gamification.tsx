@@ -14,7 +14,7 @@ export function RankBadge({ rank, size = 'md' }: RankBadgeProps) {
   const emojiSizes = { sm: 'text-sm', md: 'text-base', lg: 'text-xl' };
   return (
     <span
-      className={`inline-flex items-center rounded-full font-bold border ${sizes[size]}`}
+      className={`gamification-level-label inline-flex items-center rounded-full font-bold border ${sizes[size]}`}
       style={{ background: `${rank.color}22`, borderColor: `${rank.color}55`, color: rank.color }}
     >
       <span className={emojiSizes[size]}>{rank.emoji}</span>
@@ -34,7 +34,7 @@ export function XPBar({ profile, compact = false }: XPBarProps) {
     return (
       <div className="w-full">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</span>
+          <span className="gamification-level-label text-xs font-bold" style={{ color: rank.color }}>{rank.name}</span>
           {next_rank && <span className="text-xs text-slate-400">{xp_to_next.toLocaleString()} XP para {next_rank.name}</span>}
         </div>
         <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
@@ -50,14 +50,14 @@ export function XPBar({ profile, compact = false }: XPBarProps) {
         <div className="flex items-center gap-2">
           <span className="text-2xl">{rank.emoji}</span>
           <div>
-            <p className="font-black text-lg leading-none" style={{ color: rank.color }}>{rank.name}</p>
+            <p className="gamification-level-label font-black text-lg leading-none" style={{ color: rank.color }}>{rank.name}</p>
             <p className="text-xs text-slate-500">{total_xp.toLocaleString()} XP total</p>
           </div>
         </div>
         {next_rank && (
           <div className="text-right">
             <p className="text-xs text-slate-400">Próximo</p>
-            <p className="text-sm font-bold" style={{ color: next_rank.color }}>{next_rank.emoji} {next_rank.name}</p>
+            <p className="gamification-level-label text-sm font-bold" style={{ color: next_rank.color }}>{next_rank.emoji} {next_rank.name}</p>
           </div>
         )}
       </div>

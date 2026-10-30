@@ -234,9 +234,9 @@ export function createHrRouter({ pool, requireUser, sendJson, sendError, readJso
       });
       sendJson(req,res,200,payload,{'Cache-Control':'no-store','Vary':'Cookie'});
     } catch (error) {
-      const setup = ['42P01','3F000','42883'].includes(error.code);
+      const setup = ['42P01','42703','3F000','42883'].includes(error.code);
       const status = setup ? 503 : error.status || error.statusCode || (error.code === '23505' ? 409 : ['23514','23503','22P02','22007'].includes(error.code) ? 400 : error.code === '42501' ? 403 : 500);
-      const message = setup ? 'Módulo RH aguardando a migração 20261016_hr_module.sql no servidor.' : error.status ? error.message : status === 409 ? 'Já existe um registro para este usuário, matrícula ou período.' : status === 400 ? 'Dados inconsistentes. Revise os campos.' : status === 403 ? 'Acesso ao RH não autorizado pelo banco de dados.' : 'Não foi possível concluir a operação do RH.';
+      const message = setup ? 'Módulo RH aguardando as migrações da versão no servidor. Execute a verificação de implantação.' : error.status ? error.message : status === 409 ? 'Já existe um registro para este usuário, matrícula ou período.' : status === 400 ? 'Dados inconsistentes. Revise os campos.' : status === 403 ? 'Acesso ao RH não autorizado pelo banco de dados.' : 'Não foi possível concluir a operação do RH.';
       sendError(req,res,status,setup ? 'HR_SETUP_REQUIRED' : 'HR_ERROR',message);
     }
     return true;

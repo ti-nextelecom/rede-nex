@@ -4,7 +4,7 @@
 
 @layer base {
   :root, .dark {
-    /* ── Dark Mode (Only Mode) ──────────────────────────────────────────── */
+    /* ── Default palette; per-user appearance overrides these values ──────────────────────────────────────────── */
     --background: 220 25% 7%;
     --foreground: 210 20% 92%;
     --card: 220 22% 11%;
@@ -71,13 +71,13 @@
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: hsl(var(--foreground) / 0.12);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: hsl(var(--foreground) / 0.2);
   }
-  * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.1) transparent; }
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--foreground) / 0.1) transparent; }
 
   /* ── Selection ─────────────────────────────────────────────────────── */
   ::selection { background: hsl(var(--primary) / 0.3); color: hsl(var(--foreground)); }
@@ -205,50 +205,50 @@
 @layer utilities {
   /* ── Glass Effects ─────────────────────────────────────────────────── */
   .glass {
-    background: rgba(15, 23, 42, 0.6);
+    background: hsl(var(--card) / 0.6);
     backdrop-filter: blur(20px) saturate(1.2);
     -webkit-backdrop-filter: blur(20px) saturate(1.2);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid hsl(var(--foreground) / 0.08);
   }
 
   .glass-card {
-    background: rgba(15, 23, 42, 0.4);
+    background: hsl(var(--card) / 0.4);
     backdrop-filter: blur(16px) saturate(1.1);
     -webkit-backdrop-filter: blur(16px) saturate(1.1);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border: 1px solid hsl(var(--foreground) / 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 hsl(var(--foreground) / 0.05);
   }
 
   .glass-subtle {
-    background: rgba(15, 23, 42, 0.3);
+    background: hsl(var(--card) / 0.302);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.04);
   }
 
   /* ── Neon Glows ────────────────────────────────────────────────────── */
   .glow-cyan { box-shadow: 0 0 20px rgba(0, 229, 255, 0.25), 0 0 60px rgba(0, 229, 255, 0.1); }
   .glow-purple { box-shadow: 0 0 20px rgba(168, 85, 247, 0.25), 0 0 60px rgba(168, 85, 247, 0.1); }
   .glow-pink { box-shadow: 0 0 20px rgba(236, 72, 153, 0.25), 0 0 60px rgba(236, 72, 153, 0.1); }
-  .glow-orange { box-shadow: 0 0 20px rgba(249, 115, 22, 0.25), 0 0 60px rgba(249, 115, 22, 0.1); }
+  .glow-orange { box-shadow: 0 0 20px hsl(var(--primary) / 0.251), 0 0 60px hsl(var(--primary) / 0.102); }
 
   /* ── Gradient Text ─────────────────────────────────────────────────── */
   .text-gradient-cyan {
-    background: linear-gradient(135deg, #e65b12, #3b82f6);
+    background: linear-gradient(135deg, hsl(var(--primary)), #3b82f6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .text-gradient-purple {
-    background: linear-gradient(135deg, #0057b8, #ec4899);
+    background: linear-gradient(135deg, hsl(var(--primary)), #ec4899);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .text-gradient-warm {
-    background: linear-gradient(135deg, #f97316, #ef4444);
+    background: linear-gradient(135deg, hsl(var(--primary)), #ef4444);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -282,28 +282,28 @@
   }
 
   .bg-grid {
-    background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-image: linear-gradient(hsl(var(--foreground) / 0.02) 1px, transparent 1px),
+                      linear-gradient(90deg, hsl(var(--foreground) / 0.02) 1px, transparent 1px);
     background-size: 60px 60px;
   }
 
   .bg-dots {
-    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-image: radial-gradient(hsl(var(--foreground) / 0.06) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 
   /* ── Scrollbar thin ────────────────────────────────────────────────── */
-  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: hsl(var(--foreground) / 0.1) transparent; }
   .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.1); border-radius: 2px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: hsl(var(--foreground) / 0.1); border-radius: 2px; }
 
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 
   /* ── Shimmer / Skeleton ────────────────────────────────────────────── */
   .shimmer {
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent);
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / .05), transparent);
     background-size: 1000px 100%;
     animation: shimmer 2s infinite;
   }
@@ -320,9 +320,9 @@
   /* ── Futuristic Card ───────────────────────────────────────────────── */
   .card-futuristic {
     @apply relative rounded-2xl overflow-hidden transition-all duration-300;
-    background: rgba(15, 23, 42, 0.5);
+    background: hsl(var(--card) / 0.502);
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
   }
 
@@ -361,22 +361,22 @@
   .btn-glass {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium text-sm;
     @apply transition-all duration-200 active:scale-95;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsl(var(--foreground) / 0.05);
+    border: 1px solid hsl(var(--foreground) / 0.1);
     color: hsl(var(--foreground));
   }
 
   .btn-glass:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: hsl(var(--foreground) / 0.1);
+    border-color: hsl(var(--foreground) / 0.2);
   }
 
   /* ── Stat Card ─────────────────────────────────────────────────────── */
   .stat-card {
     @apply relative rounded-2xl p-5 overflow-hidden transition-all duration-300;
-    background: rgba(15, 23, 42, 0.5);
+    background: hsl(var(--card) / 0.502);
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .stat-card::before {
@@ -384,11 +384,11 @@
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 2px;
-    background: var(--stat-accent, linear-gradient(90deg, #e65b12, #3b82f6));
+    background: var(--stat-accent, linear-gradient(90deg, hsl(var(--primary)), #3b82f6));
   }
 
   .stat-card:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: hsl(var(--foreground) / 0.12);
     transform: translateY(-2px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
   }
@@ -412,13 +412,13 @@
   /* ── Post Card ─────────────────────────────────────────────────────── */
   .post-card, .social-post {
     @apply relative rounded-2xl overflow-hidden transition-all duration-300;
-    background: rgba(15, 23, 42, 0.5);
+    background: hsl(var(--card) / 0.502);
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .post-card:hover, .social-post:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: hsl(var(--foreground) / 0.12);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   }
 
@@ -437,9 +437,9 @@
   .social-toolbar,
   .social-composer {
     @apply overflow-hidden rounded-2xl;
-    background: rgba(15, 23, 42, 0.5);
+    background: hsl(var(--card) / 0.502);
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .social-profile-cover {
@@ -468,19 +468,19 @@
 
   .social-stories {
     @apply flex gap-3 overflow-x-auto rounded-2xl p-3 scrollbar-thin;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.4);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .social-story {
     @apply flex min-w-28 flex-col items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold transition-all;
     color: hsl(var(--muted-foreground));
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid hsl(var(--foreground) / 0.06);
+    background: hsl(var(--foreground) / 0.03);
   }
   .social-story:hover {
     transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.06);
+    background: hsl(var(--foreground) / 0.06);
     border-color: rgba(0, 229, 255, 0.2);
   }
 
@@ -491,8 +491,8 @@
 
   .social-search {
     @apply flex h-11 items-center gap-3 rounded-xl px-4;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--muted-foreground));
   }
   .social-search:focus-within {
@@ -509,8 +509,8 @@
   .social-filter-pill {
     @apply inline-flex flex-shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all;
     color: hsl(var(--muted-foreground));
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
   }
   .social-filter-pill:hover {
     border-color: hsl(var(--primary) / 0.4);
@@ -524,13 +524,13 @@
 
   .social-compose-trigger {
     @apply h-12 flex-1 rounded-full px-5 text-left text-sm font-medium transition-all;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--muted-foreground));
   }
   .social-compose-trigger:hover {
     border-color: hsl(var(--primary) / 0.3);
-    background: rgba(255, 255, 255, 0.06);
+    background: hsl(var(--foreground) / 0.06);
   }
 
   .social-composer { @apply p-4; }
@@ -543,19 +543,19 @@
     color: hsl(var(--muted-foreground));
   }
   .social-composer-icon { @apply h-11 w-11; }
-  .social-composer-icon:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--primary)); }
+  .social-composer-icon:hover { background: hsl(var(--foreground) / 0.08); color: hsl(var(--primary)); }
   .social-composer-tool { @apply h-10 w-10; }
   .social-composer-tool:hover { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
   .social-small-action { @apply h-8 w-8; background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
   .social-small-action:hover { background: hsl(var(--primary) / 0.2); }
   .social-menu-button { @apply h-9 w-9 flex-shrink-0; }
-  .social-menu-button:hover { background: rgba(255, 255, 255, 0.08); }
+  .social-menu-button:hover { background: hsl(var(--foreground) / 0.08); }
 
   .social-compose-type {
     @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-colors;
     color: hsl(var(--muted-foreground));
   }
-  .social-compose-type:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .social-compose-type:hover { background: hsl(var(--foreground) / 0.06); color: hsl(var(--foreground)); }
   .social-compose-type-active {
     background: hsl(var(--primary) / 0.2);
     color: hsl(var(--primary));
@@ -565,7 +565,7 @@
     @apply rounded-lg px-4 py-2 text-sm font-semibold transition-colors;
     color: hsl(var(--muted-foreground));
   }
-  .social-cancel-button:hover { background: rgba(255, 255, 255, 0.06); }
+  .social-cancel-button:hover { background: hsl(var(--foreground) / 0.06); }
 
   .social-submit-button {
     @apply btn-futuristic;
@@ -576,7 +576,7 @@
   .social-pinned {
     @apply flex items-center gap-2 px-5 py-3 text-sm font-bold;
     background: hsl(var(--primary) / 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid hsl(var(--foreground) / 0.06);
     color: hsl(var(--primary));
   }
 
@@ -589,7 +589,7 @@
   .social-post-stats {
     @apply mt-5 flex items-center justify-between pb-3 text-sm font-medium;
     color: hsl(var(--muted-foreground));
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid hsl(var(--foreground) / 0.06);
   }
   .social-post-stats button { @apply hover:text-foreground hover:underline; }
 
@@ -603,21 +603,21 @@
     @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95;
     color: hsl(var(--muted-foreground));
   }
-  .social-action-button:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .social-action-button:hover { background: hsl(var(--foreground) / 0.06); color: hsl(var(--foreground)); }
   .social-action-button-active { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
 
   .social-reaction-picker {
     @apply absolute bottom-full left-0 z-20 mb-2 flex items-center gap-1 rounded-2xl px-2 py-2 shadow-2xl animate-slide-up;
     background: hsl(var(--card));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid hsl(var(--foreground) / 0.1);
   }
 
   .social-reaction-choice { @apply rounded-xl p-2.5 transition-transform hover:scale-125 active:scale-110; }
 
   .social-comment-box {
     @apply flex h-11 flex-1 items-center gap-2 rounded-full px-4;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
   }
   .social-comment-box:focus-within {
     border-color: hsl(var(--primary) / 0.4);
@@ -630,7 +630,7 @@
   .social-comment-box button {
     @apply inline-flex h-8 w-8 items-center justify-center rounded-full transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40;
     background: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
+    color: var(--nex-on-accent);
   }
 
   .social-community-row,
@@ -638,7 +638,7 @@
     @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors;
   }
   .social-community-row:hover, .social-trending-row:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: hsl(var(--foreground) / 0.05);
   }
 
   .social-community-icon {
@@ -651,13 +651,13 @@
     @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors;
     color: hsl(var(--muted-foreground));
   }
-  .social-type-row:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--foreground)); }
+  .social-type-row:hover { background: hsl(var(--foreground) / 0.05); color: hsl(var(--foreground)); }
   .social-type-row-active { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
 
   .social-empty-state {
     @apply flex flex-col items-center justify-center rounded-2xl p-12 text-center;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.4);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     color: hsl(var(--muted-foreground));
   }
   .social-empty-state h3 { @apply mt-4 text-lg font-black text-foreground; }
@@ -678,21 +678,21 @@
   /* ── Wiki (keeping essential structure) ─────────────────────────────── */
   .wiki-shell {
     @apply overflow-hidden rounded-xl;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.4);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     min-height: calc(100vh - 7.5rem);
   }
 
   .wiki-topbar {
     @apply flex items-center gap-4 px-4 py-3;
-    background: rgba(15, 23, 42, 0.6);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.6);
+    border-bottom: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .wiki-global-search {
     @apply mx-auto flex min-w-0 h-10 max-w-2xl flex-1 items-center gap-3 rounded-lg px-3;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
   }
 
   .wiki-layout {
@@ -700,7 +700,7 @@
     transition: grid-template-columns 0.28s ease;
   }
 
-  .wiki-sidebar { @apply hidden min-h-full md:block; background: rgba(15, 23, 42, 0.3); }
+  .wiki-sidebar { @apply hidden min-h-full md:block; background: hsl(var(--card) / 0.302); }
 
   @media (max-width: 767px) {
     .wiki-sidebar:not(.wiki-sidebar-collapsed) {
@@ -723,11 +723,11 @@
 
   .wiki-icon-button {
     @apply h-9 w-9 items-center justify-center rounded-lg transition-colors;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--muted-foreground));
   }
-  .wiki-icon-button:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--foreground)); }
+  .wiki-icon-button:hover { background: hsl(var(--foreground) / 0.08); color: hsl(var(--foreground)); }
 
   .wiki-primary-button {
     @apply btn-futuristic text-sm;
@@ -747,13 +747,13 @@
     @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors;
     color: hsl(var(--muted-foreground));
   }
-  .wiki-secondary-action:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .wiki-secondary-action:hover { background: hsl(var(--foreground) / 0.06); color: hsl(var(--foreground)); }
 
   .wiki-sidebar-root {
     @apply flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-base font-semibold transition-colors;
     color: hsl(var(--muted-foreground));
   }
-  .wiki-sidebar-root:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--primary)); }
+  .wiki-sidebar-root:hover { background: hsl(var(--foreground) / 0.06); color: hsl(var(--primary)); }
   .wiki-sidebar-root-active {
     background: hsl(var(--primary) / 0.1);
     color: hsl(var(--primary));
@@ -771,15 +771,15 @@
     @apply flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2.5 text-left text-base font-semibold transition-colors;
     color: hsl(var(--foreground) / 0.8);
   }
-  .wiki-sidebar-section:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
-  .wiki-sidebar-section-active { background: rgba(255, 255, 255, 0.08); color: hsl(var(--foreground)); }
+  .wiki-sidebar-section:hover { background: hsl(var(--foreground) / 0.06); color: hsl(var(--foreground)); }
+  .wiki-sidebar-section-active { background: hsl(var(--foreground) / 0.08); color: hsl(var(--foreground)); }
 
   .wiki-sidebar-subitem,
   .wiki-sidebar-article {
     @apply flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors;
   }
   .wiki-sidebar-article { color: hsl(var(--muted-foreground)); }
-  .wiki-sidebar-article:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--primary)); }
+  .wiki-sidebar-article:hover { background: hsl(var(--foreground) / 0.05); color: hsl(var(--primary)); }
   .wiki-sidebar-article-active {
     border-left: 2px solid hsl(var(--primary));
     background: hsl(var(--primary) / 0.08);
@@ -791,17 +791,17 @@
     @apply ml-1 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100;
     color: hsl(var(--muted-foreground));
   }
-  .wiki-sidebar-row-action:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--primary)); }
+  .wiki-sidebar-row-action:hover { background: hsl(var(--foreground) / 0.08); color: hsl(var(--primary)); }
 
   .wiki-category-form {
     @apply mt-3 space-y-2 rounded-xl p-3;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--card) / 0.6);
+    border: 1px solid hsl(var(--foreground) / 0.08);
   }
   .wiki-category-form input, .wiki-category-form textarea {
     @apply w-full rounded-lg px-3 py-2 text-xs font-medium placeholder:text-muted-foreground focus:outline-none;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--foreground));
   }
   .wiki-category-form input:focus, .wiki-category-form textarea:focus {
@@ -827,12 +827,12 @@
 
   .wiki-hero {
     @apply relative flex flex-col gap-6 overflow-hidden rounded-2xl p-6 xl:flex-row xl:items-end xl:justify-between;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.502);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
   .wiki-hero::before {
     content: ""; @apply absolute inset-x-0 top-0 h-1;
-    background: linear-gradient(90deg, #e65b12, #0057b8, #3b82f6);
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary)), #3b82f6);
   }
   .wiki-hero::after {
     content: ""; @apply pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-40;
@@ -855,8 +855,8 @@
 
   .wiki-metric {
     @apply rounded-xl px-4 py-3 text-center;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
   .wiki-metric strong { @apply block text-2xl font-bold; color: hsl(var(--foreground)); }
   .wiki-metric span { @apply text-xs font-medium; color: hsl(var(--muted-foreground)); }
@@ -865,12 +865,12 @@
 
   .wiki-category-pill {
     @apply inline-flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-base font-semibold transition-all;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--muted-foreground));
   }
   .wiki-category-pill:hover { border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
-  .wiki-category-pill span { @apply rounded px-2 py-0.5 text-sm; background: rgba(255, 255, 255, 0.06); }
+  .wiki-category-pill span { @apply rounded px-2 py-0.5 text-sm; background: hsl(var(--foreground) / 0.06); }
   .wiki-category-pill-active {
     background: hsl(var(--primary) / 0.15);
     border-color: hsl(var(--primary) / 0.4);
@@ -880,13 +880,13 @@
 
   .wiki-panel {
     @apply rounded-xl;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.4);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .wiki-section-head {
     @apply flex items-center justify-between gap-4 px-5 py-4;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid hsl(var(--foreground) / 0.06);
   }
   .wiki-section-head h3 { @apply text-base font-bold; color: hsl(var(--foreground)); }
   .wiki-section-head p { @apply truncate text-xs; color: hsl(var(--muted-foreground)); }
@@ -894,14 +894,14 @@
 
   .wiki-article-row {
     @apply flex cursor-pointer items-start gap-4 rounded-xl px-5 py-4 transition-all;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--foreground) / 0.02);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     border-left: 3px solid hsl(var(--primary));
     margin: 6px 0;
   }
   .wiki-article-row:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-left-color: #0057b8;
+    background: hsl(var(--foreground) / 0.05);
+    border-left-color: hsl(var(--primary));
     transform: translateX(2px);
   }
 
@@ -912,7 +912,7 @@
 
   .wiki-row-category {
     @apply hidden rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:inline-flex;
-    background: rgba(255, 255, 255, 0.06);
+    background: hsl(var(--foreground) / 0.06);
     color: hsl(var(--muted-foreground));
   }
   .wiki-row-meta { @apply mt-2 flex flex-wrap items-center gap-2 text-sm font-medium; color: hsl(var(--muted-foreground)); }
@@ -920,27 +920,27 @@
     @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100;
     color: hsl(var(--muted-foreground));
   }
-  .wiki-row-edit:hover { background: rgba(255, 255, 255, 0.08); color: hsl(var(--primary)); }
+  .wiki-row-edit:hover { background: hsl(var(--foreground) / 0.08); color: hsl(var(--primary)); }
 
   .wiki-aside-title { @apply mb-3 flex items-center gap-2 text-base font-bold; color: hsl(var(--foreground)); }
 
   .wiki-recent-item {
     @apply flex w-full flex-col rounded-lg px-2 py-2.5 text-left transition-colors;
   }
-  .wiki-recent-item:hover { background: rgba(255, 255, 255, 0.05); }
+  .wiki-recent-item:hover { background: hsl(var(--foreground) / 0.05); }
   .wiki-recent-item span { @apply text-base font-semibold; color: hsl(var(--foreground) / 0.8); }
   .wiki-recent-item small { @apply text-xs; color: hsl(var(--muted-foreground)); }
 
   .wiki-governance-item {
     @apply flex items-start gap-2 rounded-lg p-3;
-    background: rgba(255, 255, 255, 0.03);
+    background: hsl(var(--foreground) / 0.03);
   }
   .wiki-governance-item svg { @apply mt-0.5 flex-shrink-0; color: hsl(var(--primary)); }
 
   .wiki-empty-state {
     @apply flex flex-col items-center justify-center rounded-xl p-12 text-center;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px dashed rgba(255, 255, 255, 0.1);
+    background: hsl(var(--foreground) / 0.02);
+    border: 1px dashed hsl(var(--foreground) / 0.1);
     color: hsl(var(--muted-foreground));
   }
   .wiki-empty-state h3 { @apply mt-4 text-lg font-bold; color: hsl(var(--foreground)); }
@@ -951,18 +951,18 @@
 
   .wiki-document {
     @apply min-w-0 rounded-xl;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.502);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
 
   .wiki-breadcrumb {
     @apply flex items-center gap-2 px-6 py-3 text-sm;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid hsl(var(--foreground) / 0.06);
     color: hsl(var(--muted-foreground));
   }
   .wiki-breadcrumb button { @apply inline-flex items-center gap-1 font-semibold; color: hsl(var(--primary)); }
 
-  .wiki-document-header { @apply px-8 py-8 md:px-14; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-document-header { @apply px-8 py-8 md:px-14; border-bottom: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-document-header h2 { @apply text-3xl font-bold leading-tight md:text-4xl; color: hsl(var(--foreground)); }
 
   .wiki-document-category, .wiki-status-badge {
@@ -977,28 +977,28 @@
     @apply hidden space-y-4 xl:block;
     position: sticky; top: 1rem; align-self: start;
     max-height: calc(100vh - 5rem); overflow-y: auto;
-    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent;
+    scrollbar-width: thin; scrollbar-color: hsl(var(--foreground) / 0.06) transparent;
   }
 
   .wiki-toc-link {
     @apply block rounded px-2 py-1.5 text-xs font-medium transition-colors;
     color: hsl(var(--muted-foreground));
   }
-  .wiki-toc-link:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--primary)); }
+  .wiki-toc-link:hover { background: hsl(var(--foreground) / 0.05); color: hsl(var(--primary)); }
 
   .wiki-tag {
     @apply rounded-lg px-2 py-1 text-xs font-semibold;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.05);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--muted-foreground));
   }
 
-  .wiki-comment-item { @apply flex gap-2 py-2 last:border-0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+  .wiki-comment-item { @apply flex gap-2 py-2 last:border-0; border-bottom: 1px solid hsl(var(--foreground) / 0.04); }
   .wiki-comment-avatar { @apply h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5; }
   .wiki-comment-input {
     @apply w-full resize-none rounded-lg px-3 py-2 text-xs placeholder-muted-foreground focus:outline-none transition-colors;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
     color: hsl(var(--foreground));
   }
   .wiki-comment-input:focus { border-color: hsl(var(--primary) / 0.5); }
@@ -1009,10 +1009,10 @@
   .wiki-category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 1rem; }
   .wiki-category-card {
     @apply relative flex flex-col rounded-xl overflow-hidden cursor-pointer transition-all duration-300;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.502);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
-  .wiki-category-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3); border-color: rgba(255, 255, 255, 0.12); }
+  .wiki-category-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3); border-color: hsl(var(--foreground) / 0.12); }
 
   .wiki-category-card-header {
     @apply h-36 flex items-center justify-center relative overflow-hidden;
@@ -1024,33 +1024,33 @@
   .wiki-category-card-icon {
     @apply relative z-10 h-20 w-20 rounded-3xl flex items-center justify-center bg-white/10 shadow-sm;
   }
-  .wiki-category-card-body { @apply p-4 flex flex-col flex-1; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-category-card-body { @apply p-4 flex flex-col flex-1; border-top: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-category-card h4 { @apply text-base font-bold; color: hsl(var(--foreground)); overflow-wrap: break-word; word-break: break-word; }
   .wiki-category-card p { @apply text-sm mt-1.5 leading-5 flex-1; color: hsl(var(--muted-foreground)); }
   .wiki-category-card-count { @apply mt-4 flex items-center justify-between text-sm font-semibold; color: hsl(var(--muted-foreground)); }
-  .wiki-category-card-count span { @apply rounded-full px-3 py-1; background: rgba(255, 255, 255, 0.06); }
+  .wiki-category-card-count span { @apply rounded-full px-3 py-1; background: hsl(var(--foreground) / 0.06); }
 
   /* Wiki Content */
   .wiki-content { @apply px-8 py-6 md:px-14; color: hsl(var(--foreground)); }
   .wiki-content--html { @apply p-0 overflow-hidden; }
   .wiki-content h1 { @apply mb-5 text-4xl font-black md:text-5xl; }
-  .wiki-content h2 { @apply mb-2 mt-5 pb-1.5 text-2xl font-black md:text-3xl; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .wiki-content h2 { @apply mb-2 mt-5 pb-1.5 text-2xl font-black md:text-3xl; border-bottom: 1px solid hsl(var(--foreground) / 0.08); }
   .wiki-content h3 { @apply mb-1.5 mt-4 text-xl font-bold md:text-2xl; }
   .wiki-content h4 { @apply mb-1 mt-3 text-lg font-bold md:text-xl; }
   .wiki-content p { @apply mb-2 w-full leading-relaxed; font-size: 1.12rem; }
   .wiki-content p + p { margin-top: 0; }
   .wiki-content strong { @apply font-bold; }
   .wiki-content em { @apply italic; color: hsl(var(--foreground) / 0.8); }
-  .wiki-content hr { @apply my-6; border-color: rgba(255, 255, 255, 0.08); }
-  .wiki-content tr { border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-content hr { @apply my-6; border-color: hsl(var(--foreground) / 0.08); }
+  .wiki-content tr { border-bottom: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-content td { @apply px-4 py-2 text-base; }
 
-  .wiki-table-wrap { @apply my-5 overflow-x-auto rounded-xl; border: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-table-wrap { @apply my-5 overflow-x-auto rounded-xl; border: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-table { @apply w-full border-collapse text-sm; min-width: 400px; }
-  .wiki-table th { @apply px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide; background: rgba(255, 255, 255, 0.04); border-bottom: 2px solid rgba(255, 255, 255, 0.08); }
-  .wiki-table td { @apply px-4 py-2.5; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+  .wiki-table th { @apply px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide; background: hsl(var(--foreground) / 0.04); border-bottom: 2px solid hsl(var(--foreground) / 0.08); }
+  .wiki-table td { @apply px-4 py-2.5; border-bottom: 1px solid hsl(var(--foreground) / 0.04); }
   .wiki-table tr:last-child td { border-bottom: none; }
-  .wiki-table tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+  .wiki-table tbody tr:hover td { background: hsl(var(--foreground) / 0.02); }
 
   .wiki-content table { @apply w-full border-collapse my-5; display: block; overflow-x: auto; max-width: 100%; }
   .wiki-content a { color: hsl(var(--primary)); @apply underline transition-colors; }
@@ -1068,10 +1068,10 @@
   .wiki-code {
     @apply my-5 w-full overflow-x-auto rounded-xl p-4 text-sm leading-6;
     background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     color: #3b82f6;
   }
-  .wiki-code-label { @apply mb-3 pb-2 text-[10px] font-bold uppercase tracking-wider; border-bottom: 1px solid rgba(255, 255, 255, 0.06); color: hsl(var(--muted-foreground)); }
+  .wiki-code-label { @apply mb-3 pb-2 text-[10px] font-bold uppercase tracking-wider; border-bottom: 1px solid hsl(var(--foreground) / 0.06); color: hsl(var(--muted-foreground)); }
 
   .wiki-inline-code {
     @apply rounded px-1.5 py-0.5 font-mono text-[0.85em];
@@ -1087,33 +1087,33 @@
     height: auto;
     max-height: 520px;
     object-fit: contain;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
   .wiki-content img[src$=".gif"] { object-fit: unset; height: auto; max-height: none; width: 100%; }
 
   .wiki-file-card {
     display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem;
-    background: rgba(255, 255, 255, 0.04); margin: 0.25rem 0; cursor: default; user-select: none;
+    border: 1px solid hsl(var(--foreground) / 0.1); border-radius: 0.5rem;
+    background: hsl(var(--foreground) / 0.04); margin: 0.25rem 0; cursor: default; user-select: none;
     max-width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
   .wiki-file-card-name { font-size: 0.875rem; font-weight: 500; color: hsl(var(--foreground)); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wiki-file-view {
-    padding: 0.2rem 0.55rem; background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+    padding: 0.2rem 0.55rem; background: hsl(var(--primary)); color: var(--nex-on-accent);
     border: none; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
   .wiki-file-view:hover { opacity: 0.9; }
 
   .wiki-content figure.image { @apply mx-auto my-6; width: 100%; max-width: 100%; }
-  .wiki-content figure.image img { @apply mx-auto block rounded-xl; max-width: 100%; width: auto; height: auto; max-height: 520px; object-fit: contain; border: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-content figure.image img { @apply mx-auto block rounded-xl; max-width: 100%; width: auto; height: auto; max-height: 520px; object-fit: contain; border: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-content figcaption { @apply mt-2 text-center text-xs italic; color: hsl(var(--muted-foreground)); }
 
   .wiki-media-video, .wiki-content video {
     @apply mx-auto my-6 aspect-video w-full max-w-4xl rounded-xl;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     background: black;
   }
-  .wiki-content iframe { @apply mx-auto my-6 block w-full max-w-5xl rounded-xl; border: 1px solid rgba(255, 255, 255, 0.06); min-height: 500px; }
+  .wiki-content iframe { @apply mx-auto my-6 block w-full max-w-5xl rounded-xl; border: 1px solid hsl(var(--foreground) / 0.06); min-height: 500px; }
   .wiki-content blockquote {
     @apply my-5 max-w-3xl rounded-r-xl py-3 pl-5 pr-4 italic;
     border-left: 4px solid hsl(var(--primary) / 0.4);
@@ -1123,7 +1123,7 @@
   .wiki-content ul, .wiki-content ol { @apply my-3 ml-6 max-w-3xl space-y-1; }
   .wiki-content ul li { @apply list-disc text-base leading-7; }
   .wiki-content ol li { @apply list-decimal text-base leading-7; }
-  .wiki-content th { @apply px-4 py-2 text-left text-sm font-bold; background: rgba(255, 255, 255, 0.04); }
+  .wiki-content th { @apply px-4 py-2 text-left text-sm font-bold; background: hsl(var(--foreground) / 0.04); }
   .wiki-content caption { @apply pb-2 text-xs font-semibold; color: hsl(var(--muted-foreground)); }
 
   .wiki-content .paragrafo { @apply mb-3 text-base leading-7; }
@@ -1138,13 +1138,13 @@
   .wiki-editor { @apply mx-auto max-w-6xl space-y-4; }
   .wiki-editor-toolbar { @apply flex items-center gap-4; }
   .wiki-editor-toolbar h2 { @apply truncate text-lg font-bold; color: hsl(var(--foreground)); }
-  .wiki-editor-card { @apply overflow-hidden rounded-xl; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); }
-  .wiki-editor-titlebar { @apply p-5; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-editor-card { @apply overflow-hidden rounded-xl; background: hsl(var(--card) / 0.502); border: 1px solid hsl(var(--foreground) / 0.06); }
+  .wiki-editor-titlebar { @apply p-5; border-bottom: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-editor-titlebar input { @apply w-full bg-transparent text-2xl font-bold placeholder:text-muted-foreground focus:outline-none; color: hsl(var(--foreground)); }
-  .wiki-editor-select { @apply mb-3 rounded-lg px-3 py-2 text-sm focus:outline-none; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: hsl(var(--foreground)); }
-  .wiki-editor-tabs { @apply flex items-center gap-2 px-5 py-2; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-editor-select { @apply mb-3 rounded-lg px-3 py-2 text-sm focus:outline-none; background: hsl(var(--foreground) / 0.04); border: 1px solid hsl(var(--foreground) / 0.08); color: hsl(var(--foreground)); }
+  .wiki-editor-tabs { @apply flex items-center gap-2 px-5 py-2; background: hsl(var(--foreground) / 0.03); border-bottom: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-editor-tabs button { @apply inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors; color: hsl(var(--muted-foreground)); }
-  .wiki-editor-tabs button:hover { background: rgba(255, 255, 255, 0.06); color: hsl(var(--foreground)); }
+  .wiki-editor-tabs button:hover { background: hsl(var(--foreground) / 0.06); color: hsl(var(--foreground)); }
   .wiki-editor-tabs button.active { background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); }
   .wiki-editor textarea { @apply min-h-[560px] w-full resize-none p-6 font-mono text-sm leading-7 placeholder:text-muted-foreground focus:outline-none; background: transparent; color: hsl(var(--foreground)); }
   .wiki-editor-preview { @apply min-h-[560px]; }
@@ -1157,26 +1157,26 @@
   .wiki-mode-actions button, .wiki-mode-actions span { @apply inline-flex items-center gap-2 text-white transition-colors hover:text-primary disabled:opacity-50; }
   .wiki-mode-actions button:first-child svg { color: #3b82f6; }
   .wiki-mode-actions button:last-child svg { color: #ef4444; }
-  .wiki-mode-pagebar { @apply flex flex-shrink-0 items-center gap-3 px-5 py-2; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .wiki-mode-pagebar { @apply flex flex-shrink-0 items-center gap-3 px-5 py-2; background: hsl(var(--card) / 0.6); border-bottom: 1px solid hsl(var(--foreground) / 0.06); }
   .wiki-mode-pagebar select, .wiki-mode-pagebar input {
     @apply rounded-lg px-3 py-2 text-sm focus:outline-none;
-    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: hsl(var(--foreground));
+    background: hsl(var(--foreground) / 0.04); border: 1px solid hsl(var(--foreground) / 0.08); color: hsl(var(--foreground));
   }
   .wiki-mode-pagebar input { @apply min-w-0 flex-1 font-semibold; }
 
   .wiki-visual-toolbar, .wiki-source-toolbar {
     @apply flex h-12 flex-shrink-0 items-center gap-1 overflow-x-auto px-5;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid hsl(var(--foreground) / 0.06);
   }
-  .wiki-visual-toolbar { background: rgba(15, 23, 42, 0.6); }
+  .wiki-visual-toolbar { background: hsl(var(--card) / 0.6); }
   .wiki-source-toolbar { background: hsl(var(--primary) / 0.15); }
-  .wiki-visual-toolbar select { @apply mr-1 h-8 rounded px-2 text-xs focus:outline-none; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); color: hsl(var(--foreground)); }
+  .wiki-visual-toolbar select { @apply mr-1 h-8 rounded px-2 text-xs focus:outline-none; background: hsl(var(--foreground) / 0.06); border: 1px solid hsl(var(--foreground) / 0.1); color: hsl(var(--foreground)); }
   .wiki-visual-toolbar button, .wiki-source-toolbar button { @apply inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-sm font-bold transition-colors; }
-  .wiki-visual-toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
-  .wiki-source-toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
-  .wiki-tb-sep { @apply mx-1 inline-block h-5 w-px flex-shrink-0; background: rgba(255, 255, 255, 0.1); }
+  .wiki-visual-toolbar button:hover { background: hsl(var(--foreground) / 0.1); }
+  .wiki-source-toolbar button:hover { background: hsl(var(--foreground) / 0.1); }
+  .wiki-tb-sep { @apply mx-1 inline-block h-5 w-px flex-shrink-0; background: hsl(var(--foreground) / 0.1); }
   .wiki-tb-color { @apply relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded; }
-  .wiki-tb-color:hover { background: rgba(255, 255, 255, 0.1); }
+  .wiki-tb-color:hover { background: hsl(var(--foreground) / 0.1); }
   .wiki-tb-color input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .wiki-img-controls { @apply flex flex-shrink-0 items-center gap-1 px-4 py-1 text-xs font-semibold; background: hsl(var(--primary) / 0.08); border-bottom: 1px solid hsl(var(--primary) / 0.15); color: hsl(var(--primary)); }
   .wiki-img-controls button { @apply rounded px-2 py-0.5 transition-colors; }
@@ -1186,13 +1186,13 @@
   .wiki-word-stage { @apply flex flex-1 justify-center overflow-auto p-8; background: hsl(var(--background)); }
   .wiki-word-page {
     @apply min-h-[900px] w-full max-w-[980px] px-10 py-9 text-base leading-7 outline-none;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.6);
+    border: 1px solid hsl(var(--foreground) / 0.06);
     border-radius: 12px;
     color: hsl(var(--foreground));
   }
-  .wiki-word-page .wiki-columns { display: flex; gap: 1rem; margin: 0.75rem 0; border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 0.375rem; padding: 0.5rem; }
-  .wiki-word-page .wiki-col { flex: 1; min-width: 0; border: 1px dashed rgba(255, 255, 255, 0.06); border-radius: 0.25rem; padding: 0.5rem; }
+  .wiki-word-page .wiki-columns { display: flex; gap: 1rem; margin: 0.75rem 0; border: 1px dashed hsl(var(--foreground) / 0.1); border-radius: 0.375rem; padding: 0.5rem; }
+  .wiki-word-page .wiki-col { flex: 1; min-width: 0; border: 1px dashed hsl(var(--foreground) / 0.06); border-radius: 0.25rem; padding: 0.5rem; }
   .wiki-content .wiki-columns { display: flex; gap: 1rem; margin: 1rem 0; }
   .wiki-content .wiki-col { flex: 1; min-width: 0; }
   .wiki-word-page:empty::before { content: "Type the page content here"; color: hsl(var(--muted-foreground)); }
@@ -1204,7 +1204,7 @@
 
   .wiki-split-editor { @apply grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]; }
   .wiki-source-pane { @apply grid min-h-[620px] grid-cols-[56px_minmax(0,1fr)] overflow-hidden; background: rgba(0, 0, 0, 0.3); }
-  .wiki-line-number { @apply px-3 py-4 text-right font-mono text-sm; border-right: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.2); color: hsl(var(--muted-foreground)); }
+  .wiki-line-number { @apply px-3 py-4 text-right font-mono text-sm; border-right: 1px solid hsl(var(--foreground) / 0.06); background: rgba(0, 0, 0, 0.2); color: hsl(var(--muted-foreground)); }
   .wiki-source-pane textarea { @apply h-full w-full resize-none px-4 py-4 font-mono text-sm leading-7 outline-none placeholder:text-muted-foreground; background: transparent; color: hsl(var(--foreground)); }
 
   .wiki-preview-pane { @apply min-h-[620px] overflow-auto; }
@@ -1220,15 +1220,15 @@
 
   .wiki-hero-compact {
     @apply relative flex flex-wrap items-center gap-6 overflow-hidden rounded-xl px-8 py-7;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: hsl(var(--card) / 0.502);
+    border: 1px solid hsl(var(--foreground) / 0.06);
   }
-  .wiki-hero-compact::before { content: ''; @apply absolute inset-x-0 top-0 h-1; background: linear-gradient(90deg, #e65b12, #0057b8, #3b82f6); }
+  .wiki-hero-compact::before { content: ''; @apply absolute inset-x-0 top-0 h-1; background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary)), #3b82f6); }
   .wiki-hero-compact::after { content: ''; @apply pointer-events-none absolute right-0 top-0 h-full w-64 opacity-40; background: radial-gradient(circle at 80% 50%, rgba(0, 229, 255, 0.1) 0%, transparent 70%); }
 
   .wiki-step-badge {
     @apply flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white;
-    background: linear-gradient(135deg, #e65b12, #0057b8);
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary)));
   }
 
   /* ── Gamification Toast ────────────────────────────────────────────── */
@@ -1244,8 +1244,8 @@
 
   .global-call-card {
     @apply fixed top-4 right-4 z-[9998] w-72 rounded-2xl p-4 shadow-2xl;
-    background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(10, 15, 30, 0.98));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(145deg, hsl(var(--card) / 0.949), hsl(var(--card) / 0.98));
+    border: 1px solid hsl(var(--foreground) / 0.1);
     backdrop-filter: blur(20px);
     animation: notifDropIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
@@ -1266,7 +1266,7 @@
     @apply flex w-72 cursor-pointer items-center gap-2.5 rounded-xl p-2.5 shadow-lg transition-shadow hover:shadow-xl;
     pointer-events: auto;
     background: hsl(var(--card));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid hsl(var(--foreground) / 0.1);
     animation: notifSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
@@ -1279,9 +1279,9 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
 
   @supports not (backdrop-filter: blur(10px)) {
-    .backdrop-blur-sm { background-color: rgba(15, 20, 25, 0.9); }
-    .backdrop-blur-md { background-color: rgba(15, 20, 25, 0.95); }
-    .backdrop-blur-xl { background-color: rgba(15, 20, 25, 0.98); }
+    .backdrop-blur-sm { background-color: hsl(var(--card) / 0.902); }
+    .backdrop-blur-md { background-color: hsl(var(--card) / 0.949); }
+    .backdrop-blur-xl { background-color: hsl(var(--card) / 0.98); }
   }
 
   @media print {
@@ -1294,7 +1294,7 @@
     @apply flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer transition-all duration-150;
     color: hsl(var(--muted-foreground));
   }
-  .wiki-tree-item:hover { background: rgba(255, 255, 255, 0.05); color: hsl(var(--primary)); transform: translateX(4px); }
+  .wiki-tree-item:hover { background: hsl(var(--foreground) / 0.05); color: hsl(var(--primary)); transform: translateX(4px); }
   .wiki-tree-item.active { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); @apply font-semibold; }
 }
 
@@ -1320,49 +1320,49 @@
 
 /* ── Chat Dark Mode ──────────────────────────────────────────────────── */
 .chat-dark { color-scheme: dark; }
-.chat-dark aside { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark aside .border-b, .chat-dark aside [class*="border-slate"] { border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark aside .bg-white, .chat-dark aside [class*="bg-orange-50"], .chat-dark aside [class*="bg-slate-50"], .chat-dark aside [class*="bg-slate-100"] { background-color: rgba(10, 15, 25, 0.95) !important; }
-.chat-dark aside [class*="hover:bg-slate-50"]:hover, .chat-dark aside [class*="hover:bg-slate-100"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark aside .bg-orange-50 { background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark aside [class*="text-slate-900"], .chat-dark aside [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark aside { background-color: hsl(var(--background) / 0.949) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark aside .border-b, .chat-dark aside [class*="border-slate"] { border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark aside .bg-white, .chat-dark aside [class*="bg-orange-50"], .chat-dark aside [class*="bg-slate-50"], .chat-dark aside [class*="bg-slate-100"] { background-color: hsl(var(--background) / 0.949) !important; }
+.chat-dark aside [class*="hover:bg-slate-50"]:hover, .chat-dark aside [class*="hover:bg-slate-100"]:hover { background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark aside .bg-orange-50 { background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark aside [class*="text-slate-900"], .chat-dark aside [class*="text-slate-800"] { color: hsl(var(--foreground)) !important; }
 .chat-dark aside [class*="text-slate-600"], .chat-dark aside [class*="text-slate-500"], .chat-dark aside [class*="text-slate-400"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark aside input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
+.chat-dark aside input { background-color: hsl(var(--foreground) / 0.04) !important; border-color: hsl(var(--foreground) / 0.08) !important; color: hsl(var(--foreground)) !important; }
 .chat-dark aside input::placeholder { color: hsl(var(--muted-foreground)) !important; }
 .chat-dark aside button[class*="text-slate-500"], .chat-dark aside button[class*="text-slate-600"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark main > div:first-child { background-color: rgba(15, 23, 42, 0.8) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark main > div:first-child [class*="text-slate-900"], .chat-dark main > div:first-child [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark main > div:first-child { background-color: hsl(var(--card) / 0.8) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark main > div:first-child [class*="text-slate-900"], .chat-dark main > div:first-child [class*="text-slate-800"] { color: hsl(var(--foreground)) !important; }
 .chat-dark main > div:first-child [class*="text-slate-600"], .chat-dark main > div:first-child [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark main > div:first-child button[class*="text-slate-500"], .chat-dark main > div:first-child button[class*="hover:bg-slate-100"]:hover { color: hsl(var(--muted-foreground)) !important; background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark main > div:first-child [class*="border-slate-100"], .chat-dark main > div:first-child [class*="border-b"] { border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark main [class*="bg-slate-50"] { background-color: rgba(15, 23, 42, 0.6) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark main [class*="bg-slate-50"] input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
+.chat-dark main > div:first-child button[class*="text-slate-500"], .chat-dark main > div:first-child button[class*="hover:bg-slate-100"]:hover { color: hsl(var(--muted-foreground)) !important; background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark main > div:first-child [class*="border-slate-100"], .chat-dark main > div:first-child [class*="border-b"] { border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark main [class*="bg-slate-50"] { background-color: hsl(var(--card) / 0.6) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark main [class*="bg-slate-50"] input { background-color: hsl(var(--foreground) / 0.04) !important; border-color: hsl(var(--foreground) / 0.08) !important; color: hsl(var(--foreground)) !important; }
 .chat-dark main [class*="bg-slate-50"] input::placeholder { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-input-bar { background-color: rgba(15, 23, 42, 0.8) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-input-bar textarea { background-color: rgba(255, 255, 255, 0.04) !important; color: #e9edef !important; }
+.chat-dark .chat-input-bar { background-color: hsl(var(--card) / 0.8) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-input-bar textarea { background-color: hsl(var(--foreground) / 0.04) !important; color: hsl(var(--foreground)) !important; }
 .chat-dark .chat-input-bar textarea::placeholder { color: hsl(var(--muted-foreground)) !important; }
 .chat-dark .chat-input-bar button[class*="text-slate-500"], .chat-dark .chat-input-bar button[class*="text-slate-400"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-input-bar button[class*="hover:bg-slate-100"]:hover, .chat-dark .chat-input-bar button[class*="hover:bg-slate-50"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-bubble-other { background-color: rgba(15, 23, 42, 0.6) !important; color: #e9edef !important; }
+.chat-dark .chat-input-bar button[class*="hover:bg-slate-100"]:hover, .chat-dark .chat-input-bar button[class*="hover:bg-slate-50"]:hover { background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-bubble-other { background-color: hsl(var(--card) / 0.6) !important; color: hsl(var(--foreground)) !important; }
 .chat-dark .chat-bubble-other [class*="text-slate-"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-emoji-panel, .chat-dark .chat-sticker-panel { background-color: rgba(15, 23, 42, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-emoji-panel button:hover, .chat-dark .chat-sticker-panel button:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark aside:last-of-type { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark aside:last-of-type [class*="text-slate-900"], .chat-dark aside:last-of-type [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark .chat-emoji-panel, .chat-dark .chat-sticker-panel { background-color: hsl(var(--card) / 0.949) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-emoji-panel button:hover, .chat-dark .chat-sticker-panel button:hover { background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark aside:last-of-type { background-color: hsl(var(--background) / 0.949) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark aside:last-of-type [class*="text-slate-900"], .chat-dark aside:last-of-type [class*="text-slate-800"] { color: hsl(var(--foreground)) !important; }
 .chat-dark aside:last-of-type [class*="text-slate-600"], .chat-dark aside:last-of-type [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-empty-state { background-color: rgba(5, 10, 18, 0.95) !important; color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-users-drawer { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-users-drawer [class*="text-slate-900"], .chat-dark .chat-users-drawer [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark .chat-empty-state { background-color: hsl(var(--background) / 0.949) !important; color: hsl(var(--muted-foreground)) !important; }
+.chat-dark .chat-users-drawer { background-color: hsl(var(--background) / 0.949) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-users-drawer [class*="text-slate-900"], .chat-dark .chat-users-drawer [class*="text-slate-800"] { color: hsl(var(--foreground)) !important; }
 .chat-dark .chat-users-drawer [class*="text-slate-600"], .chat-dark .chat-users-drawer [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-users-drawer input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
-.chat-dark .chat-users-drawer [class*="hover:bg-slate-50"]:hover, .chat-dark .chat-users-drawer [class*="hover:bg-slate-100"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-group-settings { background-color: rgba(10, 15, 25, 0.95) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-group-settings [class*="text-slate-900"], .chat-dark .chat-group-settings [class*="text-slate-800"] { color: #e9edef !important; }
+.chat-dark .chat-users-drawer input { background-color: hsl(var(--foreground) / 0.04) !important; border-color: hsl(var(--foreground) / 0.08) !important; color: hsl(var(--foreground)) !important; }
+.chat-dark .chat-users-drawer [class*="hover:bg-slate-50"]:hover, .chat-dark .chat-users-drawer [class*="hover:bg-slate-100"]:hover { background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-group-settings { background-color: hsl(var(--background) / 0.949) !important; border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-group-settings [class*="text-slate-900"], .chat-dark .chat-group-settings [class*="text-slate-800"] { color: hsl(var(--foreground)) !important; }
 .chat-dark .chat-group-settings [class*="text-slate-600"], .chat-dark .chat-group-settings [class*="text-slate-500"] { color: hsl(var(--muted-foreground)) !important; }
-.chat-dark .chat-group-settings [class*="bg-slate-50"], .chat-dark .chat-group-settings [class*="bg-white"] { background-color: rgba(10, 15, 25, 0.95) !important; }
-.chat-dark .chat-group-settings [class*="border-slate"] { border-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-group-settings [class*="hover:bg-slate-50"]:hover, .chat-dark .chat-group-settings [class*="hover:bg-slate-100"]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
-.chat-dark .chat-group-settings input { background-color: rgba(255, 255, 255, 0.04) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #e9edef !important; }
+.chat-dark .chat-group-settings [class*="bg-slate-50"], .chat-dark .chat-group-settings [class*="bg-white"] { background-color: hsl(var(--background) / 0.949) !important; }
+.chat-dark .chat-group-settings [class*="border-slate"] { border-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-group-settings [class*="hover:bg-slate-50"]:hover, .chat-dark .chat-group-settings [class*="hover:bg-slate-100"]:hover { background-color: hsl(var(--foreground) / 0.06) !important; }
+.chat-dark .chat-group-settings input { background-color: hsl(var(--foreground) / 0.04) !important; border-color: hsl(var(--foreground) / 0.08) !important; color: hsl(var(--foreground)) !important; }
 
 /* Chat page — prevent body scroll */
 html:has(.chat-shell) { overflow: hidden; }

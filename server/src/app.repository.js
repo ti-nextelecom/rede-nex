@@ -1,6 +1,7 @@
 import { query, pool } from './db.js';
 import { notifyAdmins, notifyUsers } from './notifications.repository.js';
 import { hashPassword } from './auth.repository.js';
+import { departmentUpdatePlan, saveDepartmentHierarchy } from './department-update.mjs';
 
 const ALLOWED_POST_TYPES = new Set(['message', 'announcement', 'alert', 'update', 'event', 'poll']);
 const ALLOWED_REACTIONS = new Set(['like', 'love', 'celebrate', 'insightful']);
@@ -185,12 +186,12 @@ export async function listUsers({ search = '', limit = 500 } = {}) {
   const cap = Math.min(Number(limit) || 500, 1000);
   if (search) {
     const { rows } = await query(
-      `${userSelect} where (u.name ilike $1 or u.email ilike $1) order by u.name limit $2`,
+      `${userSelect} where u.status = 'active' and (u.name ilike $1 or u.email ilike $1) order by u.name limit $2`,
       [`%${search}%`, cap]
     );
     return rows;
   }
-  const { rows } = await query(`${userSelect} order by u.name limit $1`, [cap]);
+  const { rows } = await query(`${userSelect} where u.status = 'active' order by u.name limit $1`, [cap]);
   return rows;
 }
 
@@ -222,20 +223,12 @@ export async function createDepartment(name, description) {
 }
 
 export async function updateDepartment(id, name, description, managerId, parentId) {
-  const fields = [];
-  const values = [];
-  let i = 1;
-  if (name !== undefined) { fields.push(`name = ${i++}`); values.push(String(name || '').trim().slice(0, 100)); }
-  if (description !== undefined) { fields.push(`description = ${i++}`); values.push(description ? String(description).trim().slice(0, 500) : null); }
-  if (managerId !== undefined) { fields.push(`manager_id = ${i++}`); values.push(managerId || null); }
-  if (parentId !== undefined) { fields.push(`parent_id = ${i++}`); values.push(parentId || null); }
-  if (!fields.length) throw Object.assign(new Error('Nenhum campo para atualizar'), { statusCode: 400, code: 'VALIDATION_ERROR' });
-  values.push(id);
-  const { rows } = await query(
-    `update departments set ${fields.join(', ')} where id = $${i} returning *`,
-    values
-  );
-  return rows[0] || null;
+  const plan = departmentUpdatePlan(id, { name, description, manager_id: managerId, parent_id: parentId });
+  if (parentId === undefined) {
+    const { rows } = await query(plan.text, plan.values);
+    return rows[0] || null;
+  }
+  return saveDepartmentHierarchy(pool, id, parentId, plan);
 }
 
 export async function deleteDepartment(id) {
@@ -536,13 +529,17 @@ export async function updatePostComment(commentId, actorId, content) {
 }
 
 export async function deletePostComment(commentId, actorId) {
-  await query(`DELETE FROM comment_reactions WHERE comment_id = $1`, [commentId]);
-  const { rows } = await query(
-    `DELETE FROM comments WHERE id = $1 AND author_id = $2 RETURNING id`,
-    [commentId, actorId]
-  );
-  if (!rows[0]) throw Object.assign(new Error('Nao encontrado ou sem permissao'), { statusCode: 403, code: 'FORBIDDEN' });
-  return true;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT id FROM comments WHERE id=$1 AND author_id=$2 FOR UPDATE', [commentId, actorId]);
+    if (!rows[0]) throw Object.assign(new Error('Nao encontrado ou sem permissao'), { statusCode: 403, code: 'FORBIDDEN' });
+    await client.query('DELETE FROM comment_reactions WHERE comment_id=$1', [commentId]);
+    await client.query('DELETE FROM comments WHERE id=$1 AND author_id=$2', [commentId, actorId]);
+    await client.query('COMMIT');
+    return true;
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function listRoles() {

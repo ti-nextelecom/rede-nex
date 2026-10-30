@@ -1,294 +1,74 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  Building2, Plus, Edit2, Trash2, Users, X, Loader2, AlertCircle,
-} from 'lucide-react';
-import { getDepartments, createDepartment, updateDepartment, deleteDepartmentById, type Department } from '../lib/appApi';
-import { Card } from '../components/ui/card';
-import { Skeleton } from '../components/ui/skeleton';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import * as Dialog from '@radix-ui/react-dialog';
+import { AlertCircle, ArrowUpRight, Building2, Edit2, Loader2, Network, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react';
+import { createDepartment, updateDepartment, deleteDepartmentById, type Department } from '../lib/appApi';
+import { apiGet } from '../lib/apiClient';
 import { useAuth } from '../lib/auth';
-
-interface ModalState {
-  open: boolean;
-  mode: 'create' | 'edit';
-  dept?: Department;
-}
-
-interface ConfirmState {
-  open: boolean;
-  dept?: Department;
-}
+import type { User } from '../types';
+import { EmployeeAvatar } from '../components/EmployeeAvatar';
+import './people-workspace.css';
+import './departments-workspace.css';
 
 export function Departments() {
   const { user } = useAuth();
-  const roleName = user?.roles?.name || user?.role_name || '';
-  const canEdit = ['Administrador', 'Gestor'].includes(roleName);
-
+  const canEdit = ['Administrador', 'Gestor'].includes(user?.role_name || user?.roles?.name || '');
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [people, setPeople] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState<ModalState>({ open: false, mode: 'create' });
-  const [confirm, setConfirm] = useState<ConfirmState>({ open: false });
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [modal, setModal] = useState<{ dept?: Department } | null>(null);
+  const [confirm, setConfirm] = useState<Department | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [formError, setFormError] = useState('');
-  const nameRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { load(); }, []);
-  useEffect(() => { if (modal.open) setTimeout(() => nameRef.current?.focus(), 60); }, [modal.open]);
-
-  async function load() {
-    setLoading(true);
-    const data = await getDepartments().catch(() => []);
-    setDepartments(data as Department[]);
-    setLoading(false);
-  }
-
-  function openCreate() {
-    setName('');
-    setDescription('');
-    setFormError('');
-    setModal({ open: true, mode: 'create' });
-  }
-
-  function openEdit(dept: Department) {
-    setName(dept.name);
-    setDescription(dept.description ?? '');
-    setFormError('');
-    setModal({ open: true, mode: 'edit', dept });
-  }
-
-  function closeModal() {
-    setModal({ open: false, mode: 'create' });
-  }
-
-  async function handleSave() {
-    setFormError('');
-    if (!name.trim()) { setFormError('Nome é obrigatório.'); return; }
-    setSaving(true);
+  const mutationLock = useRef(false);
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
     try {
-      if (modal.mode === 'create') {
-        const created = await createDepartment(name.trim(), description.trim() || undefined);
-        setDepartments(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-      } else if (modal.dept) {
-        const updated = await updateDepartment(modal.dept.id, { name: name.trim(), description: description.trim() || undefined });
-        setDepartments(prev => prev.map(d => d.id === modal.dept!.id ? { ...d, ...updated } : d));
-      }
-      closeModal();
-    } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : 'Erro ao salvar setor.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm.dept) return;
-    setDeleting(true);
+      const [d, p] = await Promise.all([apiGet<{ data: Department[] }>('/departments'), apiGet<{ data: User[] }>('/users')]);
+      setDepartments(d.data || []); setPeople(p.data || []);
+    } catch { setError('Não foi possível carregar os setores e seus responsáveis.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  const manager = (d: Department) => people.find(p => p.id === d.manager_id);
+  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const visible = departments.filter(d => normalize(`${d.name} ${d.description || ''} ${manager(d)?.name || ''}`).includes(normalize(query.trim())) && (filter === 'all' || (filter === 'managed' ? Boolean(d.manager_id) : !d.manager_id)));
+  function open(dept?: Department) { setName(dept?.name || ''); setDescription(dept?.description || ''); setFormError(''); setModal({ dept }); }
+  async function save() {
+    if (!canEdit || !modal || mutationLock.current) return;
+    if (!name.trim()) { setFormError('Informe o nome do setor.'); return; }
+    mutationLock.current = true; setSaving(true); setFormError('');
     try {
-      await deleteDepartmentById(confirm.dept.id);
-      setDepartments(prev => prev.filter(d => d.id !== confirm.dept!.id));
-    } catch {
-      // silently close
-    } finally {
-      setDeleting(false);
-      setConfirm({ open: false });
-    }
+      const saved = modal.dept ? await updateDepartment(modal.dept.id, { name: name.trim(), description: description.trim() }) : await createDepartment(name.trim(), description.trim() || undefined);
+      setDepartments(prev => (modal.dept ? prev.map(d => d.id === saved.id ? { ...d, ...saved } : d) : [...prev, saved]).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+      setModal(null);
+    } catch (e) { setFormError(e instanceof Error ? e.message : 'Não foi possível salvar o setor.'); }
+    finally { mutationLock.current = false; setSaving(false); }
   }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Setores e Departamentos</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {departments.length} setor{departments.length !== 1 ? 'es' : ''} cadastrado{departments.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        {canEdit && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 h-9 px-4 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
-          >
-            <Plus size={15} />
-            Novo Setor
-          </button>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
-      ) : departments.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-            <Building2 size={24} className="text-slate-400" />
-          </div>
-          <p className="text-sm font-medium text-slate-600">Nenhum setor cadastrado</p>
-          {canEdit && (
-            <p className="text-xs text-slate-400 mt-1">Clique em "Novo Setor" para começar</p>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {departments.map(dept => (
-            <Card key={dept.id} className="border-slate-200 hover:border-orange-200 hover:shadow-md transition-all duration-200 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <Building2 size={18} className="text-orange-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-slate-800 text-sm leading-tight truncate">{dept.name}</h3>
-                    {dept.description && (
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{dept.description}</p>
-                    )}
-                  </div>
-                </div>
-                {canEdit && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => openEdit(dept)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                      title="Editar"
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                    <button
-                      onClick={() => setConfirm({ open: true, dept })}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-slate-100">
-                <Users size={12} className="text-slate-400" />
-                <span className="text-xs text-slate-500">
-                  {(dept as Department & { user_count?: number }).user_count ?? 0} colaborador{((dept as Department & { user_count?: number }).user_count ?? 0) !== 1 ? 'es' : ''}
-                </span>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Create/Edit Modal */}
-      {modal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Building2 size={16} className="text-orange-500" />
-                <h2 className="font-semibold text-slate-800 text-sm">
-                  {modal.mode === 'create' ? 'Novo Setor' : 'Editar Setor'}
-                </h2>
-              </div>
-              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4">
-              {formError && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                  <AlertCircle size={13} className="text-red-500 flex-shrink-0" />
-                  <p className="text-xs text-red-600">{formError}</p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Nome *</label>
-                <input
-                  ref={nameRef}
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSave()}
-                  placeholder="Ex: Suporte Técnico"
-                  maxLength={100}
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Descrição</label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Descreva a função deste setor..."
-                  maxLength={500}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 transition-all resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button
-                onClick={closeModal}
-                className="h-9 px-4 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="h-9 px-5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-60"
-              >
-                {saving && <Loader2 size={13} className="animate-spin" />}
-                {modal.mode === 'create' ? 'Criar Setor' : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation */}
-      {confirm.open && confirm.dept && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="px-6 py-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                  <Trash2 size={18} className="text-red-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-800 text-sm">Excluir setor?</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Esta ação não pode ser desfeita</p>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600">
-                O setor <strong>"{confirm.dept.name}"</strong> será removido.
-                {(confirm.dept as Department & { user_count?: number }).user_count
-                  ? ` Os ${(confirm.dept as Department & { user_count?: number }).user_count} colaboradores serão desvinculados.`
-                  : ''}
-              </p>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button
-                onClick={() => setConfirm({ open: false })}
-                className="h-9 px-4 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="h-9 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-60"
-              >
-                {deleting && <Loader2 size={13} className="animate-spin" />}
-                Excluir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  async function remove() {
+    if (!canEdit || !confirm || mutationLock.current) return;
+    mutationLock.current = true; setSaving(true); setFormError('');
+    try { await deleteDepartmentById(confirm.id); setConfirm(null); await load(); }
+    catch (e) { setFormError(e instanceof Error ? e.message : 'Não foi possível excluir o setor.'); }
+    finally { mutationLock.current = false; setSaving(false); }
+  }
+  const count = (d: Department) => Number(d.user_count ?? people.filter(p => p.department_id === d.id).length);
+  return <div className="people-page departments-page">
+    <header className="people-hero"><div><span className="people-eyebrow"><Building2 size={16} /> PESSOAS / EQUIPES</span><h1>Setores e departamentos</h1><p>Uma visão clara de cada equipe, suas pessoas e responsabilidades.</p></div><div className="people-hero-actions"><Link className="people-button" to="/organograma"><Network size={17} /> Organograma <ArrowUpRight size={15} /></Link>{canEdit && <button className="people-button dept-primary" onClick={() => open()}><Plus size={18} /> Novo setor</button>}</div></header>
+    <div className="dept-metrics">{[{ label: 'Setores cadastrados', value: departments.length, Icon: Building2 }, { label: 'Colaboradores vinculados', value: departments.reduce((sum, d) => sum + count(d), 0), Icon: Users }, { label: 'Com responsável definido', value: departments.filter(d => d.manager_id).length, Icon: UserCheck }, { label: 'Sem responsável', value: departments.filter(d => !d.manager_id).length, Icon: Network }].map(({ label, value, Icon }) => <div key={label}><Icon size={21} /><span>{label}</span><strong>{loading || error ? '—' : value}</strong></div>)}</div>
+    <section className="dept-directory"><div className="people-section-heading"><div><h2>Equipes da REDE NEX</h2><p>Encontre um setor e acesse os colaboradores vinculados.</p></div><span className="people-result-count" aria-live="polite">{loading ? 'Carregando…' : error ? 'Dados indisponíveis' : `${visible.length} setor(es)`}</span></div>
+      <div className="dept-toolbar"><label className="dept-search"><Search size={18} /><input aria-label="Buscar setores" placeholder="Buscar setor, descrição ou responsável" value={query} onChange={e => setQuery(e.target.value)} /></label><select aria-label="Filtrar por responsável" value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Todos os setores</option><option value="managed">Com responsável</option><option value="unmanaged">Sem responsável</option></select></div>
+      {loading ? <div className="people-empty" role="status"><Loader2 className="animate-spin" /> Carregando equipes…</div> : error ? <div className="people-empty" role="alert"><AlertCircle size={30} /><h3>Setores indisponíveis</h3><p>{error}</p><button className="people-button" onClick={load}>Tentar novamente</button></div> : !visible.length ? <div className="people-empty"><Building2 size={34} /><h3>{departments.length ? 'Nenhum setor encontrado' : 'Suas equipes começam aqui'}</h3><p>{departments.length ? 'Ajuste a busca ou o filtro de responsável.' : 'Os setores cadastrados aparecerão nesta tela.'}</p>{(query || filter !== 'all') && <button className="people-button" onClick={() => { setQuery(''); setFilter('all'); }}>Limpar filtros</button>}</div> : <div className="dept-grid">{visible.map(d => { const lead = manager(d); const parent = departments.find(p => p.id === d.parent_id); return <article className="dept-card" key={d.id}>
+        <div className="dept-card-top"><span className="dept-icon"><Building2 size={23} /></span><span className="dept-count"><Users size={14} /> {count(d)} pessoa(s)</span></div><h3>{d.name}</h3><p className="dept-description">{d.description || 'A descrição desta equipe ainda não foi informada.'}</p><div className="dept-lead"><EmployeeAvatar name={lead?.name || '?'} photo={lead?.photo_url} className="employee-avatar-small" /><div><span>Responsável</span><strong>{lead?.name || (d.manager_id ? 'Cadastro indisponível' : 'Não definido')}</strong></div></div><p className="dept-parent"><Network size={14} /> {parent ? `Vinculado a ${parent.name}` : 'Setor raiz da organização'}</p><footer><Link className="people-button" to={`/colaboradores?setor=${encodeURIComponent(d.id)}`}>Ver equipe <ArrowUpRight size={16} /></Link>{canEdit && <><button className="people-button" aria-label={`Editar ${d.name}`} onClick={() => open(d)}><Edit2 size={16} /></button><button className="people-button dept-delete" aria-label={`Excluir ${d.name}`} onClick={() => { setFormError(''); setConfirm(d); }}><Trash2 size={16} /></button></>}</footer>
+      </article>; })}</div>}
+    </section>
+    <Dialog.Root open={Boolean(modal || confirm)} onOpenChange={value => { if (!value && !saving) { setModal(null); setConfirm(null); } }}><Dialog.Portal><Dialog.Overlay className="people-modal-overlay" /><Dialog.Content className="people-page people-dialog dept-dialog" onEscapeKeyDown={e => { if (saving) e.preventDefault(); }} onInteractOutside={e => { if (saving) e.preventDefault(); }}>
+      <header><div><Dialog.Title>{confirm ? 'Excluir setor?' : modal?.dept ? 'Editar setor' : 'Novo setor'}</Dialog.Title><Dialog.Description>{confirm ? 'A exclusão é permanente. Confira os vínculos antes de confirmar.' : 'Mantenha as informações da sua equipe claras e atualizadas.'}</Dialog.Description></div><button className="people-button" aria-label="Fechar setor" disabled={saving} onClick={() => { setModal(null); setConfirm(null); }}><X size={18} /></button></header><div className="dept-form">{formError && <p role="alert" className="people-form-error">{formError}</p>}{confirm ? <p>O setor <strong>{confirm.name}</strong> será excluído. Seus colaboradores serão desvinculados, mas não serão excluídos. Revise também os setores subordinados no organograma.</p> : <><label htmlFor="dept-name">Nome do setor *</label><input id="dept-name" maxLength={100} value={name} disabled={saving} onChange={e => setName(e.target.value)} /><label htmlFor="dept-description">Descrição</label><textarea id="dept-description" maxLength={500} rows={4} disabled={saving} value={description} onChange={e => setDescription(e.target.value)} /><p>Os responsáveis e a hierarquia podem ser organizados diretamente no mapa da organização.</p></>}</div><footer><button className="people-button" disabled={saving} onClick={() => { setModal(null); setConfirm(null); }}>Cancelar</button><button className={`people-button ${confirm ? 'dept-danger' : 'dept-primary'}`} disabled={saving} onClick={confirm ? remove : save}>{saving && <Loader2 size={17} className="animate-spin" />}{saving ? 'Salvando…' : confirm ? 'Excluir setor' : 'Salvar setor'}</button></footer>
+    </Dialog.Content></Dialog.Portal></Dialog.Root>
+  </div>;
 }

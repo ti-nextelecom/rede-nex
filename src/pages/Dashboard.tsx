@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import {
   Activity,
   ArrowRight,
-  BookOpen,
+  ArrowUpRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
+  CircleAlert,
+  Cpu,
   FolderKanban,
   FolderOpen,
   ListTodo,
@@ -14,8 +16,7 @@ import {
   Newspaper,
   RefreshCw,
   Search,
-  Sparkles,
-  Users,
+  Target,
 } from 'lucide-react';
 import { getDashboardData } from '../lib/appApi';
 import { apiGet } from '../lib/apiClient';
@@ -23,7 +24,9 @@ import { useAuth } from '../lib/auth';
 import { fetchPersonalProjects } from '../lib/personalProjects';
 import { buildWorkBriefing, dayKey, isFinished, isTaskMine, type PersonalProject } from '../../shared/personalWork.mjs';
 import { DailyBriefing } from '../components/DailyBriefing';
+import { DashboardCalendar } from '../components/DashboardCalendar';
 import './dashboard.css';
+import './dashboard-command.css';
 
 interface Stats {
   users: number;
@@ -237,56 +240,57 @@ export function Dashboard() {
     <div className="work-hub page-enter">
       <header className="work-hub-hero">
         <div className="work-hub-hero-copy">
-          <span className="work-hub-kicker"><Sparkles size={14} /> Central de trabalho</span>
+          <span className="work-hub-kicker"><span className="work-hub-brand-mark">N</span> REDE NEX <span className="work-hub-kicker-divider" /> Seu espaço de trabalho</span>
           <h1>{getGreeting()}, <strong>{firstName}</strong></h1>
-          <p>Suas prioridades, projetos e conversas reunidos em um só lugar.</p>
-          <div className="work-hub-date"><CalendarDays size={15} /><span>{todayLabel}</span></div>
+          <p>Mais clareza para o seu dia. Mais espaço para fazer acontecer.</p>
         </div>
         <div className="work-hub-hero-actions">
-          <button type="button" onClick={() => void loadData(true)} disabled={refreshing} className="work-hub-refresh">
+          <div className="work-hub-date"><CalendarDays size={16} /><span>{todayLabel}</span></div>
+          <button type="button" onClick={() => void loadData(true)} disabled={refreshing} className="work-hub-refresh" aria-label="Atualizar dados da dashboard">
             <RefreshCw size={16} className={refreshing ? 'is-spinning' : ''} />
             {refreshing ? 'Atualizando' : 'Atualizar'}
           </button>
-          <Link to="/tarefas" className="work-hub-primary-action"><ListTodo size={17} /> Abrir tarefas</Link>
-          <span className="work-hub-online"><i /> Operação online</span>
+          <a href="#jarvis-assistant" className="work-hub-primary-action"><Cpu size={17} /> Meu assistente <ArrowUpRight size={15} /></a>
+          <span className={`work-hub-online${loadError ? ' is-partial' : ''}`}><i /> {loadError ? 'Atualização parcial' : lastUpdated ? `Atualizado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Aguardando atualização'}</span>
         </div>
       </header>
 
       {loadError && <div className="work-hub-warning" role="status">{loadError} Os demais dados continuam disponíveis.</div>}
 
-      {user && <DailyBriefing key={user.id} userId={user.id} briefing={briefing} />}
-
-      <section className="work-hub-modules" aria-label="Módulos principais">
-        {modules.map(item => (
-          <Link key={item.to} to={item.to} className={`work-hub-module is-${item.tone}`}>
-            <span className="work-hub-module-icon"><item.icon size={19} /></span>
-            <span><strong>{item.label}</strong><small>{item.description}</small></span>
-            <ArrowRight size={15} className="work-hub-module-arrow" />
-          </Link>
-        ))}
-      </section>
-
-      <section className="work-hub-metrics" aria-label="Resumo da operação">
+      <section className="work-hub-metrics" aria-label="Seu trabalho em números">
         <Link to="/tarefas" className="work-hub-metric">
           <span className="work-hub-metric-icon is-blue"><ListTodo size={18} /></span>
           <span><small>Minhas tarefas ativas</small><strong>{activeTasks}</strong></span>
-          <em>{completedTasks} concluídas</em>
+          <em>{completedTasks} concluídas <ArrowUpRight size={15} /></em>
         </Link>
         <Link to="/projetos" className="work-hub-metric">
           <span className="work-hub-metric-icon is-violet"><FolderKanban size={18} /></span>
           <span><small>Meus projetos ativos</small><strong>{activeProjects}</strong></span>
-          <em>{projects.length} no total</em>
+          <em>{projects.length} no total <ArrowUpRight size={15} /></em>
         </Link>
-        <Link to="/colaboradores" className="work-hub-metric">
-          <span className="work-hub-metric-icon is-emerald"><Users size={18} /></span>
-          <span><small>Colaboradores</small><strong>{stats.users}</strong></span>
-          <em>na rede</em>
-        </Link>
-        <Link to="/wiki" className="work-hub-metric">
-          <span className="work-hub-metric-icon is-orange"><BookOpen size={18} /></span>
-          <span><small>Base de conhecimento</small><strong>{stats.articles}</strong></span>
-          <em>artigos publicados</em>
-        </Link>
+        <a href="#my-work-title" className="work-hub-metric">
+          <span className="work-hub-metric-icon is-emerald"><Target size={18} /></span>
+          <span><small>Entregas para hoje</small><strong>{briefing.today}</strong></span>
+          <em>Seu foco do dia <ArrowUpRight size={15} /></em>
+        </a>
+        <a href="#my-work-title" className={`work-hub-metric${briefing.overdue ? ' has-attention' : ''}`}>
+          <span className="work-hub-metric-icon is-orange"><CircleAlert size={18} /></span>
+          <span><small>Tarefas vencidas</small><strong>{briefing.overdue}</strong></span>
+          <em>{briefing.overdue ? 'Precisam de atenção' : 'Tudo em dia'} <ArrowUpRight size={15} /></em>
+        </a>
+      </section>
+
+      {user && <DailyBriefing key={user.id} userId={user.id} userName={firstName} briefing={briefing} />}
+
+      <section className="work-hub-shortcuts" aria-labelledby="dashboard-shortcuts-title">
+        <div className="work-hub-shortcuts-heading"><h2 id="dashboard-shortcuts-title">Seu próximo destino</h2><span>Acesso direto ao que importa</span></div>
+        <div className="work-hub-modules">
+          {modules.map(item => <Link key={item.to} to={item.to} className={`work-hub-module is-${item.tone}`}>
+            <span className="work-hub-module-icon"><item.icon size={20} /></span>
+            <span><strong>{item.label}</strong><small>{item.description}</small></span>
+            <ArrowUpRight size={16} className="work-hub-module-arrow" />
+          </Link>)}
+        </div>
       </section>
 
       <div className="work-hub-grid">
@@ -294,7 +298,7 @@ export function Dashboard() {
           <div className="work-hub-panel-heading">
             <div>
               <span className="work-hub-section-kicker">Meu trabalho</span>
-              <h2>Prazos e prioridades</h2>
+              <h2 id="my-work-title">Prazos e prioridades</h2>
             </div>
             <Link to="/tarefas">Ver todas <ArrowRight size={14} /></Link>
           </div>
@@ -343,20 +347,23 @@ export function Dashboard() {
                   <header><span><i />{lane.label}</span><strong>{items.length}</strong></header>
                   <p>{lane.hint}</p>
                   <div className="work-hub-task-list">
-                    {items.map(project => <Link key={project.id} to={`/projetos?projeto=${encodeURIComponent(project.id)}`} className="work-hub-task-card work-hub-project-card">
+                    {items.slice(0, 2).map(project => <Link key={project.id} to={`/projetos?projeto=${encodeURIComponent(project.id)}`} className="work-hub-task-card work-hub-project-card">
                       <strong>{project.name}</strong>
                       <span className="work-hub-project-role">{project.involvement === 'responsible' ? 'Responsável' : 'Participante'}</span>
                       <div className="work-hub-project-card-progress"><span>{project.phase || project.status}</span><strong>{project.progress}%</strong></div>
-                      <div className="work-hub-progress"><span style={{ width: `${Math.min(100, Math.max(0, project.progress))}%` }} /></div>
+                      <div className="work-hub-progress work-hub-project-progress-track" role="progressbar" aria-label={`Progresso de ${project.name}`} aria-valuenow={Math.min(100, Math.max(0, project.progress))} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, Math.max(0, project.progress))}%` }} /></div>
                       <p className={project.overdue_count ? 'has-overdue' : ''}>{project.pending_count === null ? 'Pendências indisponíveis' : `${project.pending_count} etapa(s) pendente(s)`}{project.overdue_count ? ` • ${project.overdue_count} vencida(s)` : ''}</p>
-                      <div><span><Clock3 size={12} />{formatDate(project.deadline?.slice(0, 10), true)}</span><TaskAvatar name={project.responsible_name} photo={project.responsible_photo_url || undefined} /></div>
+                      <div className="work-hub-project-card-footer"><span><Clock3 size={13} /><time dateTime={project.deadline?.slice(0, 10) || undefined}>{formatDate(project.deadline?.slice(0, 10), true)}</time></span><TaskAvatar name={project.responsible_name} photo={project.responsible_photo_url || undefined} /></div>
                     </Link>)}
+                    {items.length > 2 && <Link to="/projetos" className="work-hub-lane-more">Ver mais {items.length - 2} projeto(s) <ArrowUpRight size={13} /></Link>}
                     {!items.length && <div className="work-hub-empty-lane"><CheckCircle2 size={18} /><span>Nenhum projeto nesta situação</span></div>}
                   </div>
                 </article>;
               })}
             </div>
           </section>
+
+        {user && <DashboardCalendar key={user.id} userId={user.id} refreshKey={lastUpdated?.getTime()} />}
 
         <section className="work-hub-panel work-hub-activity">
           <div className="work-hub-panel-heading">
@@ -385,6 +392,7 @@ export function Dashboard() {
           <span className="work-hub-section-kicker">Encontre rápido</span>
           <h2>Todos os recursos, sem se perder</h2>
           <p>Use a busca do topo ou pressione <kbd>Ctrl</kbd> + <kbd>K</kbd> para abrir qualquer módulo.</p>
+          <div className="work-hub-network"><span><strong>{stats.users}</strong> colaboradores</span><Link to="/wiki"><strong>{stats.articles}</strong> artigos na Wiki <ArrowUpRight size={14} /></Link></div>
           <Link to="/ajuda">Conhecer a central <ArrowRight size={14} /></Link>
         </aside>
       </div>

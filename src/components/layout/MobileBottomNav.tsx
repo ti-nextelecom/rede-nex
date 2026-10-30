@@ -5,7 +5,8 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../lib/auth';
 import { useHrAccess } from '../../lib/hrAccess';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
-import { PRIMARY_NAVIGATION, navigationForRole } from './navigation';
+import { navigationForRole } from './navigation';
+import { useNavigationFavorites } from '../../hooks/useNavigationFavorites';
 
 export function MobileBottomNav() {
   const [open, setOpen] = useState(false);
@@ -13,12 +14,14 @@ export function MobileBottomNav() {
   const { user } = useAuth();
   const { allowed } = useHrAccess();
   const items = navigationForRole(user?.roles?.name || user?.role_name || 'Usuário', allowed('rh.view'));
+  const favorites = useNavigationFavorites(user?.id || '');
+  const primaryItems = favorites.routes.flatMap(route => items.filter(item => item.to === route));
   const filtered = items.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')));
 
   return (
-    <nav className="nex-bottom-nav" aria-label="Navegação principal no celular">
-      {PRIMARY_NAVIGATION.map(item => (
-        <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => cn('nex-bottom-link', isActive && 'active')}>
+    <nav className="nex-bottom-nav" aria-label="Navegação principal no celular" style={{ gridTemplateColumns: `repeat(${primaryItems.length + 1}, minmax(0, 1fr))` }}>
+      {primaryItems.map(item => (
+        <NavLink key={item.to} to={item.to} end={item.to === '/'} title={item.label} aria-label={item.label} className={({ isActive }) => cn('nex-bottom-link', isActive && 'active')}>
           <item.icon size={21} aria-hidden="true" /><span>{item.label}</span>
         </NavLink>
       ))}

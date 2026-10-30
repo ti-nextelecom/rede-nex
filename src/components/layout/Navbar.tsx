@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Bell, ChevronDown, Grid2X2, LogOut, Search, Settings, User, X } from 'lucide-react';
-import { useDarkMode } from '../../lib/useDarkMode';
+import { Bell, Palette, ChevronDown, Grid2X2, LogOut, Search, Settings, Star, User, X } from 'lucide-react';
+import { useAppearance } from '../../lib/appearance';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 import { cn } from '../../lib/utils';
 import { wsEventBus } from '../../lib/wsEventBus';
+import { AchievementAvatar } from '../AchievementAvatar';
 import { useAuth } from '../../lib/auth';
 import { useHrAccess } from '../../lib/hrAccess';
 import { getNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRow } from '../../lib/notificationsApi';
-import { PRIMARY_NAVIGATION, navigationForRole } from './navigation';
+import { navigationForRole } from './navigation';
+import { useNavigationFavorites } from '../../hooks/useNavigationFavorites';
+import { NavigationFavoritesDialog } from './NavigationFavoritesDialog';
+import { BrowserNotificationSettings } from '../BrowserNotificationSettings';
 import './navbar.css';
 
 function timeAgo(dateStr: string) {
@@ -46,6 +50,7 @@ export function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [moreSearch, setMoreSearch] = useState('');
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [chatUnread, setChatUnread] = useState(0);
   const [toast, setToast] = useState<NotificationRow | null>(null);
@@ -55,21 +60,22 @@ export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationPath = useRef(location.pathname);
-  useDarkMode();
+  const { flush: flushAppearance } = useAppearance();
   const role = user?.roles?.name || user?.role_name || 'Usuário';
   const { allowed } = useHrAccess();
   const items = navigationForRole(role, allowed('rh.view'));
-  const moreItems = items.filter(item => !PRIMARY_NAVIGATION.some(primary => primary.to === item.to));
+  const favorites = useNavigationFavorites(user?.id || '');
+  const primaryItems = favorites.routes.flatMap(route => items.filter(item => item.to === route));
+  const moreItems = items.filter(item => !primaryItems.some(primary => primary.to === item.to));
   const unreadCount = notifications.filter(item => !item.read).length;
   const searchItems = items.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')));
   const filteredMoreItems = moreItems.filter(item => item.label.toLocaleLowerCase('pt-BR').includes(moreSearch.toLocaleLowerCase('pt-BR')));
-  const initials = (user?.name || 'NEX').split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('');
 
   const loadNotifications = useCallback(async () => {
     const next = (await getNotifications().catch(() => [])).filter(item => item.type !== 'chat');
     const unread = new Set(next.filter(item => !item.read).map(item => item.id));
     const newest = next.find(item => unread.has(item.id) && !knownUnread.current.has(item.id));
-    if (!firstLoad.current && newest && newest.type !== 'task' && newest.type !== 'project' && !newest.link?.startsWith('/tarefas') && !newest.link?.startsWith('/projetos')) {
+    if (!firstLoad.current && newest && !newest.link?.includes('atencao=') && newest.type !== 'task' && newest.type !== 'project' && !newest.link?.startsWith('/tarefas') && !newest.link?.startsWith('/projetos')) {
       playNotificationSound();
       setToast(newest);
     }
@@ -134,10 +140,10 @@ export function Navbar() {
         </NavLink>
         <nav className="navbar-nav" aria-label="Navegação principal">
           <div className="navbar-primary-links">
-            {PRIMARY_NAVIGATION.map(item => {
+            {primaryItems.map(item => {
               const active = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
               return (
-                <NavLink key={item.to} to={item.to} className={cn('nav-item navbar-primary-link', active && 'active')}>
+                <NavLink key={item.to} to={item.to} end={item.to === '/'} title={item.label} className={cn('nav-item navbar-primary-link', active && 'active')}>
                   <item.icon size={18} aria-hidden="true" />
                   <span>{item.label}</span>
                   {item.to === '/feed' && feedHasDot && <span className="nav-unread-dot" aria-label="Novas publicações" />}
@@ -146,7 +152,7 @@ export function Navbar() {
               );
             })}
           </div>
-          <DropdownMenu onOpenChange={open => { if (!open) setMoreSearch(''); }}>
+          <DropdownMenu modal={false} onOpenChange={open => { if (!open) setMoreSearch(''); }}>
             <DropdownMenuTrigger asChild>
               <button type="button" className={cn('nav-item', moreItems.some(item => item.to === location.pathname) && 'active')}>
                 <Grid2X2 size={17} />Mais<ChevronDown size={12} />
@@ -172,10 +178,12 @@ export function Navbar() {
                 {!filteredMoreItems.length && <p className="nex-more-empty">Nenhum recurso encontrado.</p>}
               </div>
               <div className="nex-more-footer"><Search size={14} /> <span>Atalho:</span> <kbd>Ctrl</kbd> <span>+</span> <kbd>K</kbd></div>
+              <DropdownMenuItem className="nex-more-customize" onSelect={() => setFavoritesOpen(true)}><Star size={16} />Personalizar atalhos</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
         <div className="navbar-actions">
+          <button type="button" onClick={() => setFavoritesOpen(true)} className="navbar-icon-button navbar-favorites-button" aria-label="Personalizar atalhos" title="Personalizar atalhos"><Star size={19} /></button>
           <button onClick={() => setSearchOpen(true)} className="navbar-icon-button" aria-label="Buscar módulo" title="Buscar módulo"><Search size={19} /></button>
 
           <DropdownMenu>
@@ -190,6 +198,7 @@ export function Navbar() {
                 {unreadCount > 0 && <button className="text-xs text-primary min-h-9" onClick={async () => { await markAllNotificationsRead().catch(() => undefined); await loadNotifications(); }}>Marcar lidas</button>}
               </div>
               <div className="max-h-[60dvh] overflow-y-auto">
+                <BrowserNotificationSettings />
                 {notifications.length ? notifications.map(notification => (
                   <DropdownMenuItem key={notification.id} onSelect={() => { void openNotification(notification); }} className={cn('items-start gap-3 p-4 border-b border-border cursor-pointer', !notification.read && 'bg-primary/5')}>
                     <Bell size={16} className="shrink-0 mt-1 text-primary" />
@@ -206,7 +215,7 @@ export function Navbar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="navbar-profile" aria-label="Abrir menu da conta">
-                {user?.photo_url ? <img src={user.photo_url} alt="" /> : <span className="navbar-initials">{initials}</span>}
+                <AchievementAvatar userId={user?.id} name={user?.name || "Minha conta"} photo={user?.photo_url} size={36} />
                 <span className="navbar-profile-name">{user?.name?.split(' ')[0] || 'Minha conta'}</span><ChevronDown size={12} className="hidden sm:block" />
               </button>
             </DropdownMenuTrigger>
@@ -214,13 +223,15 @@ export function Navbar() {
               <div className="px-2 py-2"><p className="text-sm font-semibold truncate">{user?.name}</p><p className="text-xs text-muted-foreground">{role}</p></div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => navigate('/perfil')} className="gap-2"><User size={16} />Meu perfil</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate('/perfil?tab=aparencia')} className="gap-2"><Palette size={16} />Aparência</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => navigate('/configuracoes')} className="gap-2"><Settings size={16} />Configurações</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="gap-2 text-destructive" onSelect={() => { void logout().then(() => navigate('/login', { replace: true })); }}><LogOut size={16} />Sair</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 text-destructive" onSelect={() => { void Promise.race([flushAppearance(), new Promise(resolve => window.setTimeout(resolve, 2500))]).then(() => logout()).then(() => navigate('/login', { replace: true })); }}><LogOut size={16} />Sair</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+      {favoritesOpen && <NavigationFavoritesDialog key={user?.id} items={items} routes={favorites.routes} onSave={routes => favorites.save(routes.filter(route => items.some(item => item.to === route)))} onClose={() => setFavoritesOpen(false)} />}
       <Dialog open={searchOpen} onOpenChange={value => { setSearchOpen(value); if (!value) setSearch(''); }}>
         <DialogContent className="nex-module-dialog">
           <DialogTitle>Para onde vamos?</DialogTitle>

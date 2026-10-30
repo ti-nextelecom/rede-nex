@@ -1,7 +1,7 @@
 // Pure recipient selection: no broadcast fallback. Callers pass trusted records
 // from authenticated mutation handlers, never arbitrary recipient IDs from UI.
 export function taskRecipients(task, actorId) {
-  return [...new Set([task.created_by, task.owner_id, ...(task.assignees || []).map(person => person.id)])]
+  return [...new Set([task.created_by, task.owner_id, ...(task.assignees || []).map(person => person.id), ...(task.observers || []).map(person => person.id)])]
     .filter(id => typeof id === 'string' && id && id !== actorId);
 }
 

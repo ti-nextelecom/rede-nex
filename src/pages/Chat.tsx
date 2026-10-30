@@ -1,35 +1,51 @@
 import {
-  ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useMemo, useRef, useState,
+  ChangeEvent, CSSProperties, FormEvent, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { dayKey } from '../../shared/personalWork.mjs';
+import { chatScrollAction, mergeChatMessages } from '../../shared/chatTimeline.mjs';
+import { createChatRequestGuard } from '../../shared/chatRequestGuard.mjs';
+import { JARVIS_CONVERSATION_ID } from '../../shared/chatDrafts.mjs';
+import { getChatWorkspace } from '../lib/chatWorkspace';
+import { JarvisChatThread } from '../components/JarvisChatThread';
+import { scheduleChatNotificationSound } from '../../shared/chatNotificationSound.mjs';
+import { buildMentionMatcher, type MentionMatcher } from '../../shared/chatMentions.mjs';
 import { wsEventBus } from '../lib/wsEventBus';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import {
-  AlarmClock, Bell, BellOff, BookOpen, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronsDown, ChevronUp, Crown, Eye, FileText, History, Image,
-  Mic, MicOff, MessageCircle, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Plus, Reply, Search, Send,
-  Settings, Shield, Smile, Sticker, Trash2, UserMinus, UserPlus, Users, Video, X,
+  AlarmClock, Archive, Bell, Bot, BellOff, BookOpen, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronsDown, ChevronUp, Crown, Eye, FileText, History, Image,
+  Mic, MicOff, MessageCircle, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Play, Plus, Reply, Search, Send,
+  CornerUpRight, Settings, Shield, Smile, Sticker, Trash2, Type, UserMinus, UserPlus, Users, Video, X,
 } from 'lucide-react';
 import {
-  addParticipantsToGroup, createConversation, deleteChatMessage, editChatMessage, getConversations,
-  getGroupParticipants, getMessageHistory, getMessageReaders, getMessages, getNotes, markConversationRead,
+  addParticipantsToGroup, setConversationArchived, createConversation, deleteChatMessage, editChatMessage, getConversations,
+  getGroupParticipants, getMessageHistory, getMessageReaders, getMessages, getNotes, getSelfConversation, markConversationRead,
   pinChatConversation, pinChatMessage, removeParticipantFromGroup, saveNotes, sendChatMessage,
   toggleMuteConversation, updateConversationSettings, updateParticipantRole, uploadChatMedia,
   uploadConversationAvatar,
   type ChatConversation, type ChatMessage, type GroupParticipant, type MessageEdit, type MessageReader,
 } from '../lib/chatApi';
 import { getUsers } from '../lib/appApi';
-import { apiGet, apiPut } from '../lib/apiClient';
+import { accessibleInk } from '../../shared/appearance.mjs';
+import { useAppearance } from '../lib/appearance';
+import { AppearanceDialog } from '../components/AppearanceSettings';
 import { useAuth } from '../lib/auth';
 import { cn } from '../lib/utils';
 import { callStore } from '../lib/callStore';
 import type { CallState } from '../hooks/useVoiceCall';
-import { getRanking } from '../lib/gamificationApi';
+import { AchievementAvatar } from '../components/AchievementAvatar';
 import type { User } from '../types';
-import type { RankingEntry } from '../lib/gamificationApi';
 import { StoriesBar } from '../components/stories/StoriesBar';
+import { LinkText } from '../components/LinkText';
+import { ChatAttentionDialog } from '../components/ChatAttentionDialog';
+import { ChatMessageReactions } from '../components/ChatMessageReactions';
+import { getChatReactions,setChatReaction } from '../lib/chatApi';
+import { enableDesktopNotifications,syncDesktopNotifications } from '../lib/browserNotifications';
+import { getChatMessageContext } from '../lib/chatApi';
 import './chat.css';
+import './chat-next.css';
+import { useDarkMode } from '../lib/useDarkMode';
 
 interface IncomingToast { id: string; title: string; body: string; conversationId: string; }
 
@@ -40,20 +56,6 @@ interface ChatTheme {
   bgImage: string;
   textColor: string;
 }
-const DEFAULT_THEME: ChatTheme = {
-  bubbleColor: '#005c4b',
-  bgColor: '#eef2f5',
-  bgImage: '',
-  textColor: '#ffffff',
-};
-function loadTheme(): ChatTheme {
-  try { return { ...DEFAULT_THEME, ...JSON.parse(localStorage.getItem('chat_theme') || '{}') }; } catch { return DEFAULT_THEME; }
-}
-function saveTheme(t: ChatTheme) {
-  localStorage.setItem('chat_theme', JSON.stringify(t));
-  apiPut('/users/me/chat-theme', t).catch(() => {});
-}
-
 /* ── Stickers & Emojis ──────────────────────────────────────────────────── */
 const EMOJIS = [
   '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩',
@@ -104,23 +106,44 @@ function convPresenceLabel(conv: ChatConversation): string {
   if (diff < 86400) return `Visto às ${hm}`;
   return `Visto ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${hm}`;
 }
+function conversationTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const today = new Date();
+  if (dayKey(value) === dayKey(today.toISOString())) return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  today.setDate(today.getDate() - 1);
+  if (dayKey(value) === dayKey(today.toISOString())) return 'Ontem';
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+function conversationPreview(conv: ChatConversation, myId?: string): string {
+  const message = conv.last_message;
+  if (!message) return conv.type === 'group' ? `${conv.participant_count} participantes` : convPresenceLabel(conv) || 'Inicie uma conversa';
+  const content = message.content || '';
+  const preview = content.startsWith('[AUDIO_MSG]') ? '🎤 Áudio'
+    : content.startsWith('[STICKER]') ? '🎭 Figurinha'
+    : content.startsWith('[IMAGE]') ? '📷 Foto'
+    : content.startsWith('[VIDEO]') ? '🎬 Vídeo'
+    : content.startsWith('[DOC]') || content.startsWith('[FILE]') ? '📎 Arquivo'
+    : content;
+  const sender = message.sender?.id === myId ? 'Você' : conv.type === 'group' ? message.sender?.name?.split(' ')[0] : '';
+  return `${sender ? `${sender}: ` : ''}${preview}`;
+}
+let stopCurrentNotificationSound:(()=>void)|null=null;
+function stopNotificationSound(){stopCurrentNotificationSound?.();}
 function playNotificationSound() {
+  if(stopCurrentNotificationSound)return;
   const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return;
-  const ctx = new Ctor();
-  const osc = ctx.createOscillator(); const gain = ctx.createGain();
-  osc.type = 'sine'; osc.frequency.setValueAtTime(880, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start(); osc.stop(ctx.currentTime + 0.24);
-  setTimeout(() => ctx.close(), 350);
+  try{
+    const ctx = new Ctor();
+    stopCurrentNotificationSound=scheduleChatNotificationSound(ctx,()=>{stopCurrentNotificationSound=null;});
+    if(ctx.state==='suspended')void ctx.resume().catch(stopNotificationSound);
+  }catch{stopNotificationSound();}
 }
 
 /* ── ConvAvatar ─────────────────────────────────────────────────────────── */
 function ConvAvatar({ conv, usersById }: { conv: ChatConversation; usersById: Map<string, User> }) {
+  const { user: currentUser } = useAuth();
   const online = conv.type === 'direct' && conv.other_participant?.online === true;
   const dot = online ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" /> : null;
   const fallbackAvatar = (n: string, size = 44) => `https://ui-avatars.com/api/?name=${encodeURIComponent(n)}&size=${size}&background=ff7a00&color=fff`;
@@ -132,9 +155,7 @@ function ConvAvatar({ conv, usersById }: { conv: ChatConversation; usersById: Ma
   const u = usersById.get(conv.other_participant?.id || '');
   const photoUrl = u?.photo_url || conv.other_participant?.photo_url;
   const name = conv.name || '?';
-  const img = photoUrl
-    ? <img src={photoUrl} alt={name} className="h-11 w-11 rounded-full object-cover" onError={onErr(name)} />
-    : <img src={fallbackAvatar(name)} alt={name} className="h-11 w-11 rounded-full object-cover" />;
+  const img = <AchievementAvatar userId={conv.other_participant?.id || currentUser?.id} name={name} photo={photoUrl || (conv.other_participant ? undefined : currentUser?.photo_url)} size={44} />;
   return <div className="relative flex-shrink-0">{img}{dot}</div>;
 }
 
@@ -154,16 +175,21 @@ interface MsgBubbleProps {
   onEdit?: (msg: ChatMessage) => void;
   onDelete?: (msg: ChatMessage) => void;
   onReply?: (msg: ChatMessage) => void;
+  onForward?: (msg: ChatMessage) => void;
+  onReact?: (emoji:string|null)=>Promise<void>;
   onPin?: (msg: ChatMessage) => void;
   onImageClick?: (src: string) => void;
+  mentionMatcher?: MentionMatcher;
+  onMention?: (userId:string)=>void;
   theme: ChatTheme;
-  darkMode?: boolean;
   isPinned?: boolean;
+  isSelfConversation?: boolean;
 }
 
-function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, onReply, onPin, onImageClick, theme, darkMode, isPinned }: MsgBubbleProps) {
-  const canEdit = mine && !!onEdit && (Date.now() - new Date(message.created_at).getTime()) < 30 * 60 * 1000;
-  const canDelete = mine && !!onDelete && (Date.now() - new Date(message.created_at).getTime()) < 30 * 60 * 1000;
+function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, onReply, onForward, onReact, onPin, onImageClick, mentionMatcher, onMention, theme, isPinned, isSelfConversation }: MsgBubbleProps) {
+  const age = Date.now() - new Date(message.created_at).getTime();
+  const canEdit = mine && !!onEdit && (isSelfConversation || age < 30 * 60 * 1000);
+  const canDelete = mine && !!onDelete && (isSelfConversation || age < 30 * 60 * 1000);
   const [showTooltip, setShowTooltip] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -190,15 +216,21 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   }
   const seen = mine && !!lastReadAt && new Date(lastReadAt) >= new Date(message.created_at);
   const content = message.content ?? '';
-  const bubbleBg = mine ? theme.bubbleColor : (darkMode ? '#202c33' : '#ffffff');
-  const bubbleText = mine ? theme.textColor : (darkMode ? '#e9edef' : '#374151');
+  const fwdMatch = content.match(/^\[FWD:(.+?)\]\n/);
+  const fwdFrom = fwdMatch ? fwdMatch[1] : null;
+  const displayContent = fwdFrom ? content.slice(fwdMatch![0].length) : content;
+  const fwdHeader = fwdFrom ? <p className="text-[11px] text-indigo-400 italic mb-1 flex items-center gap-1"><CornerUpRight size={11}/> Encaminhado de {fwdFrom}</p> : null;
+  const { palette: appearance } = useAppearance();
+  const bubbleBg = mine ? theme.bubbleColor : appearance.chat.incoming;
+  const bubbleText = mine ? theme.textColor : appearance.chat.incomingText;
+  const bubbleStyle = { background: bubbleBg, color: bubbleText, '--nex-message-link': accessibleInk('#2563eb', bubbleBg) } as React.CSSProperties;
 
   if (message.is_deleted) {
     return (
       <div className={`relative group max-w-[75%] ${mine ? 'ml-auto' : ''}`}>
-        <div className={cn('rounded-2xl px-3 py-2 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
-          <p className="text-sm italic" style={{ color: mine ? `${theme.textColor}70` : '#9ca3af' }}>🚫 Mensagem apagada</p>
-          <p className="text-[10px] mt-0.5 text-right" style={{ color: mine ? `${theme.textColor}60` : '#d1d5db' }}>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+        <div className={cn('rounded-2xl px-3 py-2 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={bubbleStyle}>
+          <p className="text-sm italic" style={{ color: bubbleText }}>🚫 Mensagem apagada</p>
+          <p className="text-[10px] mt-0.5 text-right" style={{ color: bubbleText }}>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
       </div>
     );
@@ -216,6 +248,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   const menu = (
     <div className="chat-message-actions">
       {onReply && <button onClick={() => { onReply(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><Reply size={14} className="text-blue-500" /> Responder</button>}
+      {onForward && !message.is_deleted && <button onClick={() => { onForward(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><CornerUpRight size={14} className="text-indigo-500" /> Encaminhar</button>}
       {canEdit && <button onClick={() => { onEdit!(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><Pencil size={14} className="text-orange-500" /> Editar</button>}
       {canDelete && <button onClick={() => { onDelete!(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Excluir</button>}
       {onPin && <button onClick={() => { onPin(message); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"><Pin size={14} className={isPinned ? 'text-orange-500' : 'text-slate-400'} /> {isPinned ? 'Desafixar' : 'Fixar'}</button>}
@@ -224,12 +257,12 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
 
   const replyPreview = message.reply_to && (
     <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1.5 ${mine ? 'border-white/40 bg-black/10' : 'border-orange-300 bg-orange-50'}`}>
-      <p className="text-[11px] font-bold" style={{ color: mine ? `${theme.textColor}bb` : '#f97316' }}>{message.reply_to.sender?.name || 'Usuário'}</p>
-      <p className="text-xs truncate" style={{ color: mine ? `${theme.textColor}99` : '#6b7280' }}>
+      <p className="text-[11px] font-bold" style={{ color: bubbleText }}>{message.reply_to.sender?.name || 'Usuário'}</p>
+      <p className="text-xs truncate" style={{ color: bubbleText }}>
         {message.reply_to.content?.startsWith('[IMAGE]') ? '📷 Foto'
           : message.reply_to.content?.startsWith('[VIDEO]') ? '🎬 Vídeo'
           : message.reply_to.content?.startsWith('[AUDIO_MSG]') ? '🎤 Áudio'
-          : message.reply_to.content?.slice(0, 60) ?? ''}
+          : <LinkText text={message.reply_to.content || ''} mentionMatcher={mentionMatcher} onMention={onMention}/>}
       </p>
     </div>
   );
@@ -249,7 +282,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   );
 
   const timestamp = (
-    <div className="chat-message-metadata mt-1 flex items-center gap-1 justify-end text-[10px]" style={{ color: mine ? `${theme.textColor}99` : '#9ca3af' }}>
+    <><div className="chat-message-metadata mt-1 flex items-center gap-1 justify-end text-[10px]" style={{ color: bubbleText }}>
       <button onClick={() => setShowTooltip(v => !v)} className="hover:underline">{timeLabel(message.created_at)}</button>
       {message.edited_at && (
         <button ref={historyBtnRef} onClick={loadHistory} title="Ver histórico" className="hover:opacity-80"><Pencil size={9} /></button>
@@ -260,7 +293,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
         </button>
       )}
       <ReadTick mine={mine} seen={seen} />
-    </div>
+    </div>{onReact && <ChatMessageReactions reactions={message.reactions || []} mine={mine} onReact={onReact}/>}</>
   );
 
   const tooltip = showTooltip && (
@@ -274,12 +307,12 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
 
   const editHistory = showHistory && historyBtnRect && createPortal(
     <div style={{ position: 'fixed', bottom: window.innerHeight - historyBtnRect.top + 8, ...(mine ? { right: window.innerWidth - historyBtnRect.right } : { left: historyBtnRect.left }), zIndex: 9999, minWidth: 240, maxWidth: 320 }}
-      className="rounded-xl border border-slate-200 bg-white shadow-xl p-3">
+      className="chat-history-popover rounded-xl border border-slate-200 bg-white shadow-xl p-3">
       <p className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1"><History size={11} /> Histórico de edições</p>
       {history.map((h, i) => (
         <div key={i} className="mb-2 border-l-2 border-slate-200 pl-2">
           <p className="text-[10px] text-slate-400">{fullDateTime(h.edited_at)}</p>
-          <p className="text-xs text-slate-600">{h.content}</p>
+          <p className="text-xs text-slate-600"><LinkText text={h.content} mentionMatcher={mentionMatcher} onMention={onMention}/></p>
         </div>
       ))}
       {!history.length && <p className="text-xs text-slate-400">Sem histórico</p>}
@@ -293,7 +326,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     <PopoverTrigger asChild>
     <button onClick={e => e.stopPropagation()} aria-label="Opções da mensagem" aria-expanded={showMenu}
       className="absolute -top-2 opacity-0 group-hover:opacity-100 h-7 w-7 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-800 transition-opacity"
-      style={mine ? { right: 4 } : { left: 4 }}>
+      style={mine ? { left: -38, top: 6 } : { right: -38, top: 6 }}>
       <MoreVertical size={13} />
     </button>
     </PopoverTrigger>
@@ -303,13 +336,14 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
 
   const swipeStyle = { transform: `translateX(${swipeDx}px)`, transition: swipeDx === 0 ? 'transform 0.2s' : 'none' };
 
-  if (content.startsWith('[AUDIO_MSG]')) {
+  if (displayContent.startsWith('[AUDIO_MSG]')) {
     return (
       <div className="relative group max-w-[85%]" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-        <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
-          {!mine && <p className="mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+        <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={bubbleStyle}>
+          {!mine && <p className="chat-message-author mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+          {fwdHeader}
           {replyPreview}
-          <audio controls src={content.slice(11)} className="w-full max-w-[360px] h-12" preload="none" style={{ minWidth: 280 }} />
+          <audio controls src={displayContent.slice(11)} className="w-full h-14" preload="none" style={{ minWidth: 0, maxWidth: '100%' }} />
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}{readersPopup}
@@ -317,15 +351,16 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     );
   }
 
-  if (content.startsWith('[DOC|')) {
-    const end = content.indexOf(']');
-    const fileName = end > 5 ? content.slice(5, end) : 'Documento';
-    const src = end >= 0 ? content.slice(end + 1) : content;
+  if (displayContent.startsWith('[DOC|')) {
+    const end = displayContent.indexOf(']');
+    const fileName = end > 5 ? displayContent.slice(5, end) : 'Documento';
+    const src = end >= 0 ? displayContent.slice(end + 1) : displayContent;
     const ext = fileName.split('.').pop()?.toUpperCase() || 'DOC';
     return (
       <div className="relative group max-w-[85%]" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-        <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
-          {!mine && <p className="mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+        <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={bubbleStyle}>
+          {!mine && <p className="chat-message-author mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+          {fwdHeader}
           {replyPreview}
           <a href={src} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0"><FileText size={20} className="text-orange-500" /></div>
@@ -338,34 +373,13 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     );
   }
 
-  if (content.startsWith('[STICKER]')) {
+  if (displayContent.startsWith('[STICKER]')) {
     return (
       <div className="relative group" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
         <div className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
+          {fwdHeader}
           {replyPreview}
-          <span className="text-5xl leading-none">{content.slice(9)}</span>
-          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-            {timeLabel(message.created_at)}<ReadTick mine={mine} seen={seen} />
-          </div>
-        </div>
-        {menuBtn}{tooltip}{editHistory}
-      </div>
-    );
-  }
-
-  if (content.startsWith('[IMAGE]')) {
-    const rawSrc = content.slice(7);
-    const nlIdx = rawSrc.indexOf('\n');
-    const src = nlIdx >= 0 ? rawSrc.slice(0, nlIdx) : rawSrc;
-    const caption = nlIdx >= 0 ? rawSrc.slice(nlIdx + 1) : '';
-    return (
-      <div className="relative group" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-        <div className={cn('max-w-[420px] rounded-2xl overflow-hidden shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
-          {!mine && <p className="px-3 pt-2 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
-          {replyPreview && <div className="px-3 pt-2">{replyPreview}</div>}
-          <img src={src} alt="foto" className="w-full max-h-80 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => onImageClick ? onImageClick(src) : window.open(src, '_blank', 'noopener,noreferrer')} />
-          {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}>{caption}</p>}
+          <span className="text-5xl leading-none">{displayContent.slice(9)}</span>
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}
@@ -373,18 +387,40 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     );
   }
 
-  if (content.startsWith('[VIDEO]')) {
-    const rawSrc = content.slice(7);
+  if (displayContent.startsWith('[IMAGE]')) {
+    const rawSrc = displayContent.slice(7);
     const nlIdx = rawSrc.indexOf('\n');
     const src = nlIdx >= 0 ? rawSrc.slice(0, nlIdx) : rawSrc;
     const caption = nlIdx >= 0 ? rawSrc.slice(nlIdx + 1) : '';
     return (
       <div className="relative group" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-        <div className={cn('max-w-[300px] rounded-2xl overflow-hidden shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={{ background: bubbleBg }}>
-          {!mine && <p className="px-3 pt-2 text-xs font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+        <div className={cn('max-w-[420px] rounded-2xl overflow-hidden shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={bubbleStyle}>
+          {!mine && <p className="chat-message-author px-3 pt-2 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+          {fwdHeader && <div className="px-3 pt-1">{fwdHeader}</div>}
+          {replyPreview && <div className="px-3 pt-2">{replyPreview}</div>}
+          <img src={src} alt="foto" className="w-full max-h-80 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => onImageClick ? onImageClick(src) : window.open(src, '_blank', 'noopener,noreferrer')} />
+          {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention}/></p>}
+          {timestamp}
+        </div>
+        {menuBtn}{tooltip}{editHistory}
+      </div>
+    );
+  }
+
+  if (displayContent.startsWith('[VIDEO]')) {
+    const rawSrc = displayContent.slice(7);
+    const nlIdx = rawSrc.indexOf('\n');
+    const src = nlIdx >= 0 ? rawSrc.slice(0, nlIdx) : rawSrc;
+    const caption = nlIdx >= 0 ? rawSrc.slice(nlIdx + 1) : '';
+    return (
+      <div className="relative group" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <div className={cn('max-w-[300px] rounded-2xl overflow-hidden shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={bubbleStyle}>
+          {!mine && <p className="chat-message-author px-3 pt-2 text-xs font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+          {fwdHeader && <div className="px-3 pt-1">{fwdHeader}</div>}
           {replyPreview && <div className="px-3 pt-2">{replyPreview}</div>}
           <video controls src={src} className="w-full max-h-48 object-cover" preload="none" />
-          {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}>{caption}</p>}
+          {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention}/></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}
@@ -395,10 +431,11 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   return (
     <div className="relative group" style={{ maxWidth: '75%', ...swipeStyle }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       <div className={cn('rounded-2xl px-5 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')}
-        style={{ background: bubbleBg, color: bubbleText, minWidth: 80 }}>
-        {!mine && <p className="mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+        style={{ ...bubbleStyle, minWidth: 80 }}>
+        {!mine && <p className="chat-message-author mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
+        {fwdHeader}
         {replyPreview}
-        <p className="whitespace-pre-wrap text-[17px] leading-relaxed break-words">{content}</p>
+        <p className="chat-message-text whitespace-pre-wrap break-words"><LinkText text={displayContent} mentionMatcher={mentionMatcher} onMention={onMention}/></p>
         {timestamp}
       </div>
       {menuBtn}{tooltip}{editHistory}{readersPopup}
@@ -462,7 +499,7 @@ function GroupSettings({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="chat-settings-overlay fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative ml-auto h-full w-80 bg-white shadow-2xl flex flex-col">
         <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
@@ -521,7 +558,7 @@ function GroupSettings({
               <input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder="Buscar..." className="w-full h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-orange-400 mb-2" />
               {addSearch && filtered.slice(0, 5).map(u => (
                 <button key={u.id} onClick={() => addUser(u.id)} className="w-full flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-orange-50 text-left">
-                  <img src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=ff7a00&color=fff`} alt={u.name} className="h-8 w-8 rounded-full object-cover" />
+                  <AchievementAvatar userId={u.id} name={u.name} photo={u.photo_url} size={32} />
                   <p className="text-sm font-semibold text-slate-700 truncate flex-1">{u.name}</p>
                   <UserPlus size={14} className="text-orange-500" />
                 </button>
@@ -533,7 +570,7 @@ function GroupSettings({
             {participants.map(p => (
               <div key={p.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 group">
                 <div className="relative flex-shrink-0">
-                  <img src={p.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&size=36&background=ff7a00&color=fff`} alt={p.name} className="h-9 w-9 rounded-full object-cover" />
+                  <AchievementAvatar userId={p.id} name={p.name} photo={p.photo_url} size={36} />
                   {p.online && <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -553,156 +590,6 @@ function GroupSettings({
               </div>
             ))}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── ThemePanel ─────────────────────────────────────────────────────────── */
-function ThemePanel({ theme, darkMode, onChange, onToggleDark, onClose }: {
-  theme: ChatTheme;
-  darkMode: boolean;
-  onChange: (t: ChatTheme) => void;
-  onToggleDark: () => void;
-  onClose: () => void;
-}) {
-  const BUBBLE_PRESETS = ['#005c4b', '#1d4ed8', '#7c3aed', '#be185d', '#b45309', '#1f2937'];
-  const BG_PRESETS = ['#eef2f5', '#f0fdf4', '#fef3c7', '#fdf2f8', '#eff6ff', '#1a1a2e'];
-  const BG_IMAGES = [
-    '',
-    'https://images.unsplash.com/photo-1557683316-973673baf926?w=800&q=60',
-    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=60',
-    'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&q=60',
-    'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=60',
-    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=60',
-  ];
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadError, setUploadError] = useState('');
-
-  function set(key: keyof ChatTheme, value: string) {
-    const next = { ...theme, [key]: value };
-    onChange(next);
-    saveTheme(next);
-  }
-
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('Imagem muito grande. Máx: 5 MB.');
-      return;
-    }
-    setUploadError('');
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const dataUrl = ev.target?.result as string;
-      try {
-        set('bgImage', dataUrl);
-      } catch {
-        setUploadError('Erro ao salvar. Tente uma imagem menor.');
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }
-
-  const isCustomUpload = theme.bgImage && !BG_IMAGES.includes(theme.bgImage);
-
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative ml-auto h-full w-72 bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
-          <Palette size={17} className="text-orange-500" />
-          <h2 className="text-sm font-bold text-slate-900 flex-1">Personalizar Chat</h2>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={15} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Aparência</p>
-            <button type="button" onClick={onToggleDark} aria-pressed={darkMode}
-              className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">
-              <span>Modo escuro</span>
-              <span className={cn('text-xs font-semibold', darkMode ? 'text-orange-600' : 'text-slate-500')}>
-                {darkMode ? 'Ativado' : 'Desativado'}
-              </span>
-            </button>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Cor das suas mensagens</p>
-            <div className="flex flex-wrap gap-2">
-              {BUBBLE_PRESETS.map(c => (
-                <button key={c} onClick={() => set('bubbleColor', c)}
-                  className={cn('h-8 w-8 rounded-full border-2 transition-transform hover:scale-110', theme.bubbleColor === c ? 'border-orange-500 scale-110' : 'border-transparent')}
-                  style={{ background: c }} />
-              ))}
-              <input type="color" value={theme.bubbleColor} onChange={e => set('bubbleColor', e.target.value)} className="h-8 w-8 rounded-full cursor-pointer border border-slate-200" title="Cor personalizada" />
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <p className="text-xs text-slate-500">Cor do texto:</p>
-              {['#ffffff', '#1f2937', '#fbbf24'].map(c => (
-                <button key={c} onClick={() => set('textColor', c)}
-                  className={cn('h-6 w-6 rounded-full border-2', theme.textColor === c ? 'border-orange-500' : 'border-slate-200')}
-                  style={{ background: c }} />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Cor do fundo</p>
-            <div className="flex flex-wrap gap-2">
-              {BG_PRESETS.map(c => (
-                <button key={c} onClick={() => set('bgColor', c)}
-                  className={cn('h-8 w-8 rounded-lg border-2 transition-transform hover:scale-110', theme.bgColor === c ? 'border-orange-500 scale-110' : 'border-slate-200')}
-                  style={{ background: c }} />
-              ))}
-              <input type="color" value={theme.bgColor} onChange={e => set('bgColor', e.target.value)} className="h-8 w-8 rounded-lg cursor-pointer border border-slate-200" title="Cor personalizada" />
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Imagem de fundo</p>
-            <div className="grid grid-cols-2 gap-2">
-              {BG_IMAGES.map((img, i) => (
-                <button key={i} onClick={() => set('bgImage', img)}
-                  className={cn('h-16 rounded-lg border-2 overflow-hidden', theme.bgImage === img ? 'border-orange-500' : 'border-slate-200')}>
-                  {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-xs text-slate-500">Sem imagem</div>}
-                </button>
-              ))}
-            </div>
-
-            {/* Upload personalizado */}
-            <div className="mt-3">
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={cn(
-                  'w-full h-10 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 text-sm font-medium transition-colors',
-                  isCustomUpload ? 'border-orange-400 bg-orange-50 text-orange-600' : 'border-slate-300 text-slate-500 hover:border-orange-300 hover:text-orange-500 hover:bg-orange-50/50',
-                )}>
-                <Image size={15} />
-                {isCustomUpload ? 'Trocar minha foto' : 'Carregar do dispositivo'}
-              </button>
-              {isCustomUpload && (
-                <div className="mt-2 relative h-20 rounded-lg overflow-hidden border-2 border-orange-400">
-                  <img src={theme.bgImage} alt="Fundo personalizado" className="h-full w-full object-cover" />
-                  <button
-                    onClick={() => set('bgImage', '')}
-                    className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80">
-                    <X size={11} />
-                  </button>
-                </div>
-              )}
-              {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
-              <p className="mt-1 text-[10px] text-slate-400">JPG, PNG, GIF, WebP — máx. 5 MB</p>
-            </div>
-          </div>
-
-          <button onClick={() => { onChange(DEFAULT_THEME); saveTheme(DEFAULT_THEME); }} className="w-full h-9 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
-            Restaurar padrão
-          </button>
         </div>
       </div>
     </div>
@@ -751,7 +638,7 @@ function UserProfileModal({ profileUser, conversations, onClose, onChat }: {
       onClick={onClose}
     >
       <div
-        className="relative w-[480px] max-w-[92vw] rounded-2xl bg-white shadow-2xl overflow-hidden"
+        className="chat-profile-dialog relative w-[480px] max-w-[92vw] rounded-2xl bg-white shadow-2xl overflow-hidden"
         style={{ maxHeight: '90vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
@@ -772,12 +659,7 @@ function UserProfileModal({ profileUser, conversations, onClose, onChat }: {
           </button>
           <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
             <div className="relative">
-              <img
-                src={profileUser.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileUser.name)}&size=96&background=ff7a00&color=fff`}
-                alt={profileUser.name}
-                className="h-24 w-24 rounded-full object-cover border-4 border-white shadow-lg"
-                onError={e => { (e.currentTarget).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileUser.name)}&size=96&background=ff7a00&color=fff`; }}
-              />
+              <AchievementAvatar userId={profileUser.id} name={profileUser.name} photo={profileUser.photo_url} size={96} />
               <span className={cn('absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-white', profileUser.online ? 'bg-emerald-500' : 'bg-slate-300')} />
             </div>
           </div>
@@ -885,30 +767,101 @@ function UserProfileModal({ profileUser, conversations, onClose, onChat }: {
 /* ── Main Chat ──────────────────────────────────────────────────────────── */
 export function Chat() {
   const { user } = useAuth();
+  const [fontScale,setFontScale]=useState(110);
+  useEffect(()=>{
+    let scale=110;
+    if(user?.id)try{
+      const stored=localStorage.getItem(`rede-nex:chat-font:${user.id}`);
+      const parsed=stored===null?110:Number(stored);
+      if(Number.isFinite(parsed))scale=Math.max(80,Math.min(160,Math.round(parsed/10)*10));
+    }catch{/* The control still works when browser storage is unavailable. */}
+    setFontScale(scale);
+  },[user?.id]);
+  function changeFontScale(value:number){
+    const scale=Math.max(80,Math.min(160,value));
+    setFontScale(scale);
+    if(user?.id)try{localStorage.setItem(`rede-nex:chat-font:${user.id}`,String(scale));}catch{/* Keep the current session preference. */}
+  }
   const [chatParams, setChatParams] = useSearchParams();
   const requestedConversation = chatParams.get('conversa');
+  const requestedMessage=chatParams.get('mensagem');
+  const [showAttention,setShowAttention]=useState(false);
+  const [attentionMessage,setAttentionMessage]=useState<ChatMessage|null>(null);
+  const [attentionFeedback,setAttentionFeedback]=useState('');
+  const [sidebarMenuOpen,setSidebarMenuOpen]=useState(false);
+  const [openConvActionsId,setOpenConvActionsId]=useState<string|null>(null);
+  const conversationActionsLock=useRef(new Set<string>());
+  const [conversationActionsBusy,setConversationActionsBusy]=useState<Set<string>>(new Set());
+  const focusedMessage=useRef('');
+  useEffect(()=>{if(user?.id)void syncDesktopNotifications(user.id).then(setBrowserNotifications).catch(()=>undefined);},[user?.id]);
 
   const [callState, setCallStateLocal] = useState<CallState>(() => callStore.getState());
   useEffect(() => callStore.subscribe(setCallStateLocal), []);
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const currentConversation = useRef<string | null>(null);
+  // The URL is the only selection state; async list refreshes never change it.
+  const selectedId=requestedConversation;
+  const selectedJarvis = selectedId === JARVIS_CONVERSATION_ID;
+  const workspace = getChatWorkspace(user?.id || null);
+  const drafts = useSyncExternalStore(workspace.drafts.subscribe, workspace.drafts.getSnapshot);
+  const jarvisState = useSyncExternalStore(workspace.jarvis.subscribe, workspace.jarvis.getSnapshot);
+  const messageText = selectedId ? drafts[selectedId]?.text || '' : '';
+  const setMessageText = useCallback((value: string | ((previous: string) => string)) => {
+    if (selectedId) workspace.drafts.set(selectedId, value);
+  }, [workspace, selectedId]);
+  const sendingConversations = useRef(new Set<string>());
+  const [sendFailure, setSendFailure] = useState<{ conversationId: string; message: string } | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerFocusRequested = useRef(true);
+  const [composerFocusToken, setComposerFocusToken] = useState(0);
+  const currentConversation=useRef<string|null>(selectedId);
+  const [conversationRequests]=useState(()=>createChatRequestGuard(selectedId));
+  const autoSelectFirst=useRef(!selectedId);
+  const conversationsRequest=useRef(0),conversationsApplied=useRef(0);
+  useEffect(()=>{setShowAttention(false);setAttentionMessage(null);},[selectedId]);
+  useEffect(()=>{
+    if(!showAttention || attentionMessage)return;
+    const cancel=(event:KeyboardEvent)=>{if(event.key==='Escape')setShowAttention(false);};
+    window.addEventListener('keydown',cancel);
+    return ()=>window.removeEventListener('keydown',cancel);
+  },[showAttention,attentionMessage]);
+  const setSelectedId=useCallback((id:string|null)=>{
+    composerFocusRequested.current = !!id;
+    setComposerFocusToken(value => value + 1);
+    setPeopleOpen(false);
+    autoSelectFirst.current=false;
+    currentConversation.current=id;
+    conversationRequests.select(id);
+    setChatParams(params=>{const next=new URLSearchParams(params);if(id)next.set('conversa',id);else next.delete('conversa');next.delete('mensagem');next.delete('atencao');return next;},{replace:true});
+  },[setChatParams,conversationRequests]);
+  const selectConversationRef=useRef(setSelectedId);
+  useLayoutEffect(()=>{
+    selectConversationRef.current=setSelectedId;
+    currentConversation.current=selectedId;
+    conversationRequests.select(selectedId);
+    if(selectedId)autoSelectFirst.current=false;
+  },[selectedId,setSelectedId,conversationRequests]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState('');
-  useEffect(() => { currentConversation.current = selectedId; }, [selectedId]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [messageText, setMessageText] = useState('');
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionParticipants, setMentionParticipants] = useState<import('../lib/chatApi').GroupParticipant[]>([]);
   const [conversationSearch, setConversationSearch] = useState('');
-  const [conversationFilter, setConversationFilter] = useState<'all' | 'unread' | 'groups'>('all');
+  const [conversationFilter, setConversationFilter] = useState<'all' | 'unread' | 'groups' | 'agents' | 'pinned' | 'muted' | 'archived'>('all');
   const [userSearch, setUserSearch] = useState('');
   const [messageSearch, setMessageSearch] = useState('');
   const [showMsgSearch, setShowMsgSearch] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
+  const [archiveFeedback, setArchiveFeedback] = useState('');
+  const archiveBusyRef = useRef(false);
+  useEffect(()=>{
+    if(!archiveFeedback)return;
+    const timeout=window.setTimeout(()=>setArchiveFeedback(''),4500);
+    return ()=>window.clearTimeout(timeout);
+  },[archiveFeedback]);
 
   // Group creation
   const [newGroupOpen, setNewGroupOpen] = useState(false);
@@ -920,12 +873,34 @@ export function Chat() {
   const [groupBroadcast, setGroupBroadcast] = useState(false);
   const [groupUserSearch, setGroupUserSearch] = useState('');
 
+  // Forward
+  const [forwardingMsg, setForwardingMsg] = useState<ChatMessage | null>(null);
+  const [forwardSearch, setForwardSearch] = useState('');
+  const [forwardingSending, setForwardingSending] = useState(false);
+
   // Notifications
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('chat_sound_enabled') !== 'false');
+  useEffect(()=>{ localStorage.setItem('chat_sound_enabled', String(soundEnabled)); if(!soundEnabled)stopNotificationSound();},[soundEnabled]);
+  useEffect(()=>()=>stopNotificationSound(),[]);
   const [browserNotifications, setBrowserNotifications] = useState(
     typeof Notification !== 'undefined' && Notification.permission === 'granted'
   );
   const [toast, setToast] = useState<IncomingToast | null>(null);
+
+  // Typing indicator — keyed by convId → userId
+  const [typingByConv, setTypingByConv] = useState<Map<string, Map<string, { name: string; ts: number; isRecording?: boolean }>>>(new Map());
+  const typingLastSentRef = useRef<number>(0);
+  const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Mention keyboard navigation
+  const [mentionIndex, setMentionIndex] = useState(0);
+
+  // Audio waveform
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const [waveformBars, setWaveformBars] = useState<number[]>([]);
+  const cancelRecordingRef = useRef(false);
 
   // Panels
   const [showEmoji, setShowEmoji] = useState(false);
@@ -935,29 +910,43 @@ export function Chat() {
 
   // Mobile navigation (list ↔ messages)
   const [mobileView, setMobileView] = useState<'list' | 'messages'>('list');
-  const [mobileUsersOpen, setMobileUsersOpen] = useState(false);
-
-  // Theme — loaded from localStorage for immediate display, synced from API on mount
-  const [theme, setTheme] = useState<ChatTheme>(loadTheme);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('chat_dark_mode') === '1');
-  const [openConvActionsId, setOpenConvActionsId] = useState<string | null>(null);
-
+  const [peopleOpen, setPeopleOpen] = useState(false);
+  const peoplePanelRef = useRef<HTMLElement>(null);
+  const peopleSearchRef = useRef<HTMLInputElement>(null);
+  const peopleTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const togglePeople = (event: React.MouseEvent<HTMLButtonElement>) => {
+    peopleTriggerRef.current = event.currentTarget;
+    setPeopleOpen(value => !value);
+  };
+  const closePeople = (restoreFocus = false) => {
+    setPeopleOpen(false);
+    if (restoreFocus && peopleTriggerRef.current?.isConnected) peopleTriggerRef.current.focus({ preventScroll: true });
+  };
+  useLayoutEffect(() => {
+    if (peopleOpen) peopleSearchRef.current?.focus({ preventScroll: true });
+  }, [peopleOpen]);
   useEffect(() => {
-    apiGet<{ data: ChatTheme | null }>('/users/me/chat-theme').then(res => {
-      if (res.data) {
-        const merged = { ...DEFAULT_THEME, ...res.data };
-        setTheme(merged);
-        localStorage.setItem('chat_theme', JSON.stringify(merged));
-      }
-    }).catch(() => {});
-  }, []);
-  function toggleDark() {
-    setDarkMode(v => {
-      const next = !v;
-      localStorage.setItem('chat_dark_mode', next ? '1' : '0');
-      return next;
-    });
-  }
+    if (!peopleOpen) return;
+    const outside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || peoplePanelRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-chat-people-toggle]')) return;
+      setPeopleOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setPeopleOpen(false);
+      if (peopleTriggerRef.current?.isConnected) peopleTriggerRef.current.focus({ preventScroll: true });
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape); };
+  }, [peopleOpen]);
+
+  const { palette: appearance } = useAppearance();
+  const theme: ChatTheme = { bubbleColor: appearance.chat.outgoing, bgColor: appearance.chat.background, bgImage: appearance.chat.wallpaper, textColor: appearance.chat.outgoingText };
+  const { dark: darkMode } = useDarkMode();
 
   // User profile modal
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -1001,28 +990,34 @@ export function Chat() {
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
   const atBottomRef = useRef(true);
+  const initialScrollRef = useRef(true);
+  const prependScrollRef = useRef<{ top: number; height: number } | null>(null);
+  const lastMessageRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = 'auto';
+    composer.style.height = Math.min(composer.scrollHeight, 120) + 'px';
+  }, [selectedId]);
 
   const selectedConversation = conversations.find(c => c.id === selectedId);
   const selectedMuted = !!selectedConversation?.is_muted;
   useEffect(() => {
-    wsEventBus.emit({ type: 'conversation:active', conversationId: selectedId });
+    wsEventBus.emit({ type: 'conversation:active', conversationId: selectedJarvis ? null : selectedId });
     return () => wsEventBus.emit({ type: 'conversation:active', conversationId: null });
-  }, [selectedId]);
+  }, [selectedId, selectedJarvis]);
 
   const usersById = useMemo(() => {
     const map = new Map<string, User>();
     users.forEach(u => map.set(u.id, u));
     return map;
   }, [users]);
-
-  const [rankByUserId, setRankByUserId] = useState<Map<string, RankingEntry>>(new Map());
-  useEffect(() => {
-    getRanking().then(data => {
-      const map = new Map<string, RankingEntry>();
-      data.ranking.forEach(r => map.set(r.id, r));
-      setRankByUserId(map);
-    }).catch(() => {});
-  }, []);
+  const mentionMatcher=useMemo(()=>buildMentionMatcher(users),[users]);
+  const openMentionProfile=useCallback((userId:string)=>{
+    const mentionedUser=usersById.get(userId);
+    if(mentionedUser)setProfileUser(mentionedUser);
+  },[usersById]);
 
   useEffect(() => {
     const stored = localStorage.getItem('chat_reminders');
@@ -1046,35 +1041,33 @@ export function Chat() {
   }, []);
 
   const loadConversations = useCallback(async () => {
+    const request=++conversationsRequest.current;
     const next = await getConversations();
+    if(request<conversationsApplied.current)return next;
+    conversationsApplied.current=request;
     setConversations(next);
-    if (!selectedId && next[0]) setSelectedId(next[0].id);
+    const firstActive = next.find(c => !c.is_archived);
+    if (autoSelectFirst.current && !currentConversation.current && firstActive) selectConversationRef.current(firstActive.id);
     return next;
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (requestedConversation && conversations.some(c => c.id === requestedConversation)) {
-      setSelectedId(requestedConversation);
-      setMobileView('messages');
-      setChatParams(params => { params.delete('conversa'); return params; }, { replace: true });
-    }
-  }, [requestedConversation, conversations, setChatParams]);
+  }, []);
 
   const loadMessages = useCallback(async (conversationId: string, notify = false) => {
+    if(conversationId === JARVIS_CONVERSATION_ID || currentConversation.current!==conversationId)return;
+    const request=conversationRequests.capture(conversationId);
     const result = await getMessages(conversationId).catch(() => {
-      if (currentConversation.current === conversationId) { setMessagesLoading(false); setMessagesError('Não foi possível atualizar as mensagens.'); }
+      if (conversationRequests.accept(request)) { setMessagesLoading(false); setMessagesError('Não foi possível atualizar as mensagens.'); }
       return null;
     });
-    if (!result || currentConversation.current !== conversationId) return;
+    if (!result || !conversationRequests.accept(request)) return;
     const { messages: next, hasMore } = result;
     setMessagesLoading(false); setMessagesError('');
     const previousIds = knownMessageIdsRef.current;
     const incoming = next.filter(m => !previousIds.has(m.id) && m.sender_id !== user?.id);
     knownMessageIdsRef.current = new Set(next.map(m => m.id));
-    setMessages(next);
+    setMessages(previous => mergeChatMessages(previous.filter(message=>message.conversation_id===conversationId), next.filter(message=>message.conversation_id===conversationId)));
     setHasMoreMessages(hasMore);
     const convIsMuted = selectedMuted;
-    if (notify && incoming.length && !firstLoadRef.current && !convIsMuted) {
+    if (notify && incoming.length && !firstLoadRef.current && !convIsMuted && (document.hidden || !document.hasFocus())) {
       const last = incoming[incoming.length - 1];
       const title = last.sender?.name || selectedConversation?.name || 'Nova mensagem';
       if (soundEnabled) playNotificationSound();
@@ -1085,26 +1078,22 @@ export function Chat() {
         : last.content ?? '';
       setToast({ id: last.id, title, body, conversationId });
       setTimeout(() => setToast(cur => cur?.id === last.id ? null : cur), 6000);
-      if (browserNotifications) {
-        const photoUrl = last.sender?.photo_url || '';
-        if (typeof window !== 'undefined' && (window as any).electronBridge?.notify) {
-          (window as any).electronBridge.notify(title, body.slice(0, 80), photoUrl);
-        } else if (document.hidden) {
-          new Notification(title, { body: body.slice(0, 80) });
-        }
-      }
+      // Desktop delivery is centralized in Web Push for every module.
     }
     firstLoadRef.current = false;
-  }, [browserNotifications, selectedConversation?.name, soundEnabled, user?.id, selectedMuted]);
+  }, [browserNotifications, selectedConversation?.name, soundEnabled, user?.id, selectedMuted,conversationRequests]);
 
   const loadOlderMessages = useCallback(async () => {
     if (!selectedId || loadingOlder || !hasMoreMessages) return;
     const oldest = messages[0];
     if (!oldest) return;
+    const request=conversationRequests.capture(selectedId,'older');
     setLoadingOlder(true);
     try {
       const { messages: older, hasMore } = await getMessages(selectedId, oldest.id);
-      if (currentConversation.current !== selectedId) return;
+      if (!conversationRequests.accept(request)) return;
+      const container = messagesContainerRef.current;
+      if (container) prependScrollRef.current = { top: container.scrollTop, height: container.scrollHeight };
       setMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id));
         const fresh = older.filter(m => !existingIds.has(m.id));
@@ -1112,28 +1101,82 @@ export function Chat() {
       });
       setHasMoreMessages(hasMore);
     } finally {
-      setLoadingOlder(false);
+      if(conversationRequests.isCurrent(request))setLoadingOlder(false);
     }
-  }, [selectedId, loadingOlder, hasMoreMessages, messages]);
+  }, [selectedId, loadingOlder, hasMoreMessages, messages,conversationRequests]);
 
   useEffect(() => {
-    loadConversations();
+    void loadConversations().catch(()=>undefined);
     getUsers().then(setUsers).catch(() => {});
     const iv = setInterval(() => getUsers().then(setUsers).catch(() => {}), 30000);
     return () => clearInterval(iv);
   }, [loadConversations]);
 
-  useEffect(() => {
-    if (!selectedId) return;
+  const loadersRef = useRef({ loadMessages, loadConversations });
+  loadersRef.current = { loadMessages, loadConversations };
+  useEffect(()=>wsEventBus.subscribe(event=>{
+    if(event.type!=='message:reaction' || typeof event.conversationId!=='string' || typeof event.messageId!=='string' || event.conversationId!==currentConversation.current)return;
+    const conversationId=event.conversationId,messageId=event.messageId;
+    const request=conversationRequests.capture(conversationId,`reaction:${messageId}`);
+    void getChatReactions(conversationId,messageId).then(reactions=>{
+      if(conversationRequests.accept(request))setMessages(previous=>previous.map(message=>message.id===messageId?{...message,reactions}:message));
+    }).catch(()=>undefined);
+  }),[conversationRequests]);
+  useEffect(()=>wsEventBus.subscribe(event=>{
+    if(event.type!=='chat:typing')return;
+    const convId=event.conversationId as string;
+    const fromId=event.from as string;
+    const name=(event.name as string)||'Alguém';
+    const isRec=!!(event.isRecording);
+    if(fromId===user?.id)return;
+    setTypingByConv(prev=>{
+      const m=new Map(prev);
+      const inner=new Map(m.get(convId)||[]);
+      inner.set(fromId,{name,ts:Date.now(),isRecording:isRec});
+      m.set(convId,inner);
+      return m;
+    });
+    const timerKey=`${convId}:${fromId}`;
+    const existing=typingTimersRef.current.get(timerKey);
+    if(existing)clearTimeout(existing);
+    const timer=setTimeout(()=>{
+      setTypingByConv(prev=>{
+        const m=new Map(prev);
+        const inner=new Map(m.get(convId)||[]);
+        inner.delete(fromId);
+        if(inner.size===0)m.delete(convId);else m.set(convId,inner);
+        return m;
+      });
+      typingTimersRef.current.delete(timerKey);
+    },3500);
+    typingTimersRef.current.set(timerKey,timer);
+  }),[user?.id]);
+  useEffect(()=>{setMentionIndex(0);},[mentionQuery]);
+  useLayoutEffect(() => {
     firstLoadRef.current = true;
     knownMessageIdsRef.current = new Set();
     setHasMoreMessages(false);
-    setMessagesLoading(true); setMessagesError(''); setMessages([]);
-    loadMessages(selectedId, false);
+    setLoadingOlder(false);
+    setReplyingTo(null);setEditingMsg(null);setEditText('');
+    setMentionQuery(null);setMentionParticipants([]);
+    setShowGroupSettings(false);setShowNotes(false);setNotesContent('');
+    setMessages([]);setMessagesError('');setMessagesLoading(!!selectedId && selectedId !== JARVIS_CONVERSATION_ID);
+    setSendFailure(null);
+    setMessageSearch('');setShowMsgSearch(false);
+    setShowEmoji(false);setShowStickers(false);
+    if (!selectedId) return;
+    if (selectedId === JARVIS_CONVERSATION_ID) {
+      setMobileView('messages');
+      const interval = setInterval(() => { void loadersRef.current.loadConversations().catch(() => undefined); }, 3500);
+      return () => clearInterval(interval);
+    }
+    composerFocusRequested.current = true;
+    setMobileView('messages');
+    loadersRef.current.loadMessages(selectedId, false);
     markConversationRead(selectedId).catch(() => {});
-    const iv = setInterval(() => { loadMessages(selectedId, true); loadConversations(); }, 3500);
+    const iv = setInterval(() => { void loadersRef.current.loadMessages(selectedId, true); void loadersRef.current.loadConversations().catch(()=>undefined); }, 3500);
     return () => clearInterval(iv);
-  }, [loadConversations, loadMessages, selectedId]);
+  }, [selectedId]);
 
   useEffect(() => {
     return () => {
@@ -1152,15 +1195,44 @@ export function Chat() {
     window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => {
-    const c = messagesContainerRef.current;
-    if (c) { c.scrollTop = c.scrollHeight; atBottomRef.current = true; }
+  useLayoutEffect(() => {
+    initialScrollRef.current = true;
+    atBottomRef.current = true;
+    lastMessageRef.current = null;
+    prependScrollRef.current = null;
+    setShowScrollBtn(false);
   }, [selectedId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const c = messagesContainerRef.current;
-    if (c && atBottomRef.current) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
-  }, [messages.length]);
+    if (!c || messagesLoading || messages.some(m => m.conversation_id !== selectedId)) return;
+    const last = messages[messages.length - 1];
+    const ownMessage = !!last && last.id !== lastMessageRef.current && last.sender_id === user?.id;
+    const action = chatScrollAction({ initial: initialScrollRef.current, following: atBottomRef.current, ownMessage, prepending: !!prependScrollRef.current });
+    if (action === 'preserve' && prependScrollRef.current) c.scrollTop = prependScrollRef.current.top + c.scrollHeight - prependScrollRef.current.height;
+    else if (action === 'bottom') { c.scrollTop = c.scrollHeight; atBottomRef.current = true; setShowScrollBtn(false); }
+    prependScrollRef.current = null;
+    initialScrollRef.current = false;
+    lastMessageRef.current = last?.id ?? null;
+  }, [messages, messagesLoading, selectedId, user?.id, mobileView, messageSearch]);
+
+  useEffect(()=>{
+    if(!selectedId || selectedId === JARVIS_CONVERSATION_ID || !requestedMessage || (requestedConversation && selectedId!==requestedConversation) || messagesLoading) return;
+    let alive=true;
+    const request=conversationRequests.capture(selectedId,'context');
+    void getChatMessageContext(selectedId,requestedMessage).then(rows=>{
+      if(alive && conversationRequests.accept(request))setMessages(previous=>mergeChatMessages(previous,rows.filter(message=>message.conversation_id===selectedId)));
+    }).catch(()=>{if(alive && conversationRequests.isCurrent(request))setAttentionFeedback('A mensagem solicitada não está mais disponível.');});
+    return()=>{alive=false;};
+  },[selectedId,requestedMessage,requestedConversation,messagesLoading,conversationRequests]);
+
+  useLayoutEffect(()=>{
+    if(!requestedMessage || messagesLoading || (requestedConversation && selectedId!==requestedConversation) || focusedMessage.current===`${selectedId}:${requestedMessage}`)return;
+    const target=document.getElementById(`chat-message-${requestedMessage}`);
+    if(!target)return;
+    target.scrollIntoView({block:'center'});atBottomRef.current=false;
+    focusedMessage.current=`${selectedId}:${requestedMessage}`;setShowScrollBtn(true);
+  },[messages,requestedMessage,requestedConversation,selectedId,messagesLoading]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -1168,9 +1240,26 @@ export function Chat() {
     // Images can change row height after the request finishes. Follow only if
     // the user was already at the bottom; never pull them away from history.
     const observer = new ResizeObserver(() => { if (atBottomRef.current) container.scrollTop = container.scrollHeight; });
+    observer.observe(container);
     container.querySelectorAll('.chat-message-row').forEach(row => observer.observe(row));
     return () => observer.disconnect();
-  }, [messages.length]);
+  }, [messages, mobileView]);
+
+  async function handleArchiveConversation(conversation: ChatConversation) {
+    if (archiveBusyRef.current || conversationActionsLock.current.has(conversation.id)) return;
+    archiveBusyRef.current = true;
+    conversationActionsLock.current.add(conversation.id);setConversationActionsBusy(new Set(conversationActionsLock.current));
+    setArchiveError(''); setArchiveFeedback('');
+    try {
+      const archived = !conversation.is_archived;
+      await setConversationArchived(conversation.id, archived);
+      setConversations(previous => previous.map(c => c.id === conversation.id ? { ...c, is_archived: archived } : c));
+      setArchiveFeedback(archived ? 'Conversa movida para Arquivadas.' : 'Conversa de volta à lista principal.');
+      if (archived && currentConversation.current === conversation.id) { setSelectedId(null); setMobileView('list'); }
+      if (!archived) setConversationFilter('all');
+    } catch { setArchiveError('Não foi possível atualizar a conversa. Confira se a API e a migração desta versão estão atualizadas.'); }
+    finally { archiveBusyRef.current = false; conversationActionsLock.current.delete(conversation.id);setConversationActionsBusy(new Set(conversationActionsLock.current)); }
+  }
 
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -1183,16 +1272,9 @@ export function Chat() {
   }, []);
 
   async function requestBrowserNotifications() {
-    if (!('Notification' in window)) return;
-    const result = await Notification.requestPermission();
-    setBrowserNotifications(result === 'granted');
-  }
-
-  async function sendText(text: string) {
-    if (!selectedId || !text.trim()) return;
-    await sendChatMessage(selectedId, text.trim().slice(0, 8000), replyingTo?.id);
-    setReplyingTo(null);
-    await Promise.all([loadMessages(selectedId), loadConversations()]);
+    if(!user)return;
+    try{await enableDesktopNotifications(user.id);setBrowserNotifications(true);setAttentionFeedback('Notificações do computador ativadas.');}
+    catch(error){setAttentionFeedback(error instanceof Error?error.message:'Não foi possível ativar as notificações');}
   }
 
   async function handleSend(e?: FormEvent) {
@@ -1212,8 +1294,24 @@ export function Chat() {
       setPendingFile(null);
       return;
     }
-    await sendText(messageText);
-    setMessageText('');
+    const conversationId = selectedId;
+    if (!conversationId || selectedJarvis || !messageText.trim()) return;
+    const lockKey = user?.id + ':' + conversationId;
+    if (sendingConversations.current.has(lockKey)) return;
+    const draft = workspace.drafts.capture(conversationId);
+    sendingConversations.current.add(lockKey);
+    setSendFailure(null);
+    try {
+      await sendChatMessage(conversationId, messageText.trim().slice(0, 8000), replyingTo?.id);
+      workspace.drafts.clearIfUnchanged(conversationId, draft);
+      if (currentConversation.current === conversationId) setReplyingTo(null);
+      // A refresh failure must not turn an acknowledged send into a duplicate retry.
+      await Promise.allSettled([loadMessages(conversationId), loadConversations()]);
+    } catch (error) {
+      setSendFailure({ conversationId, message: error instanceof Error ? error.message : 'Não foi possível enviar. Seu rascunho foi mantido.' });
+    } finally {
+      sendingConversations.current.delete(lockKey);
+    }
   }
 
   function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
@@ -1249,6 +1347,7 @@ export function Chat() {
       mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        if (cancelRecordingRef.current) { cancelRecordingRef.current = false; return; }
         if (!selectedId) return;
         const actualMime = (mr.mimeType || 'audio/webm').split(';')[0];
         const ext = actualMime.includes('ogg') ? 'ogg' : actualMime.includes('mp4') ? 'mp4' : 'webm';
@@ -1263,7 +1362,25 @@ export function Chat() {
       mr.start();
       mediaRecorderRef.current = mr;
       setIsRecording(true); setRecordingSeconds(0);
+      if (selectedId) wsEventBus.send({ type: 'chat:typing', conversationId: selectedId, isRecording: true });
       recordingTimerRef.current = window.setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+      try {
+        const actx = new AudioContext();
+        const src = actx.createMediaStreamSource(stream);
+        const analyser = actx.createAnalyser();
+        analyser.fftSize = 64;
+        src.connect(analyser);
+        analyserRef.current = analyser;
+        audioCtxRef.current = actx;
+        const drawWave = () => {
+          if (!analyserRef.current) return;
+          const buf = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteFrequencyData(buf);
+          setWaveformBars(Array.from(buf.slice(0, 20)));
+          animFrameRef.current = requestAnimationFrame(drawWave);
+        };
+        drawWave();
+      } catch {}
     } catch { alert('Microfone não disponível ou permissão negada.'); }
   }
 
@@ -1273,6 +1390,10 @@ export function Chat() {
     setIsRecording(false);
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     setRecordingSeconds(0);
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
+    if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null; }
+    analyserRef.current = null;
+    setWaveformBars([]);
   }
 
   function handleGroupPhoto(e: ChangeEvent<HTMLInputElement>) {
@@ -1319,8 +1440,14 @@ export function Chat() {
 
   async function handleToggleMute(convId: string, e: React.MouseEvent) {
     e.stopPropagation();
-    const isMuted = await toggleMuteConversation(convId);
-    setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_muted: isMuted } : c));
+    if(conversationActionsLock.current.has(convId))return;
+    conversationActionsLock.current.add(convId);setConversationActionsBusy(new Set(conversationActionsLock.current));
+    setArchiveError('');
+    try {
+      const isMuted = await toggleMuteConversation(convId);
+      setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_muted: isMuted } : c));
+    } catch(error) {setArchiveError(error instanceof Error?error.message:'Não foi possível alterar o som da conversa.');}
+    finally {conversationActionsLock.current.delete(convId);setConversationActionsBusy(new Set(conversationActionsLock.current));}
   }
 
   async function handleEditSave() {
@@ -1349,9 +1476,25 @@ export function Chat() {
 
   async function handlePinConversation(convId: string, e: React.MouseEvent) {
     e.stopPropagation();
+    if(conversationActionsLock.current.has(convId))return;
+    conversationActionsLock.current.add(convId);setConversationActionsBusy(new Set(conversationActionsLock.current));
+    setArchiveError('');
     try {
-      await pinChatConversation(convId);
-      setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_pinned: !c.is_pinned } : c));
+      const isPinned=await pinChatConversation(convId);
+      setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_pinned: isPinned } : c));
+    } catch(error) {setArchiveError(error instanceof Error?error.message:'Não foi possível fixar a conversa.');}
+    finally {conversationActionsLock.current.delete(convId);setConversationActionsBusy(new Set(conversationActionsLock.current));}
+  }
+
+  async function handleOpenMyNotes() {
+    try {
+      const conv = await getSelfConversation();
+      setSelectedId(conv.id);
+      setMobileView('messages');
+      setConversations(prev => {
+        if (prev.some(c => c.id === conv.id)) return prev;
+        return [conv, ...prev];
+      });
     } catch {}
   }
 
@@ -1401,18 +1544,29 @@ export function Chat() {
   const filteredConversations = useMemo(() => {
     const q = conversationSearch.trim().toLowerCase();
     const base = conversations.filter(c => {
-      const matchesFilter = conversationFilter === 'all' || (conversationFilter === 'unread' ? c.unread_count > 0 : c.type === 'group');
+      if (conversationFilter === 'archived' ? !c.is_archived : c.is_archived) return false;
+      const matchesFilter = conversationFilter === 'all' || conversationFilter === 'archived'
+        || (conversationFilter === 'unread' && c.unread_count > 0)
+        || (conversationFilter === 'groups' && c.type === 'group')
+        || (conversationFilter === 'agents' && c.type === 'direct' && !!c.other_participant)
+        || (conversationFilter === 'pinned' && c.is_pinned)
+        || (conversationFilter === 'muted' && c.is_muted);
       return matchesFilter && (!q || `${c.name || ''} ${c.other_participant?.name || ''} ${c.last_message?.content || ''}`.toLowerCase().includes(q));
     });
-    return [...base].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+    const activity = (conversation: ChatConversation) => Date.parse(conversation.last_message?.created_at || conversation.created_at) || 0;
+    return [...base].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || activity(b) - activity(a));
   }, [conversations, conversationSearch, conversationFilter]);
+
+  const showJarvisConversation = conversationFilter === 'all' && (!conversationSearch.trim() ||
+    `jarvis assistente pessoal ${drafts[JARVIS_CONVERSATION_ID]?.text || ''}`.toLowerCase().includes(conversationSearch.trim().toLowerCase()));
 
   // Filtered messages (search)
   const displayedMessages = useMemo(() => {
-    if (!messageSearch.trim()) return messages;
+    const currentMessages=messages.filter(message=>message.conversation_id===selectedId);
+    if (!messageSearch.trim()) return currentMessages;
     const q = messageSearch.toLowerCase();
-    return messages.filter(m => m.content?.toLowerCase().includes(q));
-  }, [messages, messageSearch]);
+    return currentMessages.filter(m => m.content?.toLowerCase().includes(q));
+  }, [messages, messageSearch,selectedId]);
 
   // Right panel users split
   const { onlineUsers, offlineUsers } = useMemo(() => {
@@ -1422,11 +1576,20 @@ export function Chat() {
   }, [users, user?.id, userSearch]);
 
   const canSend = !selectedConversation?.broadcast_mode || ['owner', 'admin'].includes(selectedConversation?.my_role || '');
+  useLayoutEffect(() => {
+    if (!composerFocusRequested.current || !selectedId || selectedConversation?.id !== selectedId || mobileView !== 'messages' || !canSend || isRecording || pendingFile || editingMsg || showTheme || newGroupOpen || profileUser || showGroupSettings || showNotes || showReminderModal || peopleOpen) return;
+    const composer = composerRef.current;
+    if (!composer || composer.disabled) return;
+    composer.focus({ preventScroll: true });
+    composerFocusRequested.current = false;
+  }, [selectedId, selectedConversation?.id, composerFocusToken, mobileView, canSend, isRecording, pendingFile, editingMsg, showTheme, newGroupOpen, profileUser, showGroupSettings, showNotes, showReminderModal, peopleOpen]);
+
 
   return (
     <div
-      className={cn('chat-shell flex overflow-hidden', darkMode ? 'bg-[#111b21] chat-dark' : 'bg-slate-50')}
+      className={cn('chat-shell flex overflow-hidden', darkMode ? 'bg-[hsl(var(--card))] chat-dark' : 'bg-slate-50')}
       data-mobile-view={mobileView}
+      style={{'--chat-message-font-size':`${14*fontScale/100}px`} as CSSProperties}
     >
       {/* Lightbox */}
       {lightboxSrc && (
@@ -1442,6 +1605,8 @@ export function Chat() {
         </div>
       )}
 
+      {showAttention && attentionMessage && selectedConversation && <ChatAttentionDialog key={`${selectedConversation.id}:${attentionMessage.id}`} conversationId={selectedConversation.id} name={selectedConversation.name || 'Conversa'} group={selectedConversation.type==='group'} message={messages.find(item=>item.id===attentionMessage.id) || attentionMessage} onClose={()=>setAttentionMessage(null)} onSent={count=>{setShowAttention(false);setAttentionMessage(null);setAttentionFeedback(`Atenção solicitada para ${count} participante(s).`);}}/>}
+      {attentionFeedback && <div className='chat-attention-feedback' role='status'>{attentionFeedback}<button onClick={()=>setAttentionFeedback('')} aria-label='Fechar aviso'><X size={18}/></button></div>}
       {/* Toast */}
       {toast && (
         <button onClick={() => { setSelectedId(toast.conversationId); setToast(null); }}
@@ -1459,50 +1624,51 @@ export function Chat() {
 
       {/* ── Left: Conversations ── */}
       <aside className={cn(
-        cn('chat-conversations overflow-hidden border-r flex flex-col flex-shrink-0', darkMode ? 'bg-[#111b21] border-[#2a3942]' : 'bg-slate-50 border-slate-200'),
+        cn('chat-conversations overflow-hidden border-r flex flex-col flex-shrink-0', darkMode ? 'bg-[hsl(var(--card))] border-[hsl(var(--muted))]' : 'bg-slate-50 border-slate-200'),
         'w-full md:w-[260px]',
         mobileView === 'messages' ? 'hidden md:flex' : 'flex'
       )}>
         <div className="chat-list-heading border-b border-slate-100 p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className={cn("text-lg font-bold", darkMode ? "text-[#e9edef]" : "text-slate-900")}>Bate-papo</h1>
-              <p className={cn("text-xs", darkMode ? "text-[#8696a0]" : "text-slate-600")}>Sua equipe, mais perto.</p>
+              <h1 className={cn("text-lg font-bold", darkMode ? "text-[hsl(var(--foreground))]" : "text-slate-900")}>Conversas</h1>
             </div>
             <div className="chat-list-actions flex items-center gap-1">
-              <button type="button" onClick={() => setMobileUsersOpen(true)} className="chat-icon-button" title="Encontrar pessoas" aria-label="Encontrar pessoas"><UserPlus size={22} /></button>
-              <button onClick={() => setShowTheme(v => !v)} className={cn('h-9 w-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100', showTheme && 'bg-orange-50 text-orange-600')} title="Personalizar"><Palette size={16} /></button>
-              <button onClick={() => setNewGroupOpen(v => !v)} className="h-9 w-9 rounded-lg bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600" title="Criar grupo"><Plus size={17} /></button>
+              <button type="button" onClick={togglePeople} data-chat-people-toggle aria-haspopup="dialog" aria-controls="chat-people-panel" aria-expanded={peopleOpen} className="chat-icon-button" title="Encontrar pessoas" aria-label="Encontrar pessoas"><UserPlus size={22} /></button>
+              <button type="button" onClick={handleOpenMyNotes} className="chat-icon-button" title="Minhas notas" aria-label="Minhas notas"><BookOpen size={20} /></button>
+              <button onClick={() => setNewGroupOpen(v => !v)} className="chat-icon-button" title="Criar grupo" aria-label="Criar grupo"><Plus size={20} /></button>
+              <Popover open={sidebarMenuOpen} onOpenChange={setSidebarMenuOpen}>
+                <PopoverTrigger asChild><button className='chat-icon-button' title='Opções do chat' aria-label='Opções do chat'><MoreVertical size={20}/></button></PopoverTrigger>
+                <PopoverContent align='end' sideOffset={8} className='chat-sidebar-options'>
+                  <p>Preferências do chat</p>
+                  <button onClick={()=>setSoundEnabled(value=>!value)} aria-pressed={soundEnabled}>{soundEnabled?<Bell size={18}/>:<BellOff size={18}/>}<span>Som das mensagens</span><small>{soundEnabled?'Ativado':'Desativado'}</small></button>
+                  <button type='button' onClick={playNotificationSound} disabled={!soundEnabled} aria-label='Testar som de mensagem'><Play size={18}/><span>Testar som</span><small>Quatro toques</small></button>
+                  <button onClick={requestBrowserNotifications}><Bell size={18}/><span>Notificações do computador</span><small>{browserNotifications?'Ativadas':'Ativar'}</small></button>
+                  <button onClick={()=>{setSidebarMenuOpen(false);setShowTheme(true);}}><Palette size={18}/><span>Personalizar chat</span></button>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-          <div className="chat-preferences mt-3 flex gap-2">
-            <button onClick={() => setSoundEnabled(v => !v)}
-              className={cn('flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold', soundEnabled ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600')}>
-              {soundEnabled ? <Bell size={13} /> : <BellOff size={13} />} Som
-            </button>
-            <button onClick={requestBrowserNotifications}
-              className={cn('flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold', browserNotifications ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600')}>
-              <Check size={13} /> Notif.
-            </button>
-          </div>
-          <div className="relative mt-2">
+          <div className="chat-conversation-search relative mt-2">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={conversationSearch} onChange={e => setConversationSearch(e.target.value)} placeholder="Buscar conversas..." aria-label="Buscar conversas" className={cn("h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400", darkMode ? "bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]" : "border-slate-200 bg-white")} />
+            <input value={conversationSearch} onChange={e => setConversationSearch(e.target.value)} placeholder="Buscar conversas..." aria-label="Buscar conversas" className={cn("h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400", darkMode ? "bg-[hsl(var(--muted))] border-[hsl(var(--border))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]" : "border-slate-200 bg-white")} />
           </div>
           <div className="chat-conversation-filters" aria-label="Filtrar conversas">
-            {([{ id: 'all', label: 'Todas' }, { id: 'unread', label: 'Não lidas' }, { id: 'groups', label: 'Grupos' }] as const).map(filter => (
+            {([{ id: 'all', label: 'Todas' }, { id: 'unread', label: 'Não lidas' }, { id: 'groups', label: 'Grupos' }, { id: 'agents', label: 'Agentes' }, { id: 'pinned', label: 'Fixadas' }, { id: 'muted', label: 'Silenciadas' }, { id: 'archived', label: 'Arquivadas' }] as const).map(filter => (
               <button key={filter.id} type="button" aria-pressed={conversationFilter === filter.id} onClick={() => setConversationFilter(filter.id)}>{filter.label}</button>
             ))}
           </div>
+          {archiveError && <p role='alert' className='chat-archive-notice is-error'>{archiveError}</p>}
+          {archiveFeedback && <p role='status' className='chat-archive-notice'>{archiveFeedback}</p>}
         </div>
 
         {/* New group modal */}
         {newGroupOpen && createPortal(
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={e => { if (e.target === e.currentTarget) { setNewGroupOpen(false); setGroupName(''); setGroupPhoto(null); setGroupPhotoPreview(''); setSelectedUsers([]); setGroupBroadcast(false); setGroupUserSearch(''); } }}>
-            <div className={cn('w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh]', darkMode ? 'bg-[#1f2c34]' : 'bg-white')}>
-              <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', darkMode ? 'border-[#2a3942]' : 'border-slate-100')}>
-                <span className={cn('text-base font-semibold', darkMode ? 'text-[#e9edef]' : 'text-slate-800')}>Novo grupo</span>
-                <button type="button" onClick={() => { setNewGroupOpen(false); setGroupName(''); setGroupPhoto(null); setGroupPhotoPreview(''); setSelectedUsers([]); setGroupBroadcast(false); setGroupUserSearch(''); }} className={cn('h-8 w-8 rounded-full flex items-center justify-center transition-colors', darkMode ? 'text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef]' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600')}>
+            <div className={cn('w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh]', darkMode ? 'bg-[hsl(var(--card))]' : 'bg-white')}>
+              <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', darkMode ? 'border-[hsl(var(--muted))]' : 'border-slate-100')}>
+                <span className={cn('text-base font-semibold', darkMode ? 'text-[hsl(var(--foreground))]' : 'text-slate-800')}>Novo grupo</span>
+                <button type="button" onClick={() => { setNewGroupOpen(false); setGroupName(''); setGroupPhoto(null); setGroupPhotoPreview(''); setSelectedUsers([]); setGroupBroadcast(false); setGroupUserSearch(''); }} className={cn('h-8 w-8 rounded-full flex items-center justify-center transition-colors', darkMode ? 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600')}>
                   <X size={18} />
                 </button>
               </div>
@@ -1512,23 +1678,23 @@ export function Chat() {
                     {groupPhotoPreview ? <img src={groupPhotoPreview} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-slate-500"><Camera size={22} /></div>}
                   </button>
                   <input ref={groupPhotoRef} type="file" accept="image/*" className="hidden" onChange={handleGroupPhoto} />
-                  <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Nome do grupo" autoFocus className={cn('h-10 flex-1 rounded-lg border px-3 text-sm outline-none focus:border-orange-400', darkMode ? 'bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]' : 'border-slate-200')} />
+                  <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Nome do grupo" autoFocus className={cn('h-10 flex-1 rounded-lg border px-3 text-sm outline-none focus:border-orange-400', darkMode ? 'bg-[hsl(var(--muted))] border-[hsl(var(--border))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]' : 'border-slate-200')} />
                 </div>
-                <div className={cn('mx-5 mb-4 rounded-xl border p-3 flex items-center gap-3 flex-shrink-0', darkMode ? 'border-[#2a3942] bg-[#2a3942]/50' : 'border-slate-100 bg-slate-50')}>
+                <div className={cn('mx-5 mb-4 rounded-xl border p-3 flex items-center gap-3 flex-shrink-0', darkMode ? 'border-[hsl(var(--muted))] bg-[hsl(var(--muted))]/50' : 'border-slate-100 bg-slate-50')}>
                   <div className="flex-1">
-                    <p className={cn('text-sm font-medium', darkMode ? 'text-[#e9edef]' : 'text-slate-700')}>Grupo informativo</p>
-                    <p className={cn('text-xs mt-0.5', darkMode ? 'text-[#8696a0]' : 'text-slate-500')}>Apenas admins podem enviar mensagens</p>
+                    <p className={cn('text-sm font-medium', darkMode ? 'text-[hsl(var(--foreground))]' : 'text-slate-700')}>Grupo informativo</p>
+                    <p className={cn('text-xs mt-0.5', darkMode ? 'text-[hsl(var(--muted-foreground))]' : 'text-slate-500')}>Apenas admins podem enviar mensagens</p>
                   </div>
-                  <button type="button" onClick={() => setGroupBroadcast(v => !v)} className={cn('relative h-6 w-11 rounded-full transition-colors flex-shrink-0', groupBroadcast ? 'bg-orange-500' : (darkMode ? 'bg-[#3b4a54]' : 'bg-slate-200'))}>
+                  <button type="button" onClick={() => setGroupBroadcast(v => !v)} className={cn('relative h-6 w-11 rounded-full transition-colors flex-shrink-0', groupBroadcast ? 'bg-orange-500' : (darkMode ? 'bg-[hsl(var(--border))]' : 'bg-slate-200'))}>
                     <span className={cn('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform', groupBroadcast ? 'translate-x-5' : 'translate-x-0.5')} />
                   </button>
                 </div>
-                <div className={cn('mx-5 mb-2 text-xs font-semibold uppercase tracking-wide flex-shrink-0', darkMode ? 'text-[#8696a0]' : 'text-slate-500')}>
+                <div className={cn('mx-5 mb-2 text-xs font-semibold uppercase tracking-wide flex-shrink-0', darkMode ? 'text-[hsl(var(--muted-foreground))]' : 'text-slate-500')}>
                   Participantes{selectedUsers.length > 0 && <span className="normal-case font-normal"> ({selectedUsers.length} selecionados)</span>}
                 </div>
                 <div className="px-5 mb-2 relative flex-shrink-0">
                   <Search size={14} className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <input value={groupUserSearch} onChange={e => setGroupUserSearch(e.target.value)} placeholder="Buscar participantes..." className={cn('h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400', darkMode ? 'bg-[#2a3942] border-[#3b4a54] text-[#e9edef] placeholder:text-[#8696a0]' : 'border-slate-200')} />
+                  <input value={groupUserSearch} onChange={e => setGroupUserSearch(e.target.value)} placeholder="Buscar participantes..." className={cn('h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:border-orange-400', darkMode ? 'bg-[hsl(var(--muted))] border-[hsl(var(--border))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]' : 'border-slate-200')} />
                 </div>
                 <div className="overflow-y-auto px-5 pb-2 flex-1" style={{ minHeight: '160px' }}>
                   {users.filter(u => u.id !== user?.id).filter(u => {
@@ -1538,23 +1704,23 @@ export function Chat() {
                   }).map(u => {
                     const sel = selectedUsers.includes(u.id);
                     return (
-                      <button key={u.id} type="button" onClick={() => setSelectedUsers(v => sel ? v.filter(id => id !== u.id) : [...v, u.id])} className={cn('w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors', sel ? (darkMode ? 'bg-orange-500/20' : 'bg-orange-50') : (darkMode ? 'hover:bg-[#2a3942]' : 'hover:bg-slate-50'))}>
+                      <button key={u.id} type="button" onClick={() => setSelectedUsers(v => sel ? v.filter(id => id !== u.id) : [...v, u.id])} className={cn('w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors', sel ? (darkMode ? 'bg-orange-500/20' : 'bg-orange-50') : (darkMode ? 'hover:bg-[hsl(var(--muted))]' : 'hover:bg-slate-50'))}>
                         <div className="relative h-9 w-9 flex-shrink-0">
                           {u.photo_url ? <img src={u.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" /> : <div className="h-9 w-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-sm font-semibold">{u.name.charAt(0).toUpperCase()}</div>}
                           {u.online && <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={cn('text-sm font-medium truncate', darkMode ? 'text-[#e9edef]' : 'text-slate-800')}>{u.name}</p>
-                          {u.position && <p className={cn('text-xs truncate', darkMode ? 'text-[#8696a0]' : 'text-slate-500')}>{u.position}</p>}
+                          <p className={cn('text-sm font-medium truncate', darkMode ? 'text-[hsl(var(--foreground))]' : 'text-slate-800')}>{u.name}</p>
+                          {u.position && <p className={cn('text-xs truncate', darkMode ? 'text-[hsl(var(--muted-foreground))]' : 'text-slate-500')}>{u.position}</p>}
                         </div>
-                        <div className={cn('h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors', sel ? 'border-orange-500 bg-orange-500' : (darkMode ? 'border-[#3b4a54]' : 'border-slate-300'))}>
+                        <div className={cn('h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors', sel ? 'border-orange-500 bg-orange-500' : (darkMode ? 'border-[hsl(var(--border))]' : 'border-slate-300'))}>
                           {sel && <Check size={11} className="text-white" />}
                         </div>
                       </button>
                     );
                   })}
                 </div>
-                <div className={cn('px-5 py-4 border-t flex-shrink-0', darkMode ? 'border-[#2a3942]' : 'border-slate-100')}>
+                <div className={cn('px-5 py-4 border-t flex-shrink-0', darkMode ? 'border-[hsl(var(--muted))]' : 'border-slate-100')}>
                   <button type="submit" disabled={!groupName.trim()} className="h-10 w-full rounded-xl bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
                     Criar grupo{selectedUsers.length > 0 ? ` com ${selectedUsers.length} participante${selectedUsers.length > 1 ? 's' : ''}` : ''}
                   </button>
@@ -1568,15 +1734,22 @@ export function Chat() {
         <div className="chat-stories"><StoriesBar /></div>
         <div className="chat-conversation-list flex-1 overflow-y-auto">
 
-          {filteredConversations.length ? filteredConversations.map((conv, index) => (
+          {showJarvisConversation && <div className={cn('chat-conversation-row', selectedJarvis && 'is-jarvis-selected')}>
+            <button type="button" className="chat-jarvis-conversation" aria-current={selectedJarvis ? 'true' : undefined} onClick={() => { setSelectedId(JARVIS_CONVERSATION_ID); setMobileView('messages'); }}>
+              <span className="chat-jarvis-avatar"><Bot size={24} /></span>
+              <span className="chat-jarvis-summary"><span className="chat-conversation-name">Jarvis</span>
+                <span className="chat-conversation-preview truncate">{drafts[JARVIS_CONVERSATION_ID]?.text
+                  ? <><span className="chat-draft-label">Rascunho: </span>{drafts[JARVIS_CONVERSATION_ID].text}</>
+                  : jarvisState.pending ? 'Jarvis está respondendo…' : jarvisState.messages.at(-1)?.content || 'Converse com seu assistente pessoal'}</span>
+              </span>
+            </button>
+          </div>}
+          {filteredConversations.length || showJarvisConversation ? filteredConversations.map(conv => (
             <div key={conv.id} className={cn(
               'chat-conversation-row group relative w-full border-b flex items-center gap-3 transition-colors',
-              darkMode ? 'border-[#2a3942] hover:bg-[#1f2c34]' : 'border-slate-50 hover:bg-slate-50',
-              conv.type === 'direct' && !!conv.other_participant && !conv.other_participant.online &&
-                filteredConversations[index - 1]?.type === 'direct' &&
-                filteredConversations[index - 1]?.other_participant?.online &&
-                (darkMode ? 'mt-4 border-t-2 border-t-[#3b4a54] pt-2' : 'mt-4 border-t-2 border-t-slate-200 pt-2'),
-              selectedId === conv.id && (darkMode ? 'bg-[#2a3942]' : 'bg-orange-50'),
+              darkMode ? 'border-[hsl(var(--muted))] hover:bg-[hsl(var(--card))]' : 'border-slate-50 hover:bg-slate-50',
+              conv.unread_count > 0 && 'has-unread',
+              selectedId === conv.id && (darkMode ? 'bg-[hsl(var(--muted))]' : 'bg-orange-50'),
             )}>
               {/* Avatar: click → profile (direct) or select (group) */}
               <button
@@ -1591,59 +1764,25 @@ export function Chat() {
               </button>
               {/* Body: click → select conversation */}
               <button onClick={() => { setSelectedId(conv.id); setMobileView('messages'); setMentionQuery(null); setMentionParticipants([]); }} className="chat-conversation-body min-w-0 flex-1 text-left pr-2 py-3" aria-current={selectedId === conv.id ? 'true' : undefined} title={conv.name || 'Minhas notas'}>
-                <div className="flex items-center gap-1.5">
-                  <p className={cn("chat-conversation-name min-w-0 whitespace-normal break-words text-[15px] font-bold leading-5", darkMode ? "text-[#e9edef]" : "text-slate-800")}>{conv.type === 'direct' && !conv.other_participant ? 'Minhas notas' : (conv.name || 'Conversa direta')}</p>
-                  {conv.is_pinned && <Pin size={10} className="text-orange-400 flex-shrink-0" />}
-                  {conv.unread_count > 0 && !conv.is_muted && <span className="flex-shrink-0 min-w-[20px] text-center rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white leading-tight">{conv.unread_count}</span>}
-                  {conv.is_muted && <BellOff size={11} className="text-slate-400 flex-shrink-0" />}
+                <div className="chat-conversation-summary flex items-center gap-1.5">
+                  <p className={cn("chat-conversation-name min-w-0 whitespace-normal break-words text-[15px] font-bold leading-5", darkMode ? "text-[hsl(var(--foreground))]" : "text-slate-800")}>{conv.type === 'direct' && !conv.other_participant ? 'Minhas notas' : (conv.name || 'Conversa direta')}</p>
+                  {conv.last_message?.created_at && <time className='chat-conversation-time' dateTime={conv.last_message.created_at}>{conversationTime(conv.last_message.created_at)}</time>}
                 </div>
-                {conv.type === 'direct' ? (
-                  <p className={cn('chat-conversation-preview truncate text-xs font-medium', conv.other_participant?.online ? 'text-emerald-600' : 'text-slate-500')}>
-                    {convPresenceLabel(conv)}
-                  </p>
-                ) : (
-                  <p className="chat-conversation-preview truncate text-xs text-slate-600">
-                    {conv.last_message?.content?.startsWith('[AUDIO_MSG]') ? '🎤 Áudio'
-                      : conv.last_message?.content?.startsWith('[STICKER]') ? '🎭 Figurinha'
-                      : conv.last_message?.content?.startsWith('[IMAGE]') ? '📷 Foto'
-                      : conv.last_message?.content?.startsWith('[VIDEO]') ? '🎬 Vídeo'
-                      : conv.last_message?.content || `${conv.participant_count} participante(s)`}
-                  </p>
-                )}
+                <div className='chat-conversation-bottom'>
+                  <p className='chat-conversation-preview truncate'>{(()=>{const ct=typingByConv.get(conv.id);if(ct&&ct.size>0){const us=Array.from(ct.values());const rec=us.some(u=>u.isRecording);return <span className="text-orange-500 italic">{rec?'🎤 Gravando áudio...':`${us.map(u=>u.name).join(', ')} ${us.length===1?'está':'estão'} digitando...`}</span>;}return drafts[conv.id]?.text?<><span className='chat-draft-label'>Rascunho: </span>{drafts[conv.id].text}</>:conversationPreview(conv,user?.id);})()}</p>
+                  {conv.is_pinned && <Pin size={12} className='text-orange-400 flex-shrink-0' aria-label='Conversa fixada'/>}
+                  {conv.is_muted && <BellOff size={12} className='text-slate-400 flex-shrink-0' aria-label='Conversa silenciada'/>}
+                  {conv.unread_count > 0 && <span className={cn('chat-conversation-unread',conv.is_muted && 'is-muted')} aria-label={`${conv.unread_count} mensagens não lidas`}>{conv.unread_count>99?'99+':conv.unread_count}</span>}
+                </div>
               </button>
-              <div className="chat-conversation-actions absolute bottom-1 right-1 hidden opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 md:flex">
-                <button
-                  onClick={e => handlePinConversation(conv.id, e)}
-                  title={conv.is_pinned ? 'Desafixar conversa' : 'Fixar conversa'}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-orange-500"
-                >
-                  <Pin size={14} className={conv.is_pinned ? 'text-orange-500' : ''} />
-                </button>
-                <button
-                  onClick={e => handleToggleMute(conv.id, e)}
-                  title={conv.is_muted ? 'Reativar notificações' : 'Silenciar'}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-orange-500"
-                >
-                  {conv.is_muted ? <Bell size={14} /> : <BellOff size={14} />}
-                </button>
-              </div>
-              <Popover open={openConvActionsId === conv.id} onOpenChange={open => setOpenConvActionsId(open ? conv.id : null)}>
+              <Popover open={openConvActionsId===conv.id} onOpenChange={open=>setOpenConvActionsId(open?conv.id:null)}>
                 <PopoverTrigger asChild>
-                  <button type="button" className="chat-conversation-more flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-orange-500 md:hidden"
-                    aria-label={`Opções da conversa ${conv.name || 'Conversa direta'}`}>
-                    <MoreVertical size={18} aria-hidden="true" />
-                  </button>
+                  <button type='button' className='chat-conversation-more' title='Opções da conversa' aria-label={`Opções da conversa ${conv.name || 'Minhas notas'}`} disabled={conversationActionsBusy.has(conv.id)}><MoreVertical size={18}/></button>
                 </PopoverTrigger>
-                <PopoverContent align="end" sideOffset={6} className="w-48 border-slate-700 bg-[#192437] p-1.5 text-slate-100">
-                  <button type="button" onClick={e => { setOpenConvActionsId(null); void handlePinConversation(conv.id, e); }}
-                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-slate-700">
-                    <Pin size={15} aria-hidden="true" /> {conv.is_pinned ? 'Desafixar conversa' : 'Fixar conversa'}
-                  </button>
-                  <button type="button" onClick={e => { setOpenConvActionsId(null); void handleToggleMute(conv.id, e); }}
-                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-slate-700">
-                    {conv.is_muted ? <Bell size={15} aria-hidden="true" /> : <BellOff size={15} aria-hidden="true" />}
-                    {conv.is_muted ? 'Reativar notificações' : 'Silenciar'}
-                  </button>
+                <PopoverContent align='end' sideOffset={6} collisionPadding={12} className='chat-conversation-options' aria-label={`Ações da conversa ${conv.name || 'Minhas notas'}`}>
+                  <button type='button' disabled={conversationActionsBusy.has(conv.id)} onClick={event=>{setOpenConvActionsId(null);void handlePinConversation(conv.id,event);}}><Pin size={17}/><span>{conv.is_pinned?'Desafixar conversa':'Fixar conversa'}</span></button>
+                  <button type='button' disabled={conversationActionsBusy.has(conv.id)} onClick={event=>{setOpenConvActionsId(null);void handleToggleMute(conv.id,event);}}>{conv.is_muted?<Bell size={17}/>:<BellOff size={17}/>}<span>{conv.is_muted?'Reativar notificações':'Silenciar conversa'}</span></button>
+                  <button type='button' disabled={conversationActionsBusy.has(conv.id)} onClick={()=>{setOpenConvActionsId(null);void handleArchiveConversation(conv);}}><Archive size={17}/><span>{conv.is_archived?'Desarquivar conversa':'Arquivar conversa'}</span></button>
                 </PopoverContent>
               </Popover>
             </div>
@@ -1655,13 +1794,13 @@ export function Chat() {
 
       {/* ── Center: Messages ── */}
       <main className={cn(
-        cn('chat-message-pane min-w-0 overflow-hidden flex-col flex-1 lg:rounded-r-2xl', darkMode ? 'bg-[#0d1418]' : 'bg-white'),
+        cn('chat-message-pane min-w-0 overflow-hidden flex-col flex-1 lg:rounded-r-2xl', darkMode ? 'bg-[hsl(var(--background))]' : 'bg-white'),
         mobileView === 'list' ? 'hidden md:flex' : 'flex'
       )}>
-        {selectedConversation ? (
+        {selectedJarvis && user ? <JarvisChatThread key={user.id} userId={user.id} onBack={() => setMobileView('list')} /> : selectedConversation ? (
           <>
             {/* Header */}
-            <div className={cn("chat-thread-header flex items-center gap-2 border-b px-3 md:px-5 py-3 flex-shrink-0", darkMode ? "border-[#2a3942] bg-[#202c33]" : "border-slate-100 bg-white")}>
+            <div className={cn("chat-thread-header flex items-center gap-2 border-b px-3 md:px-5 py-3 flex-shrink-0", darkMode ? "border-[hsl(var(--muted))] bg-[hsl(var(--card))]" : "border-slate-100 bg-white")}>
               <button className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 flex-shrink-0"
                 onClick={() => setMobileView('list')} aria-label="Voltar às conversas">
                 <ChevronLeft size={20} />
@@ -1676,7 +1815,7 @@ export function Chat() {
               <div className="chat-thread-identity min-w-0 flex-1">
                 <button
                   onClick={() => openProfileFromConv(selectedConversation)}
-                  className={cn('truncate text-base font-bold block w-full text-left', darkMode ? 'text-[#e9edef]' : 'text-slate-900', selectedConversation.type === 'direct' && 'hover:text-[#0057b8] transition-colors')}
+                  className={cn('truncate text-base font-bold block w-full text-left', darkMode ? 'text-[hsl(var(--foreground))]' : 'text-slate-900', selectedConversation.type === 'direct' && 'hover:text-[#0057b8] transition-colors')}
                   disabled={selectedConversation.type !== 'direct'}
                 >
                   {selectedConversation.type === 'direct' && !selectedConversation.other_participant ? 'Minhas notas' : selectedConversation.name || 'Conversa direta'}
@@ -1692,6 +1831,22 @@ export function Chat() {
                 )}
               </div>
               <div className="chat-thread-actions flex items-center gap-1 flex-shrink-0">
+                <Popover>
+                  <PopoverTrigger asChild><button type='button' className='chat-icon-button' title='Tamanho da fonte' aria-label='Tamanho da fonte'><Type size={20}/></button></PopoverTrigger>
+                  <PopoverContent align='end' sideOffset={8} className='chat-font-options'>
+                    <p>Fonte das mensagens</p>
+                    <div className='chat-font-controls'>
+                      <button type='button' aria-label='Diminuir fonte' disabled={fontScale<=80} onClick={()=>changeFontScale(fontScale-10)}>A−</button>
+                      <output aria-live='polite' aria-label='Tamanho atual da fonte'>{fontScale}%</output>
+                      <button type='button' aria-label='Aumentar fonte' disabled={fontScale>=160} onClick={()=>changeFontScale(fontScale+10)}>A+</button>
+                    </div>
+                    <button type='button' className='chat-font-reset' onClick={()=>changeFontScale(110)}>Restaurar padrão (110%)</button>
+                  </PopoverContent>
+                </Popover>
+                <button type='button' aria-label={selectedConversation.is_pinned?'Desafixar conversa':'Fixar conversa'} title={selectedConversation.is_pinned?'Desafixar conversa':'Fixar conversa'} aria-pressed={!!selectedConversation.is_pinned} disabled={conversationActionsBusy.has(selectedConversation.id)} onClick={event=>void handlePinConversation(selectedConversation.id,event)} className='chat-icon-button'><Pin size={20}/></button>
+                <button type='button' aria-label={selectedConversation.is_muted?'Reativar notificações':'Silenciar conversa'} title={selectedConversation.is_muted?'Reativar notificações':'Silenciar conversa'} aria-pressed={!!selectedConversation.is_muted} disabled={conversationActionsBusy.has(selectedConversation.id)} onClick={event=>void handleToggleMute(selectedConversation.id,event)} className='chat-icon-button'><BellOff size={20}/></button>
+                <button aria-label='Chamar atenção' aria-pressed={showAttention} title='Chamar atenção para uma mensagem' className='chat-icon-button chat-attention-trigger' disabled={!canSend} onClick={()=>{setShowAttention(value=>!value);setAttentionMessage(null);}}><Bell size={22}/></button>
+                <button aria-label={selectedConversation.is_archived ? 'Desarquivar conversa' : 'Arquivar conversa'} title={selectedConversation.is_archived ? 'Desarquivar conversa' : 'Arquivar conversa'} disabled={conversationActionsBusy.has(selectedConversation.id)} onClick={() => void handleArchiveConversation(selectedConversation)} className='chat-icon-button'><Archive size={22} /></button>
                 {selectedConversation.type === 'direct' && selectedConversation.other_participant && (
                   <>
                     <button
@@ -1719,10 +1874,10 @@ export function Chat() {
                   </>
                 )}
                 <button
-                  onClick={() => setMobileUsersOpen(v => !v)}
-                  title="Usuários"
-                  aria-label="Mostrar pessoas" aria-expanded={mobileUsersOpen}
-                  className={cn('chat-show-people h-8 w-8 flex items-center justify-center rounded-lg transition-colors', mobileUsersOpen ? 'bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-100')}
+                  onClick={togglePeople}
+                  data-chat-people-toggle title={peopleOpen ? "Ocultar pessoas" : "Mostrar pessoas"}
+                  aria-label="Mostrar pessoas" aria-haspopup="dialog" aria-controls="chat-people-panel" aria-expanded={peopleOpen}
+                  className={cn('chat-show-people h-8 w-8 flex items-center justify-center rounded-lg transition-colors', peopleOpen ? 'bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-100')}
                 >
                   <Users size={15} />
                 </button>
@@ -1757,26 +1912,28 @@ export function Chat() {
 
             {/* Pinned message */}
             {selectedConversation.pinned_message && (
-              <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 flex-shrink-0 flex items-center gap-2">
-                <Pin size={13} className="text-amber-500 flex-shrink-0" />
+              <div className="chat-pinned-message flex-shrink-0 flex items-center gap-3" aria-label="Mensagem fixada">
+                <Pin size={16} className="flex-shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Mensagem fixada</p>
-                  <p className="text-xs text-slate-700 truncate">
+                  <p className="chat-pinned-label">Mensagem fixada</p>
+                  <p className="chat-pinned-preview truncate">
                     {selectedConversation.pinned_message.content?.startsWith('[IMAGE]') ? '📷 Foto'
                       : selectedConversation.pinned_message.content?.startsWith('[VIDEO]') ? '🎬 Vídeo'
                       : selectedConversation.pinned_message.content?.startsWith('[AUDIO_MSG]') ? '🎤 Áudio'
-                      : selectedConversation.pinned_message.content?.slice(0, 80) ?? ''}
+                      : <LinkText text={selectedConversation.pinned_message.content || ''} mentionMatcher={mentionMatcher} onMention={openMentionProfile}/>}
                   </p>
                 </div>
-                <button onClick={() => handlePinMessage({ id: selectedConversation.pinned_message!.id, content: selectedConversation.pinned_message!.content, sender: selectedConversation.pinned_message!.sender as any, conversation_id: selectedId!, created_at: '', updated_at: '' })} className="text-slate-400 hover:text-slate-700 flex-shrink-0"><X size={13} /></button>
+                <button type="button" aria-label="Desafixar mensagem" title="Desafixar mensagem" onClick={() => handlePinMessage({ id: selectedConversation.pinned_message!.id, content: selectedConversation.pinned_message!.content, sender: selectedConversation.pinned_message!.sender as any, conversation_id: selectedId!, created_at: '', updated_at: '' })} className="flex-shrink-0"><X size={16} /></button>
               </div>
             )}
 
+            {showAttention && <div className='chat-attention-selection' role='status'><Bell size={20}/><span>Selecione a mensagem na conversa para chamar atenção.</span><button onClick={()=>{setShowAttention(false);setAttentionMessage(null);}}>Cancelar</button></div>}
             {/* Messages */}
-            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging')} aria-label="Mensagens da conversa" onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
-              background: theme.bgImage
-                ? `url(${theme.bgImage}) center/cover`
-                : (darkMode && theme.bgColor === DEFAULT_THEME.bgColor ? '#0d1418' : theme.bgColor),
+            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging',showAttention && 'is-selecting-attention')} data-custom-wallpaper={!!theme.bgImage} aria-label="Mensagens da conversa" onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
+              backgroundColor: theme.bgColor,
+              backgroundImage: theme.bgImage ? `url(${theme.bgImage})` : undefined,
+              backgroundPosition: theme.bgImage ? 'center' : undefined,
+              backgroundSize: theme.bgImage ? 'cover' : undefined,
             }}>
               {messagesError && <div role="alert" className="chat-load-error">{messagesError} <button onClick={() => selectedId && void loadMessages(selectedId)}>Tentar novamente</button></div>}
               {hasMoreMessages && (
@@ -1800,7 +1957,8 @@ export function Chat() {
                 return (
                   <Fragment key={message.id}>
                   {newDay && <div className="chat-day-divider"><time dateTime={message.created_at}>{new Date(message.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</time></div>}
-                  <div className={cn('chat-message-row flex gap-2', mine && 'justify-end', continuation && 'is-continuation')}>
+                  <div id={`chat-message-${message.id}`} data-conversation-id={message.conversation_id} className={cn('chat-message-row flex gap-2', mine && 'justify-end', continuation && 'is-continuation',requestedMessage===message.id && 'chat-message-attention')}>
+                    {showAttention && !message.is_deleted && <button type='button' className='chat-attention-pick' aria-label={`Chamar atenção para a mensagem de ${message.sender?.name || 'participante'}: ${message.content.startsWith('[')?'Mídia ou arquivo':message.content.slice(0,100)}`} onClick={()=>setAttentionMessage(message)}><span><Bell size={16}/>Selecionar mensagem</span></button>}
                     {!mine && (
                       <button
                         onClick={() => {
@@ -1812,33 +1970,26 @@ export function Chat() {
                           }
                         }}
                         className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                        title={rankByUserId.get(message.sender_id ?? '')?.rank?.name}
+                        aria-label={`Ver perfil de ${message.sender?.name || "usuário"}`}
                       >
-                        {(() => {
-                          const senderId = message.sender_id ?? '';
-                          const rankEntry = rankByUserId.get(senderId);
-                          const rankColor = rankEntry?.rank?.color;
-                          const avatarSrc = (message.sender_id ? usersById.get(message.sender_id)?.photo_url : undefined) || message.sender?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender?.name || 'N')}&size=36&background=0057b8&color=fff`;
-                          return rankColor ? (
-                            <div className="relative">
-                              <div className="rounded-full p-0.5" style={{ background: `linear-gradient(135deg, ${rankColor}, ${rankColor}77)` }}>
-                                <img src={avatarSrc} alt={message.sender?.name || ''} className="h-8 w-8 rounded-full object-cover ring-1 ring-white" />
-                              </div>
-                              <span className="absolute -bottom-0.5 -right-0.5 text-[10px] leading-none">{rankEntry?.rank?.emoji}</span>
-                            </div>
-                          ) : (
-                            <img src={avatarSrc} alt={message.sender?.name || ''} className="h-9 w-9 rounded-full object-cover" />
-                          );
-                        })()}
+                        <AchievementAvatar userId={message.sender_id} name={message.sender?.name || 'Usuário'}
+                          photo={usersById.get(message.sender_id || '')?.photo_url || message.sender?.photo_url} size={36} />
                       </button>
                     )}
                     <MessageBubble
-                      message={message} mine={mine} lastReadAt={lastReadAt} theme={theme} darkMode={darkMode}
+                      message={message} mine={mine} lastReadAt={lastReadAt} theme={theme}
                       isGroup={selectedConversation?.type === 'group'}
+                      isSelfConversation={selectedConversation?.type === 'direct' && !selectedConversation?.other_participant}
+                      mentionMatcher={mentionMatcher} onMention={openMentionProfile}
                       onImageClick={setLightboxSrc}
                       onEdit={mine ? (msg) => { setEditingMsg(msg); setEditText(msg.content); } : undefined}
                       onDelete={mine ? handleDeleteMessage : undefined}
                       onReply={setReplyingTo}
+                      onForward={(msg) => { setForwardingMsg(msg); setForwardSearch(''); }}
+                      onReact={async emoji=>{
+                        const reactions=await setChatReaction(message.conversation_id,message.id,emoji);
+                        if(currentConversation.current===message.conversation_id)setMessages(previous=>previous.map(item=>item.id===message.id?{...item,reactions}:item));
+                      }}
                       onPin={handlePinMessage}
                       isPinned={selectedConversation?.pinned_message?.id === message.id}
                     />
@@ -1846,14 +1997,14 @@ export function Chat() {
                   </Fragment>
                 );
               }) : (
-                <div className="flex h-full items-center justify-center text-sm text-slate-600 bg-white/60 rounded-xl p-4">
+                <div className='chat-thread-status' role='status' aria-live='polite'>
                   {messagesLoading ? 'Carregando mensagens…' : messageSearch ? 'Nenhuma mensagem encontrada.' : messagesError ? 'Mensagens indisponíveis no momento.' : 'Nenhuma mensagem ainda.'}
                 </div>
               )}
               {showScrollBtn && (
                 <div className="sticky bottom-4 z-20 flex justify-end pointer-events-none">
                   <button
-                    onClick={() => { const c = messagesContainerRef.current; if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' }); }}
+                    onClick={() => { const c = messagesContainerRef.current; atBottomRef.current = true; if (c) c.scrollTop = c.scrollHeight; setShowScrollBtn(false); }}
                     className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg hover:bg-orange-600 transition-colors"
                     title="Ir para o final"
                   >
@@ -1955,12 +2106,20 @@ export function Chat() {
               <div className="chat-input-bar border-t border-slate-100 bg-white p-3 flex-shrink-0">
                 {isRecording && (
                   <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-sm font-semibold text-red-700">Gravando... {recordingSeconds}s</span>
-                    <button onClick={stopRecording} className="ml-auto h-8 px-3 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600">Enviar</button>
-                    <button onClick={() => { mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop()); mediaRecorderRef.current = null; setIsRecording(false); if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); }} className="h-8 px-3 rounded-lg border border-red-200 text-red-600 text-xs font-bold">Cancelar</button>
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                    <div className="flex items-end gap-[2px] flex-1 min-w-0 h-8">
+                      {(waveformBars.length > 0 ? waveformBars : Array.from({length:20},()=>20)).map((v,i)=>(
+                        <span key={i} className="flex-1 rounded-sm bg-red-500 transition-all duration-75"
+                          style={{height:`${Math.max(4,(v/255)*100)}%`,opacity:waveformBars.length>0?1:0.3}} />
+                      ))}
+                    </div>
+                    <span className="text-sm font-semibold text-red-700 flex-shrink-0">{recordingSeconds}s</span>
+                    <button onClick={stopRecording} className="ml-2 h-8 px-3 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600 flex-shrink-0">Enviar</button>
+                    <button onClick={() => { cancelRecordingRef.current = true; mediaRecorderRef.current?.stop(); mediaRecorderRef.current = null; setIsRecording(false); if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; } if (audioCtxRef.current) { audioCtxRef.current.close().catch(()=>{}); audioCtxRef.current = null; } analyserRef.current = null; setWaveformBars([]); }} className="h-8 px-3 rounded-lg border border-red-200 text-red-600 text-xs font-bold flex-shrink-0">Cancelar</button>
                   </div>
                 )}
+                {(()=>{const ct=selectedId?typingByConv.get(selectedId):null;if(!ct||ct.size===0)return null;const us=Array.from(ct.values());return(<div className="px-1 pb-1 flex items-center gap-1.5 text-xs text-slate-400 italic"><span className="flex gap-[3px] items-end"><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'0ms'}}/><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'150ms'}}/><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'300ms'}}/></span>{us.map(u=>u.name).join(', ')} {us.length===1?'está':'estão'} digitando...</div>);})()}
+                {sendFailure?.conversationId === selectedId && <p role="alert" className="chat-send-error">{sendFailure.message}</p>}
                 <form onSubmit={handleSend} className="chat-composer-form relative flex items-center gap-2">
                   {/* Mobile toggle — shows/hides tool buttons */}
                   <button type="button"
@@ -2024,27 +2183,44 @@ export function Chat() {
                   </button>
                   </div>{/* end tools */}
 
-                  {mentionQuery !== null && mentionParticipants.length > 0 && (
-                    <div className="absolute bottom-14 left-12 z-30 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-                      <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mencionar</p>
-                      {mentionParticipants.filter(p => p.name.toLowerCase().includes((mentionQuery || '').toLowerCase())).slice(0, 6).map(p => (
-                        <button key={p.id} type="button"
-                          onMouseDown={e => {
-                            e.preventDefault();
-                            setMessageText(prev => {
-                              const at = prev.lastIndexOf('@');
-                              return at >= 0 ? prev.slice(0, at) + '@' + p.name + ' ' : prev + '@' + p.name + ' ';
-                            });
-                            setMentionQuery(null);
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-orange-50 text-left">
-                          <img src={p.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&size=28&background=ff7a00&color=fff`} alt={p.name} className="h-7 w-7 rounded-full object-cover" />
-                          <span className="text-sm font-semibold text-slate-700 truncate">{p.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <textarea value={messageText} onChange={e => {
+                  {mentionQuery !== null && mentionParticipants.length > 0 && (() => {
+                    const mShowTodos = 'todos'.startsWith((mentionQuery || '').toLowerCase());
+                    const mFiltered = mentionParticipants.filter(p => p.name.toLowerCase().includes((mentionQuery || '').toLowerCase())).slice(0, 6);
+                    return (
+                      <div className="absolute bottom-14 left-12 z-30 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                        <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mencionar</p>
+                        {mShowTodos && (
+                          <button type="button"
+                            onMouseDown={e => {
+                              e.preventDefault();
+                              setMessageText(prev => { const at = prev.lastIndexOf('@'); return at >= 0 ? prev.slice(0, at) + '@todos ' : prev + '@todos '; });
+                              setMentionQuery(null);
+                            }}
+                            className={cn('w-full flex items-center gap-2 px-3 py-2 text-left border-b border-slate-100', mentionIndex === 0 ? 'bg-orange-100' : 'hover:bg-orange-50')}>
+                            <Users size={16} className="text-orange-500 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-slate-700">@todos</span>
+                            <span className="text-xs text-slate-400 ml-auto">{mentionParticipants.length}</span>
+                          </button>
+                        )}
+                        {mFiltered.map((p, pIdx) => {
+                          const absIdx = mShowTodos ? pIdx + 1 : pIdx;
+                          return (
+                            <button key={p.id} type="button"
+                              onMouseDown={e => {
+                                e.preventDefault();
+                                setMessageText(prev => { const at = prev.lastIndexOf('@'); return at >= 0 ? prev.slice(0, at) + '@' + p.name + ' ' : prev + '@' + p.name + ' '; });
+                                setMentionQuery(null);
+                              }}
+                              className={cn('w-full flex items-center gap-2 px-3 py-2 text-left', mentionIndex === absIdx ? 'bg-orange-100' : 'hover:bg-orange-50')}>
+                              <AchievementAvatar userId={p.id} name={p.name} photo={p.photo_url} size={36} />
+                              <span className="text-sm font-semibold text-slate-700 truncate">{p.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                  <textarea ref={composerRef} value={messageText} onChange={e => {
                     setMessageText(e.target.value);
                     e.target.style.height = 'auto';
                     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
@@ -2060,12 +2236,38 @@ export function Chat() {
                     } else {
                       setMentionQuery(null);
                     }
+                    if (selectedId && val.trim().length > 0) {
+                      const now = Date.now();
+                      if (now - typingLastSentRef.current > 2000) {
+                        typingLastSentRef.current = now;
+                        wsEventBus.send({ type: 'chat:typing', conversationId: selectedId });
+                      }
+                    }
                   }} onKeyDown={e => {
+                    if (mentionQuery !== null) {
+                      const mfK = mentionParticipants.filter(p => p.name.toLowerCase().includes((mentionQuery || '').toLowerCase())).slice(0, 6);
+                      const msTK = 'todos'.startsWith((mentionQuery || '').toLowerCase());
+                      const totalK = (msTK ? 1 : 0) + mfK.length;
+                      if (e.key === 'ArrowDown' && totalK > 0) { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, totalK - 1)); return; }
+                      if (e.key === 'ArrowUp' && totalK > 0) { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
+                      if (e.key === 'Enter' && !e.shiftKey && totalK > 0) {
+                        e.preventDefault();
+                        const idx = mentionIndex;
+                        if (msTK && idx === 0) {
+                          setMessageText(prev => { const at = prev.lastIndexOf('@'); return at >= 0 ? prev.slice(0, at) + '@todos ' : prev + '@todos '; });
+                        } else {
+                          const p = mfK[msTK ? idx - 1 : idx];
+                          if (p) setMessageText(prev => { const at = prev.lastIndexOf('@'); return at >= 0 ? prev.slice(0, at) + '@' + p.name + ' ' : prev + '@' + p.name + ' '; });
+                        }
+                        setMentionQuery(null);
+                        return;
+                      }
+                    }
                     if (e.key === 'Escape') setMentionQuery(null);
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void handleSend(); }
                   }} onPaste={handlePaste}
                     placeholder="Mensagem…" aria-label="Escreva uma mensagem" disabled={isRecording}
-                    rows={1}
+                    rows={1} maxLength={8000}
                     className="flex-1 min-h-[40px] max-h-[120px] rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-400 resize-none overflow-y-auto leading-5 align-middle"
                     style={darkMode ? { backgroundColor: '#2a3942', borderColor: '#3b4a54', color: '#e9edef' } : {}} />
 
@@ -2094,19 +2296,10 @@ export function Chat() {
         )}
       </main>
 
-      {/* ── Right: Online users panel — overlay on mobile, inline on desktop ── */}
-      {mobileUsersOpen && (
-        <div
-          className="chat-people-backdrop absolute inset-0 z-40 bg-black/50"
-          onClick={() => setMobileUsersOpen(false)}
-        />
-      )}
-      <aside className={cn(
-        'chat-users-drawer flex-col overflow-hidden border-l border-slate-200 bg-slate-50',
-        mobileUsersOpen
-          ? 'chat-users-drawer-mobile flex absolute inset-y-0 right-0 z-50 shadow-2xl'
-          : 'hidden md:flex md:min-w-0 md:w-[220px] md:flex-shrink-0'
-      )} aria-label="Pessoas da equipe">
+      {/* People float above the workspace without taking a conversation column. */}
+      {peopleOpen && <aside ref={peoplePanelRef} id="chat-people-panel" role="dialog" aria-modal="false"
+        className="chat-users-drawer chat-users-floating flex-col overflow-hidden border border-slate-200 bg-slate-50"
+        aria-label="Pessoas da equipe">
         <div className="border-b border-slate-100 p-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Users size={16} className="text-orange-500" />
@@ -2114,14 +2307,14 @@ export function Chat() {
             <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{onlineUsers.length} online</span>
             <button
               className="chat-people-close h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="Fechar pessoas"
-              onClick={() => setMobileUsersOpen(false)}
+              onClick={() => closePeople(true)}
             >
               <X size={15} />
             </button>
           </div>
           <div className="relative mt-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Encontrar uma pessoa…" aria-label="Encontrar uma pessoa" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-orange-400" />
+            <input ref={peopleSearchRef} value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Encontrar uma pessoa…" aria-label="Encontrar uma pessoa" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-orange-400" />
           </div>
         </div>
 
@@ -2139,18 +2332,18 @@ export function Chat() {
                 const unread = unreadByUserId.get(item.id) ?? 0;
                 return (
                   <div key={item.id} className={cn('group px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 flex items-center gap-2.5 transition-colors', selected && 'bg-orange-50')}>
-                    <button onClick={() => setProfileUser(item)} className="relative flex-shrink-0 hover:opacity-80 transition-opacity">
-                      <img src={item.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&size=40&background=ff7a00&color=fff`} alt={item.name} className="h-10 w-10 rounded-full object-cover" />
+                    <button onClick={() => { setPeopleOpen(false); setProfileUser(item); }} className="relative flex-shrink-0 hover:opacity-80 transition-opacity">
+                      <AchievementAvatar userId={item.id} name={item.name} photo={item.photo_url} size={40} />
                       <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
                     </button>
-                    <button onClick={() => setProfileUser(item)} className="min-w-0 flex-1 text-left">
+                    <button onClick={() => { setPeopleOpen(false); setProfileUser(item); }} className="min-w-0 flex-1 text-left">
                       <div className="flex items-center gap-1.5">
                         <p className="min-w-0 whitespace-normal break-words text-[15px] font-semibold leading-5 text-slate-800">{item.name}</p>
                         {unread > 0 && <span className="flex-shrink-0 min-w-[18px] text-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-tight">{unread}</span>}
                       </div>
                       <p className="truncate text-xs text-emerald-600">Online</p>
                     </button>
-                    <button onClick={() => { setNewGroupOpen(true); setSelectedUsers(prev => selected ? prev.filter(id => id !== item.id) : [...prev, item.id]); }}
+                    <button onClick={() => { setPeopleOpen(false); setNewGroupOpen(true); setSelectedUsers(prev => selected ? prev.filter(id => id !== item.id) : [...prev, item.id]); }}
                       className={cn('flex h-6 w-6 items-center justify-center rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity', selected ? 'bg-orange-100 text-orange-700' : 'border border-slate-200 text-slate-500')}>
                       {selected ? <Check size={12} /> : <Plus size={12} />}
                     </button>
@@ -2171,18 +2364,18 @@ export function Chat() {
                 const unread = unreadByUserId.get(item.id) ?? 0;
                 return (
                   <div key={item.id} className={cn('group px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 flex items-center gap-2.5 transition-colors', selected && 'bg-orange-50')}>
-                    <button onClick={() => setProfileUser(item)} className="relative flex-shrink-0 hover:opacity-80 transition-opacity">
-                      <img src={item.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&size=40&background=ff7a00&color=fff`} alt={item.name} className="h-10 w-10 rounded-full object-cover" />
+                    <button onClick={() => { setPeopleOpen(false); setProfileUser(item); }} className="relative flex-shrink-0 hover:opacity-80 transition-opacity">
+                      <AchievementAvatar userId={item.id} name={item.name} photo={item.photo_url} size={40} />
                       <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-slate-300" />
                     </button>
-                    <button onClick={() => setProfileUser(item)} className="min-w-0 flex-1 text-left">
+                    <button onClick={() => { setPeopleOpen(false); setProfileUser(item); }} className="min-w-0 flex-1 text-left">
                       <div className="flex items-center gap-1.5">
                         <p className="min-w-0 whitespace-normal break-words text-[15px] font-semibold leading-5 text-slate-800">{item.name}</p>
                         {unread > 0 && <span className="flex-shrink-0 min-w-[18px] text-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-tight">{unread}</span>}
                       </div>
                       <p className="truncate text-xs text-slate-500">{presenceLabel(item)}</p>
                     </button>
-                    <button onClick={() => { setNewGroupOpen(true); setSelectedUsers(prev => selected ? prev.filter(id => id !== item.id) : [...prev, item.id]); }}
+                    <button onClick={() => { setPeopleOpen(false); setNewGroupOpen(true); setSelectedUsers(prev => selected ? prev.filter(id => id !== item.id) : [...prev, item.id]); }}
                       className={cn('flex h-6 w-6 items-center justify-center rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity', selected ? 'bg-orange-100 text-orange-700' : 'border border-slate-200 text-slate-500')}>
                       {selected ? <Check size={12} /> : <Plus size={12} />}
                     </button>
@@ -2192,7 +2385,7 @@ export function Chat() {
             </div>
           )}
         </div>
-      </aside>
+      </aside>}
 
       {/* Group settings panel */}
       {showGroupSettings && selectedConversation?.type === 'group' && user && (
@@ -2200,11 +2393,11 @@ export function Chat() {
       )}
 
       {/* Theme panel */}
-      {showTheme && <ThemePanel theme={theme} darkMode={darkMode} onChange={setTheme} onToggleDark={toggleDark} onClose={() => setShowTheme(false)} />}
+      {showTheme && <AppearanceDialog onClose={() => setShowTheme(false)} />}
 
       {/* Notes panel */}
       {showNotes && selectedConversation && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="chat-settings-overlay fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowNotes(false)} />
           <div className="relative ml-auto h-full w-80 bg-white shadow-2xl flex flex-col">
             <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
@@ -2268,6 +2461,62 @@ export function Chat() {
           onClose={() => setProfileUser(null)}
           onChat={openDirectChat}
         />
+      )}
+
+      {/* Forward message modal */}
+      {forwardingMsg && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setForwardingMsg(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[70vh]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 text-base">Encaminhar mensagem</h3>
+              <button onClick={() => setForwardingMsg(null)} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={18}/></button>
+            </div>
+            <div className="px-3 py-2 border-b border-slate-100">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Buscar conversa..."
+                value={forwardSearch}
+                onChange={e => setForwardSearch(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-400"
+              />
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {conversations
+                .filter(c => {
+                  const name = c.type === 'direct' && !c.other_participant ? 'Minhas notas' : (c.name || '');
+                  return name.toLowerCase().includes(forwardSearch.toLowerCase());
+                })
+                .map(c => {
+                  const name = c.type === 'direct' && !c.other_participant ? 'Minhas notas' : (c.name || 'Conversa direta');
+                  return (
+                    <button
+                      key={c.id}
+                      disabled={forwardingSending}
+                      onClick={async () => {
+                        setForwardingSending(true);
+                        try {
+                          const senderName = forwardingMsg.sender?.name || 'Alguém';
+                          const originalContent = forwardingMsg.content ?? '';
+                          const fwdPrefix = originalContent.match(/^\[FWD:(.+?)\]\n/) ? '' : `[FWD:${senderName}]\n`;
+                          const content = fwdPrefix + originalContent;
+                          await sendChatMessage(c.id, content);
+                          await loadConversations();
+                          setForwardingMsg(null);
+                        } catch { alert('Erro ao encaminhar. Tente novamente.'); }
+                        finally { setForwardingSending(false); }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-orange-50 disabled:opacity-50"
+                    >
+                      <span className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 flex-shrink-0">{name.charAt(0).toUpperCase()}</span>
+                      <span className="text-sm font-medium text-slate-800 truncate">{name}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

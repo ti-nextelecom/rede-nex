@@ -29,12 +29,12 @@
 .nex-module-search:focus-within { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .nex-module-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .nex-module-link { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 88px; gap: 10px; padding: 12px 8px; border: 1px solid hsl(var(--border)); border-radius: 14px; color: hsl(var(--foreground)); text-align: center; font-size: 12px; font-weight: 600; }
-.nex-module-link svg { color: #e65b12; flex-shrink: 0; }
+.nex-module-link svg { color: var(--nex-accent-ink); flex-shrink: 0; }
 .nex-module-link:hover, .nex-module-link.active { background: hsl(var(--muted)); border-color: hsl(var(--ring)); }
 
 .nex-error-state, .nex-empty-state { padding: 32px 20px; margin: auto; max-width: 520px; text-align: center; }
-.nex-error-state { color: hsl(var(--foreground)); }
-.nex-error-state p, .nex-empty-state p { color: hsl(var(--muted-foreground)); margin: 8px 0 16px; font-size: 14px; }
+.nex-error-state { color: var(--nex-danger-ink); }
+.nex-error-state p, .nex-empty-state p { color: var(--nex-danger-ink); margin: 8px 0 16px; font-size: 14px; }
 .nex-retry { min-height: 44px; padding: 8px 18px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); font-size: 14px; font-weight: 600; color: hsl(var(--foreground)); }
 .nex-retry:hover { background: hsl(var(--muted)); }
 
@@ -111,8 +111,8 @@
     color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 600;
   }
   .nex-bottom-link.active {
-    color: #e65b12;
-    box-shadow: inset 0 3px #e65b12;
+    color: var(--nex-accent-ink);
+    box-shadow: inset 0 3px hsl(var(--primary));
     background: hsl(var(--muted));
   }
 }

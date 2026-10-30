@@ -1,372 +1,120 @@
-import { useEffect, useState, useCallback } from 'react';
-import {
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Search,
-  User,
-  AlertCircle,
-  Clock,
-  Database,
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Activity, AlertCircle, ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Clock3, Database, FileSearch, Filter, History, Loader2, Pencil, Plus, RefreshCw, Search, ShieldCheck, ShieldOff, Trash2, X } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { apiGet } from '../lib/apiClient';
-import { cn } from '../lib/utils';
+import { EmployeeAvatar } from '../components/EmployeeAvatar';
+import { auditFields, matchesAuditLog } from '../../shared/auditPresentation.mjs';
+import './people-workspace.css';
+import './audit-workspace.css';
 
 interface AuditLogEntry {
-  id: string;
-  action: 'INSERT' | 'UPDATE' | 'DELETE';
-  entity_type: string;
-  entity_id: string;
-  old_data: Record<string, unknown> | null;
-  new_data: Record<string, unknown> | null;
-  ip_address: string | null;
-  created_at: string;
-  actor_id: string | null;
-  actor_name: string | null;
-  actor_photo: string | null;
+  id: string; action: string; entity_type: string; entity_id: string;
+  old_data: Record<string, unknown> | null; new_data: Record<string, unknown> | null;
+  ip_address: string | null; created_at: string;
+  actor_id: string | null; actor_name: string | null; actor_photo: string | null;
 }
-
-interface LogsResponse {
-  data: AuditLogEntry[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-const ACTION_STYLE: Record<string, { label: string; className: string }> = {
-  INSERT: { label: 'Criação',  className: 'bg-emerald-100 text-emerald-700' },
-  UPDATE: { label: 'Edição',   className: 'bg-blue-100 text-blue-700' },
-  DELETE: { label: 'Exclusão', className: 'bg-red-100 text-red-700' },
+interface LogsResponse { data: AuditLogEntry[]; total: number; page: number; pageSize: number }
+const ACTIONS = {
+  INSERT: { label: 'Criação', tone: 'create', Icon: Plus },
+  UPDATE: { label: 'Edição', tone: 'update', Icon: Pencil },
+  DELETE: { label: 'Exclusão', tone: 'delete', Icon: Trash2 },
 };
-
 const ENTITY_LABELS: Record<string, string> = {
-  users:             'Usuários',
-  wiki_articles:     'Wiki',
-  tasks:             'Tarefas',
-  feed_posts:        'Feed',
-  training_courses:  'Treinamentos',
-  chat_messages:     'Chat',
-  notifications:     'Notificações',
-  departments:       'Departamentos',
-  roles:             'Cargos',
-  permissions:       'Permissões',
+  users: 'Usuários', wiki_articles: 'Wiki', tasks: 'Tarefas', feed_posts: 'Feed', training_courses: 'Treinamentos',
+  chat_messages: 'Chat', notifications: 'Notificações', departments: 'Departamentos', roles: 'Cargos', permissions: 'Permissões',
 };
-
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
+const actionFor = (action: string) => ACTIONS[action as keyof typeof ACTIONS] || { label: action, tone: 'other', Icon: Activity };
+const actorFor = (log: AuditLogEntry) => log.actor_name || 'Origem não identificada';
+const entityFor = (log: AuditLogEntry) => ENTITY_LABELS[log.entity_type] || log.entity_type;
+function dateParts(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { day: 'Data indisponível', time: '—' };
+  return {
+    day: date.toLocaleDateString('pt-BR', { timeZone: 'America/Bahia' }),
+    time: date.toLocaleTimeString('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+  };
 }
-
-function DiffView({ oldData, newData }: { oldData: Record<string, unknown> | null; newData: Record<string, unknown> | null }) {
-  if (!oldData && !newData) return null;
-
-  const allKeys = Array.from(new Set([
-    ...Object.keys(oldData ?? {}),
-    ...Object.keys(newData ?? {}),
-  ])).filter(k => {
-    const o = oldData?.[k];
-    const n = newData?.[k];
-    return JSON.stringify(o) !== JSON.stringify(n);
-  });
-
-  if (allKeys.length === 0) {
-    return <p className="text-xs text-slate-400 italic">Nenhuma diferença detectada.</p>;
-  }
-
-  return (
-    <div className="space-y-1 max-h-48 overflow-y-auto text-xs font-mono">
-      {allKeys.map(key => (
-        <div key={key} className="grid grid-cols-[120px_1fr_1fr] gap-1 items-start">
-          <span className="text-slate-500 truncate font-sans">{key}</span>
-          {oldData?.[key] !== undefined ? (
-            <span className="bg-red-50 text-red-700 px-1 rounded truncate">{String(oldData[key])}</span>
-          ) : (
-            <span className="text-slate-300">—</span>
-          )}
-          {newData?.[key] !== undefined ? (
-            <span className="bg-emerald-50 text-emerald-700 px-1 rounded truncate">{String(newData[key])}</span>
-          ) : (
-            <span className="text-slate-300">—</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+function ActionBadge({ action }: { action: string }) {
+  const { label, tone, Icon } = actionFor(action);
+  return <span className={`audit-action audit-action-${tone}`}><Icon size={13} aria-hidden="true" />{label}</span>;
 }
-
-function LogRow({ log }: { log: AuditLogEntry }) {
-  const [expanded, setExpanded] = useState(false);
-  const action = ACTION_STYLE[log.action] ?? { label: log.action, className: 'bg-slate-100 text-slate-600' };
-  const entityLabel = ENTITY_LABELS[log.entity_type] ?? log.entity_type;
-  const avatarUrl = log.actor_photo || (log.actor_name
-    ? `https://ui-avatars.com/api/?name=${encodeURIComponent(log.actor_name)}&size=32&background=0057b8&color=fff`
-    : null);
-
-  return (
-    <>
-      <tr
-        className="hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-100"
-        onClick={() => setExpanded(e => !e)}
-      >
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt={log.actor_name ?? ''} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
-                <User size={13} className="text-slate-400" />
-              </div>
-            )}
-            <span className="text-sm text-slate-800 font-medium">{log.actor_name ?? 'Sistema'}</span>
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', action.className)}>
-            {action.label}
-          </span>
-        </td>
-        <td className="px-4 py-3 text-sm text-slate-600">{entityLabel}</td>
-        <td className="px-4 py-3 text-xs text-slate-400 font-mono truncate max-w-[120px]">{log.entity_id}</td>
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-1 text-xs text-slate-500">
-            <Clock size={11} />
-            {formatDateTime(log.created_at)}
-          </div>
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="bg-slate-50 border-b border-slate-100">
-          <td colSpan={5} className="px-6 py-3">
-            <div className="space-y-2">
-              {log.ip_address && (
-                <p className="text-xs text-slate-500">IP: <span className="font-mono">{log.ip_address}</span></p>
-              )}
-              {log.action === 'UPDATE' && (
-                <>
-                  <p className="text-xs font-semibold text-slate-600 mb-1">Campos alterados:</p>
-                  <div className="grid grid-cols-[120px_1fr_1fr] gap-1 text-xs font-semibold text-slate-400 mb-1">
-                    <span>Campo</span><span>Antes</span><span>Depois</span>
-                  </div>
-                  <DiffView oldData={log.old_data} newData={log.new_data} />
-                </>
-              )}
-              {log.action === 'INSERT' && log.new_data && (
-                <>
-                  <p className="text-xs font-semibold text-slate-600 mb-1">Dados criados:</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto text-xs font-mono">
-                    {Object.entries(log.new_data).map(([k, v]) => (
-                      <div key={k} className="flex gap-2">
-                        <span className="text-slate-400 font-sans w-32 flex-shrink-0">{k}</span>
-                        <span className="text-emerald-700 truncate">{String(v)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              {log.action === 'DELETE' && log.old_data && (
-                <>
-                  <p className="text-xs font-semibold text-slate-600 mb-1">Dados excluídos:</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto text-xs font-mono">
-                    {Object.entries(log.old_data).map(([k, v]) => (
-                      <div key={k} className="flex gap-2">
-                        <span className="text-slate-400 font-sans w-32 flex-shrink-0">{k}</span>
-                        <span className="text-red-600 truncate">{String(v)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
+function Actor({ log }: { log: AuditLogEntry }) {
+  return <div className="audit-actor"><EmployeeAvatar name={log.actor_name || '?'} photo={log.actor_photo} className="employee-avatar-small" /><div><strong>{actorFor(log)}</strong><span>{log.actor_name ? 'Usuário registrado no evento' : 'Sem usuário associado'}</span></div></div>;
+}
+function AuditDetails({ log, onClose }: { log: AuditLogEntry; onClose: () => void }) {
+  const fields = useMemo(() => auditFields(log.old_data, log.new_data, log.action), [log]);
+  const date = dateParts(log.created_at);
+  return <Dialog.Root open onOpenChange={open => { if (!open) onClose(); }}><Dialog.Portal><Dialog.Overlay className="people-modal-overlay" /><Dialog.Content className="people-page people-dialog audit-dialog">
+    <header className="audit-detail-header"><div><span className="people-eyebrow"><FileSearch size={15} aria-hidden="true" /> DETALHES DO EVENTO</span><Dialog.Title>{entityFor(log)} <ActionBadge action={log.action} /></Dialog.Title><Dialog.Description>Consulte os dados registrados no momento desta alteração.</Dialog.Description></div><button className="people-button" aria-label="Fechar detalhes do evento" onClick={onClose}><X size={19} /></button></header>
+    <div className="audit-detail-body">
+      <div className="audit-detail-summary"><Actor log={log} /><p><Clock3 size={17} aria-hidden="true" /><span>{date.day} às {date.time}<small>Horário da Bahia (UTC−3)</small></span></p></div>
+      <dl className="audit-identifiers"><div><dt>ID do evento</dt><dd>{log.id}</dd></div><div><dt>ID do registro</dt><dd>{log.entity_id || 'Não registrado'}</dd></div><div><dt>Origem / IP</dt><dd>{log.ip_address || 'Não registrado'}</dd></div><div><dt>Entidade</dt><dd>{log.entity_type}</dd></div></dl>
+      <div className="audit-change-heading"><div><h3>{log.action === 'INSERT' ? 'Dados criados' : log.action === 'DELETE' ? 'Dados excluídos' : 'Campos alterados'}</h3><p>{fields.length} campo(s) {log.action === 'UPDATE' ? 'com diferença' : 'no registro'}</p></div><span>Consulta somente leitura</span></div>
+      {fields.length ? <div className="audit-diff-list">{fields.map(field => <section key={field.key} className="audit-diff-field"><h4>{field.key}</h4><div className="audit-diff-values">{log.action !== 'INSERT' && <div className="audit-before"><span><ArrowDownLeft size={14} aria-hidden="true" /> Antes</span><pre>{field.before}</pre></div>}{log.action !== 'DELETE' && <div className="audit-after"><span><ArrowUpRight size={14} aria-hidden="true" /> Depois</span><pre>{field.after}</pre></div>}</div></section>)}</div> : <div className="audit-empty-detail"><Database size={28} /><p>{log.old_data || log.new_data ? 'Nenhum campo diferente nos dados disponíveis.' : 'Este evento não contém um retrato dos dados.'}</p></div>}
+      <p className="audit-sensitive-note">Valores de credenciais reconhecidas são ocultados nesta visualização. “Não registrado” indica ausência do campo; null é um valor nulo registrado.</p>
+    </div><footer className="audit-detail-footer"><span><ShieldCheck size={15} aria-hidden="true" /> Histórico de auditoria</span><button className="people-button" onClick={onClose}>Fechar detalhes</button></footer>
+  </Dialog.Content></Dialog.Portal></Dialog.Root>;
 }
 
 export function Logs() {
   const { user } = useAuth();
-  const isAdmin = ['Administrador', 'Gestor'].includes(user?.role_name ?? '');
-
+  const canView = ['Administrador', 'Gestor'].includes(user?.role_name || '');
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(50);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filterAction, setFilterAction] = useState('');
   const [filterEntity, setFilterEntity] = useState('');
-  const pageSize = 50;
-
-  const load = useCallback(async (p: number) => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams({ page: String(p), pageSize: String(pageSize) });
-      if (filterAction) params.set('action', filterAction);
-      if (filterEntity) params.set('entityType', filterEntity);
-      const res = await apiGet<LogsResponse>(`/admin/logs?${params}`);
-      setLogs(res.data ?? []);
-      setTotal(res.total ?? 0);
-      setPage(res.page ?? p);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar logs');
-    } finally {
-      setLoading(false);
-    }
-  }, [filterAction, filterEntity]);
-
-  useEffect(() => { load(1); }, [load]);
-
-  const filtered = search.trim()
-    ? logs.filter(l =>
-        (l.actor_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (ENTITY_LABELS[l.entity_type] ?? l.entity_type).toLowerCase().includes(search.toLowerCase()) ||
-        l.entity_id.toLowerCase().includes(search.toLowerCase())
-      )
-    : logs;
-
+  const [refresh, setRefresh] = useState(0);
+  const [selected, setSelected] = useState<AuditLogEntry | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!canView) return;
+    let active = true;
+    setLoading(true); setError('');
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (filterAction) params.set('action', filterAction);
+    if (filterEntity) params.set('entityType', filterEntity);
+    // No writes, no demo fallback; stale responses from older filters are ignored.
+    apiGet<LogsResponse>(`/admin/logs?${params}`).then(response => {
+      if (!active) return;
+      const lastPage = Math.max(1, Math.ceil((response.total || 0) / pageSize));
+      if (page > lastPage) { setPage(lastPage); return; }
+      setLogs(response.data || []); setTotal(response.total || 0); setUpdatedAt(new Date().toISOString());
+    }).catch(e => { if (active) { setLogs([]); setTotal(0); setError(e instanceof Error ? e.message : 'Não foi possível carregar a auditoria.'); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [canView, page, pageSize, filterAction, filterEntity, refresh]);
+  const filtered = useMemo(() => logs.filter(log => matchesAuditLog(log, search, entityFor(log))), [logs, search]);
+  const counts = useMemo(() => logs.reduce((result, log) => { if (log.action in result) result[log.action as keyof typeof result]++; return result; }, { INSERT: 0, UPDATE: 0, DELETE: 0 }), [logs]);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const activeFilters = Boolean(search.trim() || filterAction || filterEntity);
+  function clearFilters() { setSearch(''); setFilterAction(''); setFilterEntity(''); setPage(1); }
 
-  if (!isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-slate-400">
-        <AlertCircle size={48} />
-        <p className="text-lg font-medium">Acesso restrito a administradores</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 max-w-7xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg">
-          <Activity size={20} className="text-white" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Logs de Auditoria</h1>
-          <p className="text-sm text-slate-500">Rastreamento completo de todas as alterações do sistema</p>
-        </div>
-        <span className="ml-auto bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full">
-          {total.toLocaleString('pt-BR')} registros
-        </span>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 bg-white border border-slate-200 rounded-xl p-3">
-        <div className="flex items-center gap-2 flex-1 min-w-[200px] border border-slate-200 rounded-lg px-3 py-2">
-          <Search size={14} className="text-slate-400 flex-shrink-0" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por usuário, entidade ou ID..."
-            className="flex-1 text-sm outline-none placeholder:text-slate-400"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-slate-400" />
-          <select
-            value={filterAction}
-            onChange={e => { setFilterAction(e.target.value); setPage(1); }}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none bg-white"
-          >
-            <option value="">Todas as ações</option>
-            <option value="INSERT">Criação</option>
-            <option value="UPDATE">Edição</option>
-            <option value="DELETE">Exclusão</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Database size={14} className="text-slate-400" />
-          <select
-            value={filterEntity}
-            onChange={e => { setFilterEntity(e.target.value); setPage(1); }}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none bg-white"
-          >
-            <option value="">Todos os módulos</option>
-            {Object.entries(ENTITY_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        {error && (
-          <div className="p-4 text-center text-red-600 text-sm flex items-center justify-center gap-2">
-            <AlertCircle size={16} />
-            {error}
-          </div>
-        )}
-        {loading ? (
-          <div className="p-8 text-center text-slate-400 text-sm animate-pulse">Carregando logs...</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-sm">Nenhum registro encontrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Usuário</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Ação</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Módulo</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Data/Hora</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(log => <LogRow key={log.id} log={log} />)}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <span>Página {page} de {totalPages} ({total.toLocaleString('pt-BR')} registros)</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => load(page - 1)}
-              disabled={page <= 1 || loading}
-              className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pg = Math.max(1, Math.min(totalPages - 4, page - 2)) + i;
-              return (
-                <button
-                  key={pg}
-                  onClick={() => load(pg)}
-                  disabled={loading}
-                  className={cn(
-                    'w-8 h-8 rounded-lg text-sm font-medium transition-colors',
-                    pg === page ? 'bg-orange-500 text-white' : 'hover:bg-slate-100'
-                  )}
-                >
-                  {pg}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => load(page + 1)}
-              disabled={page >= totalPages || loading}
-              className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  if (!canView) return <div className="people-page audit-page"><div className="audit-denied"><ShieldOff size={44} /><h1>Acesso restrito</h1><p>Os logs de auditoria estão disponíveis para administradores e gestores autorizados.</p></div></div>;
+  return <div className="people-page audit-page">
+    <header className="people-hero"><div><span className="people-eyebrow"><ShieldCheck size={16} aria-hidden="true" /> ADMINISTRAÇÃO / RASTREABILIDADE</span><h1>Logs de auditoria</h1><p>Pessoas, ações e alterações. O contexto de cada evento em um só lugar.</p></div><div className="people-hero-actions"><span className="audit-readonly"><ShieldCheck size={15} /> Somente leitura</span><button className="people-button" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={17} className={loading ? 'animate-spin' : ''} />{loading ? 'Atualizando…' : 'Atualizar registros'}</button></div></header>
+    <div className="audit-metrics" aria-label="Resumo dos registros">{[
+      { label: 'Registros no filtro', value: total, hint: 'Total informado pelo servidor', Icon: History, tone: 'total' },
+      { label: 'Criações', value: counts.INSERT, hint: 'Nesta página', Icon: Plus, tone: 'create' },
+      { label: 'Edições', value: counts.UPDATE, hint: 'Nesta página', Icon: Pencil, tone: 'update' },
+      { label: 'Exclusões', value: counts.DELETE, hint: 'Nesta página', Icon: Trash2, tone: 'delete' },
+    ].map(({ label, value, hint, Icon, tone }) => <div key={label} className={`audit-metric audit-metric-${tone}`}><span className="audit-metric-icon"><Icon size={20} aria-hidden="true" /></span><span>{label}</span><strong>{loading || error ? '—' : value.toLocaleString('pt-BR')}</strong><small>{hint}</small></div>)}</div>
+    <section className="audit-filter-panel" aria-labelledby="audit-filter-title"><div className="audit-filter-title"><h2 id="audit-filter-title"><Filter size={17} aria-hidden="true" /> Refine sua consulta</h2>{activeFilters && <button onClick={clearFilters}>Limpar filtros <X size={14} /></button>}</div>
+      <div className="audit-filters"><label className="audit-search"><Search size={18} aria-hidden="true" /><input aria-label="Buscar nesta página de auditoria" placeholder="Buscar pessoa, módulo, IP ou ID nesta página" value={search} onChange={e => setSearch(e.target.value)} /></label><label className="audit-select"><span>Ação</span><select aria-label="Filtrar ação de auditoria" value={filterAction} onChange={e => { setFilterAction(e.target.value); setPage(1); }}><option value="">Todas as ações</option>{Object.entries(ACTIONS).map(([value, action]) => <option key={value} value={value}>{action.label}</option>)}</select></label><label className="audit-select"><span>Módulo</span><select aria-label="Filtrar módulo de auditoria" value={filterEntity} onChange={e => { setFilterEntity(e.target.value); setPage(1); }}><option value="">Todos os módulos</option>{Object.entries(ENTITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+      <p>Ação e módulo filtram todo o histórico. A busca por texto considera somente a página carregada.</p>
+    </section>
+    <section className="audit-records" aria-labelledby="audit-records-title" aria-busy={loading}><div className="audit-records-heading"><div><h2 id="audit-records-title">Histórico de alterações</h2><p>Abra um evento para consultar o que foi registrado.</p></div><span className="people-result-count" aria-live="polite">{loading ? 'Carregando…' : error ? 'Dados indisponíveis' : `${filtered.length} de ${logs.length} evento(s) nesta página`}</span></div>
+      {loading ? <div className="audit-state" role="status"><Loader2 size={27} className="animate-spin" /><h3>Carregando histórico…</h3><p>Consultando os registros de auditoria.</p></div> : error ? <div className="audit-state audit-error" role="alert"><AlertCircle size={30} /><h3>Não foi possível carregar os registros</h3><p>{error}</p><button className="people-button" onClick={() => setRefresh(value => value + 1)}>Tentar novamente</button></div> : !filtered.length ? <div className="audit-state"><FileSearch size={34} /><h3>{activeFilters ? 'Nenhum evento neste recorte' : 'Nenhum registro disponível'}</h3><p>{search.trim() ? 'A busca vale apenas para esta página. Tente outro termo, altere a página ou use os filtros de ação e módulo.' : 'Os eventos disponíveis aparecerão aqui conforme o histórico registrado pelo sistema.'}</p>{activeFilters && <button className="people-button" onClick={clearFilters}>Limpar filtros</button>}</div> : <>
+        <div className="audit-table-wrap"><table className="audit-table"><caption className="sr-only">Eventos de auditoria. As datas usam o horário da Bahia.</caption><thead><tr><th scope="col">Pessoa / origem</th><th scope="col">Ação</th><th scope="col">Módulo e registro</th><th scope="col">Data e hora <small>UTC−3</small></th><th scope="col"><span className="sr-only">Detalhes</span></th></tr></thead><tbody>{filtered.map(log => { const date = dateParts(log.created_at); return <tr key={log.id}><td><Actor log={log} /></td><td><ActionBadge action={log.action} /></td><td><strong className="audit-entity">{entityFor(log)}</strong><code className="audit-entity-id" title={log.entity_id}>{log.entity_id || 'ID não registrado'}</code></td><td><time dateTime={log.created_at}>{date.day}<span>{date.time}</span></time></td><td><button className="people-button audit-detail-button" aria-label={`Ver evento ${log.id}`} onClick={() => setSelected(log)}><FileSearch size={17} /><span>Ver detalhes</span><ChevronRight size={15} /></button></td></tr>; })}</tbody></table></div>
+        <div className="audit-mobile-list">{filtered.map(log => { const date = dateParts(log.created_at); return <article key={log.id}><header><ActionBadge action={log.action} /><time dateTime={log.created_at}>{date.day} · {date.time}</time></header><Actor log={log} /><p><Database size={15} aria-hidden="true" />{entityFor(log)}</p><code>{log.entity_id || 'ID não registrado'}</code><button className="people-button" aria-label={`Ver evento ${log.id} no celular`} onClick={() => setSelected(log)}>Ver detalhes do evento <ChevronRight size={17} /></button></article>; })}</div>
+      </>}
+      {!loading && !error && <footer className="audit-pagination"><div><strong>Página {page} de {totalPages}</strong><span>{total.toLocaleString('pt-BR')} registro(s) no filtro{updatedAt ? ` · Atualizado às ${dateParts(updatedAt).time}` : ''}</span></div><label><span>Por página</span><select aria-label="Registros de auditoria por página" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label><nav aria-label="Paginação dos logs"><button className="people-button" aria-label="Página anterior dos logs" disabled={page <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}><ChevronLeft size={18} /></button><span aria-current="page">{page} / {totalPages}</span><button className="people-button" aria-label="Próxima página dos logs" disabled={page >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}><ChevronRight size={18} /></button></nav></footer>}
+    </section>
+    {selected && <AuditDetails log={selected} onClose={() => setSelected(null)} />}
+  </div>;
 }

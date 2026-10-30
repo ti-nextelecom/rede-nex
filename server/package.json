@@ -1,0 +1,9 @@
+{
+  "name": "rede-nex-server",
+  "type": "module",
+  "version": "0.0.0",
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "web-push": "^3.6.7"
+  }
+}

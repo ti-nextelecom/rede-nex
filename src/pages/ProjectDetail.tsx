@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { LinkText } from '../components/LinkText';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -109,7 +110,7 @@ function StatusSubPickerStep({ value, onChange }: { value: Status; onChange: (s:
   );
 }
 
-function UserSearchSelectDetail({ users, selectName, required, emptyLabel }: { users: ProjectUser[]; selectName: string; required?: boolean; emptyLabel?: string }) {
+function UserSearchSelectDetail({ users, selectName, emptyLabel }: { users: ProjectUser[]; selectName: string; required?: boolean; emptyLabel?: string }) {
   const [inputText, setInputText] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [open, setOpen] = useState(false);
@@ -121,9 +122,9 @@ function UserSearchSelectDetail({ users, selectName, required, emptyLabel }: { u
       <input type="text" value={inputText} onChange={handleChange} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={emptyLabel || 'Buscar usuário…'} autoComplete="off" style={{width:'100%',boxSizing:'border-box',fontSize:13,padding:'4px 8px',borderRadius:6,border:'1px solid #e2e8f0'}} />
       <input type="hidden" name={selectName} value={selectedId} />
       {open && suggestions.length > 0 && (
-        <div style={{position:'absolute',zIndex:9,background:'#fff',border:'1px solid #e2e8f0',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
+        <div style={{position:'absolute',zIndex:9,background:'var(--project-raised, #1b2736)',color:'var(--project-text, #e5edf7)',border:'1px solid var(--project-border, #304054)',borderRadius:6,boxShadow:'0 4px 12px rgba(0,0,0,.12)',width:'100%',maxHeight:200,overflowY:'auto',top:'100%',left:0}}>
           {suggestions.slice(0, 8).map(u => (
-            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid #f1f5f9',cursor:'pointer',fontSize:13}}>
+            <button key={u.id} type="button" onMouseDown={() => handleSelect(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',padding:'6px 12px',background:'none',border:'none',borderBottom:'1px solid var(--project-border, #304054)',cursor:'pointer',fontSize:13}}>
               {u.photo_url ? <img src={u.photo_url} alt={u.name} style={{width:26,height:26,borderRadius:'50%',objectFit:'cover',flexShrink:0}} /> : <div style={{width:26,height:26,borderRadius:'50%',background:'#304363',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{getInitials(u.name)}</div>}
               <span>{u.name}{u.department_name ? ` · ${u.department_name}` : ''}</span>
             </button>
@@ -632,7 +633,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
         project.id,
         step.id,
         isEdit ? `Data de entrega editada para ${formattedDate}` : `Etapa marcada como entregue em ${formattedDate}`,
-        isEdit ? `Data anterior: ${step.delivery_date ? new Date(step.delivery_date).toLocaleDateString('pt-BR') : 'nenhuma'}` : null,
+        isEdit ? `Data anterior: ${step.delivery_date ? new Date(`${step.delivery_date.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : 'nenhuma'}` : null,
         currentUserName
       );
       load(true);
@@ -957,7 +958,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
                         </div>
                       ) : (
                         <>
-                          {c.content && <p className="comment-content">{c.content}</p>}
+                          {c.content && <p className="comment-content"><LinkText text={c.content} /></p>}
                           {(c.images ?? []).length > 0 && (
                             <div className="comment-images-display">
                               {(c.images ?? []).map((src, i) => (
@@ -1136,7 +1137,7 @@ export function ProjectDetailView({ project, onBack, onProjectUpdated, isAdmin =
                         <div className="step-delivery-cell">
                           <div className="step-date-cell" style={{color:'#13a99b',fontWeight:600}}>
                             <CheckCircle2 size={13} />
-                            <span>{new Date(step.delivery_date).toLocaleDateString('pt-BR', {day:'2-digit',month:'short',year:'numeric'})}</span>
+                            <span>{new Date(`${step.delivery_date.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR', {day:'2-digit',month:'short',year:'numeric'})}</span>
                           </div>
                           {isAdmin && <div className="step-delivery-actions">
                             <button className="tag-add-btn" style={{fontSize:10}} onClick={() => { setDeliveryStep(step); setDeliveryDate(step.delivery_date!.split('T')[0]); setEditingDelivery(true); }} title="Editar data de entrega"><Pencil size={10} /></button>

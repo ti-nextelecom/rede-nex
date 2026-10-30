@@ -86,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    await import('./browserNotifications').then(module=>module.disableDesktopNotifications()).catch(()=>undefined);
     await apiPost('/auth/logout', {}).catch(() => undefined);
     setUser(null);
   }

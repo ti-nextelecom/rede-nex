@@ -1,0 +1,27 @@
+/* The project module is natively dark, including portal dialogs and new controls.
+   Local tokens also override the global orange input palette without global rules. */
+.projetos-wrap, .project-dialog { --project-surface: hsl(var(--card)); --project-raised: hsl(var(--muted)); --project-border: hsl(var(--border)); --project-text: hsl(var(--foreground)); --project-muted: hsl(var(--muted-foreground)); color: var(--project-text); color-scheme: inherit; }
+:where(.projetos-wrap, .project-dialog) :is(.modal, .step-form, .step-form-grid, .form-intro, .new-project-layout, .status-picker, .status-picker-menu, .status-preset-picker, .mention-picker-dropdown, .step-assignee-picker, .assignee-dropdown, .user-picker-dropdown, .empty-state, .notification-popover) { background-color: hsl(var(--card)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+:where(.projetos-wrap, .project-dialog) :is(.status-preset-option, .status-custom-input, .status-custom-row, .step-group-header, .step-table-head, .step-group-title, .step-table thead, .steps-table thead, .step-row, .step-table-row, .calendar-nav, .timeline-item, .request-row) { background-color: hsl(var(--muted)); color: hsl(var(--foreground)); border-color: hsl(var(--foreground) / 0.071); }
+:where(.projetos-wrap, .project-dialog) :is(.status-preset-option:hover, .mention-picker-option:hover) { background-color: hsl(var(--accent)); }
+:where(.projetos-wrap, .project-dialog) :is(.comment-author-input, .comment-input, .comment-textarea, .comment-step-select, .step-status-select-sm, .form-field, .tag-input, .step-edit-input) { background-color: hsl(var(--card)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+:where(.projetos-wrap, .project-dialog) :is(.step-desc-cell, .step-date-cell, .list-deadline, .assignee-deadline, .resp-deadline, .optional, .form-note, .history-description, .history-time) { color: hsl(var(--muted-foreground)); }
+:where(.projetos-wrap, .project-dialog) :is(.modal-header h2, .modal-header h3, .empty-state h3, .summary-title, .comment-author, .attachment-name, .form-intro h2) { color: #e7f0fb; }
+:where(.projetos-wrap, .project-dialog) :is(.secondary-button, .round-button, .view-mode-btn, .comment-type-btn, .tag-add-btn, .mention-picker-option, .step-action-btn) { background-color: hsl(var(--muted)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+:where(.projetos-wrap, .project-dialog) :is(.secondary-button:hover, .round-button:hover, .view-mode-btn:hover) { background-color: hsl(var(--accent)); color: #e5f4ff; }
+:where(.projetos-wrap, .project-dialog) :is(.project-form, .step-form, .modal) label { color: hsl(var(--muted-foreground)); }
+:where(.projetos-wrap, .project-dialog) select option { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+:where(.projetos-wrap, .project-dialog) .card-footer { gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+:where(.projetos-wrap, .project-dialog) .card-footer :is(.deadline, .owner) { min-width: 0; }
+:where(.projetos-wrap, .project-dialog) .deadline strong { white-space: normal; line-height: 1.6; }
+:where(.projetos-wrap, .project-dialog) :is(.step-color-bar, .progress-track) { overflow: hidden; }
+.project-dialog .modal { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); box-shadow: 0 25px 80px #0008; }
+.project-dialog :is(.modal-header, .form-actions) { border-color: hsl(var(--foreground) / 0.071); }
+.projetos-wrap .steps-tbl th { color: hsl(var(--muted-foreground)) !important; background: hsl(var(--muted)); font-size: 11px; letter-spacing: .04em; border-color: hsl(var(--foreground) / 0.071); }
+.projetos-wrap .steps-tbl-row[class*='row-'] td { background: hsl(var(--muted)) !important; border-color: hsl(var(--foreground) / 0.063); font-size: 13px; }
+.projetos-wrap .steps-tbl-row[class*='row-']:hover td { background: hsl(var(--accent)) !important; }
+.projetos-wrap .steps-tbl-row.row-late td { background: hsl(var(--muted)) !important; }
+.projetos-wrap .steps-tbl-row.row-done td { background: #172e2d !important; }
+.projetos-wrap .steps-tbl-row.row-attention td { background: hsl(var(--muted)) !important; }
+.projetos-wrap .projetos-sidebar .sidebar-section { border-color: hsl(var(--foreground) / 0.071) !important; }
+.project-dialog .section-kicker, .project-dialog .step-form-divider { color: hsl(var(--muted-foreground)); }

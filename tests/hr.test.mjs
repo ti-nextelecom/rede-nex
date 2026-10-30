@@ -1,0 +1,94 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { effectivePermissions, addMonths, addDays, validDate, asoSummary, vacationSummary, csvCell } from '../shared/hr.mjs';
+import { validateHrRecord, hrTransaction, hrAccess } from '../server/src/hr.js';
+test('HR: explicit user deny overrides role, and child rights require module and view',()=>{
+  const role={'rh.view':true,'aso.view':true,'aso.manage':true};
+  assert.equal(effectivePermissions(false,role,{'aso.manage':false})['aso.manage'],false);
+  assert.equal(effectivePermissions(false,role,{'rh.view':false})['aso.view'],false);
+  assert.equal(effectivePermissions(false,{'rh.view':true,'aso.manage':true})['aso.manage'],false);
+  assert.equal(effectivePermissions(true,{}, {'rh.view':false})['aso.manage'],true);
+});
+test('HR: calendar dates preserve end-of-month, leap years and inclusive vacation end',()=>{
+  assert.equal(addMonths('2024-02-29',12),'2025-02-28');assert.equal(addMonths('2026-01-31',1),'2026-02-28');
+  assert.equal(addDays('2026-12-31',1),'2027-01-01');assert.equal(validDate('2026-02-30'),false);assert.equal(validDate('banana'),false);
+  const summary=vacationSummary({start_on:'2026-11-01',leave_days:20,acquisition_end:'2025-12-31',concession_end:'2026-12-31'},'2026-10-16');
+  assert.equal(summary.end,'2026-11-20');assert.equal(summary.returnOn,'2026-11-21');assert.equal(summary.limit,'2026-12-12');assert.equal(summary.notice,'2026-10-02');assert.equal(summary.payment,'2026-10-30');
+  assert.equal(asoSummary({last_exam_on:'2024-01-01',completed_on:'2026-10-15',periodicity_months:12},'2026-10-16').due,'2027-10-15');
+});
+test('HR: CSV formulas neutralized, invalid data rejected and fractional balances retained',()=>{
+  assert.equal(csvCell(' =SUM(A1)'), '"\' =SUM(A1)"');assert.equal(csvCell('a"b'),'"a""b"');
+  assert.throws(()=>validateHrRecord('employees',{full_name:'A'}));
+  assert.throws(()=>validateHrRecord('asos',{employee_id:'bad'}));
+  const base={employee_id:'10000000-0000-4000-8000-000000000002',acquisition_start:'2024-01-01',acquisition_end:'2024-12-31',concession_end:'2025-12-31',balance_days:'7.50',leave_days:7,bonus_days:0,status:'draft'};
+  assert.equal(validateHrRecord('vacations',base).balance_days,'7.50');
+  assert.throws(()=>validateHrRecord('vacations',{...base,status:'planned',leave_days:8,start_on:'2025-10-01'}));
+});
+test('HR: importer reads only literals, rejects executable defaults and maps fictional sources',async()=>{
+  const {extractData,extractDefaults,mapPrototypes}=await import('../server/scripts/import-hr-prototypes.mjs');
+  assert.throws(()=>extractData('const DATA = [runMaliciousCode()];'));
+  assert.throws(()=>extractDefaults("const DEFAULTS = {\n '001': {gozo:runMaliciousCode()},\n};"));
+  const aso='const DATA = '+JSON.stringify([{id:'r001',nome:'Pessoa Fictícia',curto:'Pessoa',team:'QA',adm:'2020-01-01',ult:'2025-01-01',per:12,obs:'OUTUBRO'}])+';';
+  const vacations='const DATA = '+JSON.stringify([{id:'001',nome:'Pessoa Ficticia',team:'QA',periods:[{tipo:'vencido',ini:'2024-01-01',fim:'2024-12-31',saldo:7.5,limite:'2025-12-24'}]}])+';';
+  const mapped=mapPrototypes(aso,vacations);assert.equal(mapped.people.length,1);assert.equal(mapped.report.matchedNames,1);assert.equal(mapped.report.problems.length,0);assert.equal(mapped.entries[0].body.planned_month,null,'A note naming a month does not invent a year');assert.equal(mapped.entries[1].body.balance_days,'7.5');assert.equal(mapped.report.unlinkedUsers,1);
+});
+test('HR isolated PostgreSQL: API, FORCE RLS, overrides, persistence, conflicts and exports',{skip:process.env.RUN_HR_DB_TESTS!=='1'},async()=>{
+  const {createHrTestDb,ids}=await import('./hr-test-support.mjs');const {fixtureServer}=await import('./hr-fixture-server.mjs');
+  const {pool}=await createHrTestDb();const server=fixtureServer(pool);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const base='http://127.0.0.1:'+server.address().port;
+  const request=async(path,actor='admin',method='GET',body)=>{
+    const response=await fetch(base+'/api'+path,{method,headers:{'x-test-actor':actor,'Content-Type':'application/json'},body:body===undefined ? undefined : JSON.stringify(body)});
+    return {status:response.status,data:await response.json(),headers:response.headers};
+  };
+  try {
+    assert.equal((await pool.query('SELECT rolsuper FROM pg_roles WHERE rolname=current_user')).rows[0].rolsuper,false);
+    assert.equal((await pool.query('SELECT count(*)::int n FROM nex_hr.asos')).rows[0].n,0,'No context leaks rows, even to table owner');
+    assert.equal((await request('/rh/asos','blocked')).status,403);
+    assert.equal((await request('/rh/asos','manager')).status,403,'Gestor is not automatically privileged');
+    assert.equal((await request('/permissions/rh','employee')).status,403);
+    assert.equal((await request('/rh/asos','invalid')).status,401);
+    let config=(await request('/permissions/rh')).data;
+    const grants={'rh.view':true,'aso.view':true,'aso.manage':true};
+    assert.equal((await request('/permissions/rh','admin','PUT',{target_kind:'role',target_id:ids.employeeRole,grants,revision:config.revision})).status,200);
+    config=(await request('/permissions/rh')).data;
+    assert.equal((await request('/permissions/rh','admin','PUT',{target_kind:'user',target_id:ids.employee,grants:{'aso.manage':false},revision:config.revision})).status,200);
+    assert.equal((await request('/rh/asos','employee')).status,200);
+    assert.equal((await request('/rh/vacations','employee')).status,403);
+    assert.equal((await request('/rh/asos/export','employee')).status,403);
+    const row=(await request('/rh/asos')).data.records[0];
+    assert.equal((await request('/rh/asos/'+row.id,'employee','PUT',{...row,notes:'Não deve salvar'})).status,403);
+    assert.equal((await request('/rh/asos/'+row.id,'admin','PUT',{...row,notes:'Persistido em teste'})).status,200);
+    assert.equal((await request('/rh/asos')).data.records[0].notes,'Persistido em teste');
+    assert.equal((await request('/rh/asos/'+row.id,'admin','PUT',{...row,notes:'Conflito'})).status,409);
+    const exported=await request('/rh/asos/export');assert.equal(exported.status,200);assert.match(exported.data.csv,/Persistido em teste/);assert.equal(exported.headers.get('cache-control'),'no-store');
+    config=(await request('/permissions/rh')).data;
+    const rev=config.revision;
+    assert.equal((await request('/permissions/rh','admin','PUT',{target_kind:'user',target_id:ids.employee,grants:{'rh.view':false},revision:rev})).status,200);
+    assert.equal((await request('/rh/asos','employee')).status,403,'Revocation applied without new login');
+    assert.equal((await request('/permissions/rh','admin','PUT',{target_kind:'user',target_id:ids.employee,grants:{},revision:rev})).status,409);
+    assert.equal((await request('/permissions/rh','admin','PUT',{target_kind:'user',target_id:ids.admin,grants:{'rh.view':false},revision:rev+1})).status,400);
+    await hrTransaction(pool,ids.employee,async client=>{assert.equal((await client.query('SELECT count(*)::int n FROM nex_hr.asos')).rows[0].n,0);assert.equal((await hrAccess(client)).permissions['rh.view'],false);});
+    assert.equal((await pool.query('SELECT count(*)::int n FROM nex_hr.asos')).rows[0].n,0,'SET LOCAL cleared after release');
+    const history=(await request('/rh/history')).data.records;assert.ok(history.length>=7);
+    assert.equal((await request('/rh/employees','admin','POST',{user_id:ids.blocked,employee_code:'NOVO-TESTE',team:'QA'})).status,200);
+    assert.equal((await request('/rh/employees','admin','POST',{user_id:ids.blocked,employee_code:'OUTRO-TESTE',team:'QA'})).status,409);
+    assert.equal((await request('/rh/employees','admin','POST',{full_name:'Sem vínculo',team:'QA'})).status,400);
+    assert.equal((await request('/rh/employees','admin','POST',{user_id:'90000000-0000-4000-8000-000000000001',team:'QA'})).status,400);
+    const {mapPrototypes,applyPrototypeImport}=await import('../server/scripts/import-hr-prototypes.mjs');
+    const asoHtml='const DATA = '+JSON.stringify([{id:'import-test',nome:'Pessoa Importada Fictícia',team:'QA',ult:'2025-01-01',per:12}])+';';
+    const vacationHtml='const DATA = '+JSON.stringify([{id:'IMP-TEST',nome:'Pessoa Importada Ficticia',team:'QA',periods:[{tipo:'avencer',ini:'2025-01-01',fim:'2025-12-31',saldo:7.5,limite:'2026-12-24'}]}])+';';
+    const mapped=mapPrototypes(asoHtml,vacationHtml,{'aso:import-test':ids.manager,'vacations:IMP-TEST':ids.manager});
+    const imported=await applyPrototypeImport(pool,ids.admin,mapped);assert.equal(imported.insertedEmployees,1);
+    const repeated=await applyPrototypeImport(pool,ids.admin,mapped);assert.equal(repeated.insertedEmployees,0);assert.equal(repeated.skippedAlreadyImported,1);
+    const changedMap=mapPrototypes(asoHtml,vacationHtml,{'aso:import-test':ids.admin,'vacations:IMP-TEST':ids.admin});await assert.rejects(()=>applyPrototypeImport(pool,ids.admin,changedMap),/mapa alterou/);
+    assert.equal((await request('/rh/vacations')).data.records.find(r=>r.employee_code==='IMP-TEST').balance_days,7.5);
+    await assert.rejects(()=>applyPrototypeImport(pool,ids.employee,mapped),/Administrador ativo/);
+    assert.equal((await hrTransaction(pool,ids.admin,client=>client.query("UPDATE nex_hr.audit SET operation='tampered'"))).rowCount,0);
+    assert.equal((await request('/rh/users','employee')).status,403);
+    const roster=(await request('/rh/employees')).data.records;const linked=roster.find(r=>r.user_id===ids.employee);
+    assert.equal(linked.full_name,'Ana Teste RH');assert.match(linked.photo_url,/^data:image\/svg/);
+    await pool.query('UPDATE public.users SET name=\'Ana Perfil Atualizado\',photo_url=\'/foto-de-teste.png\' WHERE id=$1',[ids.employee]);
+    const refreshed=(await request('/rh/asos')).data.records[0];assert.equal(refreshed.full_name,'Ana Perfil Atualizado');assert.equal(refreshed.photo_url,'/foto-de-teste.png');assert.equal(refreshed.user_id,ids.employee);
+    assert.equal((await request('/rh/employees/'+linked.id,'admin','PUT',{...linked,user_id:ids.admin})).status,400);
+  } finally {await new Promise(resolve=>server.close(resolve));await pool.end();}
+});

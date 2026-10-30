@@ -6,9 +6,12 @@ import { Card } from '../components/ui/card';
 import { getGamificationProfile, getMissions, type GamificationProfile, type Mission } from '../lib/gamificationApi';
 import { XPBar, BadgeGrid, MissionCard } from '../components/Gamification';
 import { getFeedPosts } from '../lib/appApi';
+import { AchievementAvatar } from '../components/AchievementAvatar';
+import { AppearanceSettings } from '../components/AppearanceSettings';
+import { AvatarFramePicker } from '../components/AvatarFramePicker';
 import type { Post } from '../types';
 
-type ProfileTab = 'config' | 'conquistas' | 'missoes' | 'publicacoes';
+type ProfileTab = 'aparencia' | 'bordas' | 'config' | 'conquistas' | 'missoes' | 'publicacoes';
 
 export function Profile() {
   const { user, uploadAvatar, uploadCover, updateProfile } = useAuth();
@@ -17,7 +20,11 @@ export function Profile() {
   const coverRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<ProfileTab>(params.get('edit') === '1' ? 'config' : 'conquistas');
+  const [tab, setTab] = useState<ProfileTab>(params.get('edit') === '1' ? 'config' : params.get('tab') === 'aparencia' ? 'aparencia' : params.get('tab') === 'bordas' ? 'bordas' : 'conquistas');
+  useEffect(() => {
+    if (params.get('tab') === 'aparencia') setTab('aparencia');
+    else if (params.get('tab') === 'bordas') setTab('bordas');
+  }, [params]);
   const [gamification, setGamification] = useState<GamificationProfile | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [myPosts, setMyPosts] = useState<Post[]>([]);
@@ -86,7 +93,6 @@ export function Profile() {
     }
   }
 
-  const avatar = user?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Rede Nex')}&size=160&background=ff7a00&color=fff`;
   const role = user?.roles?.name || user?.role_name || 'Usuário';
   const department = user?.departments?.name || user?.department_name || 'Rede Nex';
 
@@ -95,6 +101,8 @@ export function Profile() {
   const achievements = missions.filter(m => m.type === 'achievement');
 
   const tabs: { id: ProfileTab; label: string; icon: typeof Star }[] = [
+    { id: 'aparencia', label: 'Aparência', icon: Settings },
+    { id: 'bordas', label: 'Bordas', icon: ShieldCheck },
     { id: 'conquistas', label: 'Conquistas', icon: Star },
     { id: 'missoes', label: 'Missões', icon: Target },
     { id: 'publicacoes', label: 'Publicações', icon: Newspaper },
@@ -119,12 +127,7 @@ export function Profile() {
         </div>
         <div className="px-6 pb-6">
           <div className="relative -mt-14 inline-block">
-            <div
-              className="rounded-full p-1"
-              style={gamification ? { background: `linear-gradient(135deg, ${gamification.rank.color}, ${gamification.rank.color}88)` } : {}}
-            >
-              <img src={avatar} alt={user?.name || 'Usuário'} className="h-24 w-24 rounded-full object-cover ring-4 ring-white" />
-            </div>
+            <AchievementAvatar userId={user?.id} name={user?.name || "Usuário"} photo={user?.photo_url} size={104} />
             <button
               onClick={() => fileRef.current?.click()}
               className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg hover:bg-orange-600"
@@ -177,6 +180,7 @@ export function Profile() {
           {tabs.map(t => (
             <button
               key={t.id}
+              aria-label={t.label}
               onClick={() => setTab(t.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all border-b-2 ${
                 tab === t.id
@@ -191,6 +195,8 @@ export function Profile() {
         </div>
 
         <div className="p-6">
+          {tab === 'aparencia' && <AppearanceSettings />}
+          {tab === 'bordas' && <AvatarFramePicker key={user?.id} />}
           {/* Conquistas tab */}
           {tab === 'conquistas' && (
             <div className="space-y-6">
@@ -201,6 +207,7 @@ export function Profile() {
                       <span>🏅</span> Conquistas ({gamification.badges.length})
                     </h3>
                     <BadgeGrid badges={gamification.badges} />
+                    <button className="mt-5 text-sm font-semibold text-orange-500" onClick={() => setTab('bordas')}>Escolher minha borda de conquista →</button>
                   </div>
                 </>
               ) : (

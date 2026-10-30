@@ -1,0 +1,13 @@
+export type Appearance = { version: 1; mode: 'dark' | 'light' | 'system'; accent: string; surface: string; chatBackground: string | null; chatIncoming: string | null; chatOutgoing: string | null; wallpaper: string; platformWallpaper: string };
+export const DEFAULT_APPEARANCE: Readonly<Appearance>;
+export function parseAppearance(value: unknown): Appearance;
+export function legacyAppearance(value: unknown): Appearance;
+export function validWallpaper(value: unknown): boolean;
+export function rgb(color: string): number[];
+export function luminance(color: string): number;
+export function contrast(first: string, second: string): number;
+export function readableText(background: string): string;
+export function accessibleInk(color: string, background: string): string;
+export function hexHsl(color: string): number[];
+export function hslHex(h: number, s: number, l: number): string;
+export function appearancePalette(settings: Appearance, systemDark?: boolean): { dark: boolean; variables: Record<string,string>; chat: { background: string; incoming: string; outgoing: string; incomingText: string; outgoingText: string; wallpaper: string } };
