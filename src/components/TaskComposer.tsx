@@ -1,3 +1,4 @@
+import { reviewImageUploads } from '../lib/mediaTools';
 import { useRef, useState } from 'react';
 import { CheckSquare, FileText, Images, Plus, Save, Trash2, X } from 'lucide-react';
 import { AccessibleModal } from './AccessibleModal';
@@ -28,7 +29,7 @@ export function TaskComposer({ users, initial, mode = 'task', modelName = '', li
     if (!images.length) return;
     uploadingRef.current = true; setUploading(true); setError('');
     try {
-      for (const file of images) {
+      for (const file of await reviewImageUploads(images)) {
         const type = taskUploadType(file);
         const url = await uploadChatMedia(file);
         const markdown = descriptionImageMarkdown({ id: crypto.randomUUID(), name: file.name, file_url: url, file_type: type });

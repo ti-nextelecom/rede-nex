@@ -51,7 +51,7 @@ const allowedWikiTypes = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]);
 
-const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.ogg', '.m4a', '.mp3', '.wav', '.pdf', '.doc', '.docx', '.xls', '.xlsx']);
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.ogg', '.m4a', '.mp3', '.wav', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar', '.7z', '.ppt', '.pptx', '.txt', '.csv']);
 
 function extensionFor(fileName, fileType) {
   const current = extname(fileName || '').toLowerCase();
@@ -65,8 +65,14 @@ function extensionFor(fileName, fileType) {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
     'application/vnd.ms-excel': '.xls',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/zip': '.zip', 'application/x-zip-compressed': '.zip', 'application/x-zip': '.zip',
+    'application/x-rar-compressed': '.rar', 'application/vnd.rar': '.rar',
+    'application/x-7z-compressed': '.7z',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+    'text/plain': '.txt', 'text/csv': '.csv',
   };
-  return map[fileType] || '.jpg';
+  return map[fileType] || '.bin';
 }
 
 export async function saveUserAvatar(user, input) {
@@ -238,6 +244,12 @@ export async function saveChatMedia(userId, input) {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/zip', 'application/x-zip-compressed', 'application/x-zip',
+    'application/x-rar-compressed', 'application/vnd.rar',
+    'application/x-7z-compressed',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain', 'text/csv',
   ]);
   if (!allowedChatTypes.has(input.file_type)) throw new Error('Formato não permitido no chat');
   const base64 = String(input.data).includes(',') ? String(input.data).split(',').pop() : String(input.data);

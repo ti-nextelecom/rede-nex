@@ -105,6 +105,8 @@ const api = {
     apiPatch<{ data: Task }>(`/tasks/${taskId}/checklists/${clId}`, { title }).then(r => r.data!),
   addComment: (taskId: string, content: string) =>
     apiPost<{ data: Task }>(`/tasks/${taskId}/comments`, { content }).then(r => r.data!),
+  deleteComment: (taskId: string, commentId: string) =>
+    apiDeleteJson<{ data: Task }>(`/tasks/${taskId}/comments/${commentId}`).then(r => r.data),
   listFiles: (taskId: string) => apiGet<{ data: TaskFile[] }>(`/tasks/${taskId}/files`).then(r => r.data ?? []),
   addFile: (taskId: string, input: object) => apiPost<{ data: TaskFile }>(`/tasks/${taskId}/files`, input).then(r => r.data!),
   removeFile: (taskId: string, fileId: string) => apiDelete(`/tasks/${taskId}/files/${fileId}`),
@@ -1154,7 +1156,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
           )}
         </div>
 
-        <TaskConversation comments={task.comments} files={taskFiles} people={Array.from(new Map([task.owner, task.creator, ...task.assignees, ...(task.observers || [])].filter((person): person is TaskUser => Boolean(person)).map(person => [person.id, person])).values())} currentUserId={me?.id} busy={saving || checklistUploading} onSend={content => runChange(() => api.addComment(task.id, content))} onUpload={uploadTaskFile} onClose={onClose} onBack={() => setShowConversation(false)} onRefresh={refreshConversation} refreshError={refreshError} active={showConversation} />
+        <TaskConversation comments={task.comments} files={taskFiles} people={Array.from(new Map([task.owner, task.creator, ...task.assignees, ...(task.observers || [])].filter((person): person is TaskUser => Boolean(person)).map(person => [person.id, person])).values())} currentUserId={me?.id} busy={saving || checklistUploading} onSend={content => runChange(() => api.addComment(task.id, content))} onDeleteComment={async (commentId) => { void runChange(() => api.deleteComment(task.id, commentId)); }} canDeleteAny={Boolean(me && ['Administrador', 'Gestor'].includes(me.role_name || ''))} onUpload={uploadTaskFile} onClose={onClose} onBack={() => setShowConversation(false)} onRefresh={refreshConversation} refreshError={refreshError} active={showConversation} />
       </div>
       {showSaveModal && (
         <AccessibleModal title="Salvar tarefa como modelo" onClose={() => { if (!savingTemplate) setShowSaveModal(false); }} className="task-sharing-dialog task-copy-template-panel outline-none">

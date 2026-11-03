@@ -1,6 +1,7 @@
 export const JARVIS_CONVERSATION_ID: 'jarvis';
 export interface DraftToken { readonly text: string }
 export interface ChatDraftStore {
+  flush(): void;
   getSnapshot(): Record<string, DraftToken>;
   subscribe(listener: () => void): () => void;
   capture(id: string): DraftToken | undefined;

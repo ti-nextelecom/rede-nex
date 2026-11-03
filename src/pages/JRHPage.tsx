@@ -1,3 +1,4 @@
+import { editImage } from '../lib/mediaTools';
 import { useEffect, useRef, useState } from 'react';
 import {
   Cake, CalendarHeart, Eye, Film, Heart, Image as ImageIcon,
@@ -140,8 +141,10 @@ function CreatePostModal({
   const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files?.[0] ?? null;
+    const file = selected ? await editImage(selected) : null;
+    if (!file) return;
     setImageFile(file);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(file ? URL.createObjectURL(file) : '');

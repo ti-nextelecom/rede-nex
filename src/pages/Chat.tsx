@@ -1,20 +1,27 @@
 import {
-  ChangeEvent, CSSProperties, FormEvent, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
+  ChangeEvent, CSSProperties, FormEvent, Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { dayKey } from '../../shared/personalWork.mjs';
-import { chatScrollAction, mergeChatMessages } from '../../shared/chatTimeline.mjs';
+import { chatScrollAction, mergeChatMessages, reuseChatSnapshot } from '../../shared/chatTimeline.mjs';
 import { createChatRequestGuard } from '../../shared/chatRequestGuard.mjs';
 import { JARVIS_CONVERSATION_ID } from '../../shared/chatDrafts.mjs';
 import { getChatWorkspace } from '../lib/chatWorkspace';
 import { JarvisChatThread } from '../components/JarvisChatThread';
-import { scheduleChatNotificationSound } from '../../shared/chatNotificationSound.mjs';
+import { chatDelivery, applyChatRead, preserveConversationReads } from '../../shared/chatDelivery.mjs';
+import { playNotificationSound, stopNotificationSound, setNotificationSound, notificationSoundEnabled } from '../lib/notificationSound';
+import { ChatAudioPlayer } from '../components/ChatAudioPlayer';
+import { openMedia, editImage } from '../lib/mediaTools';
+import { ImageLightbox } from '../components/ui/ImageLightbox';
+import { mergeChatOutbox } from '../../shared/chatOutbox.mjs';
+import { ChatCaptionInput } from '../components/ChatCaptionInput';
+import './chat-interactions.css';
 import { buildMentionMatcher, type MentionMatcher } from '../../shared/chatMentions.mjs';
 import { wsEventBus } from '../lib/wsEventBus';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import {
-  AlarmClock, Archive, Bell, Bot, BellOff, BookOpen, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronsDown, ChevronUp, Crown, Eye, FileText, History, Image,
+  AlarmClock, Archive, Bell, Bot, Loader2, BellOff, BookOpen, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronsDown, ChevronUp, Crown, Eye, FileText, History, Image,
   Mic, MicOff, MessageCircle, MoreVertical, Palette, Paperclip, Pencil, Phone, Pin, Play, Plus, Reply, Search, Send,
   CornerUpRight, Settings, Shield, Smile, Sticker, Trash2, Type, UserMinus, UserPlus, Users, Video, X,
 } from 'lucide-react';
@@ -128,21 +135,8 @@ function conversationPreview(conv: ChatConversation, myId?: string): string {
   const sender = message.sender?.id === myId ? 'Você' : conv.type === 'group' ? message.sender?.name?.split(' ')[0] : '';
   return `${sender ? `${sender}: ` : ''}${preview}`;
 }
-let stopCurrentNotificationSound:(()=>void)|null=null;
-function stopNotificationSound(){stopCurrentNotificationSound?.();}
-function playNotificationSound() {
-  if(stopCurrentNotificationSound)return;
-  const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return;
-  try{
-    const ctx = new Ctor();
-    stopCurrentNotificationSound=scheduleChatNotificationSound(ctx,()=>{stopCurrentNotificationSound=null;});
-    if(ctx.state==='suspended')void ctx.resume().catch(stopNotificationSound);
-  }catch{stopNotificationSound();}
-}
-
 /* ── ConvAvatar ─────────────────────────────────────────────────────────── */
-function ConvAvatar({ conv, usersById }: { conv: ChatConversation; usersById: Map<string, User> }) {
+const ConvAvatar = memo(function ConvAvatar({ conv, usersById }: { conv: ChatConversation; usersById: Map<string, User> }) {
   const { user: currentUser } = useAuth();
   const online = conv.type === 'direct' && conv.other_participant?.online === true;
   const dot = online ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" /> : null;
@@ -157,14 +151,14 @@ function ConvAvatar({ conv, usersById }: { conv: ChatConversation; usersById: Ma
   const name = conv.name || '?';
   const img = <AchievementAvatar userId={conv.other_participant?.id || currentUser?.id} name={name} photo={photoUrl || (conv.other_participant ? undefined : currentUser?.photo_url)} size={44} />;
   return <div className="relative flex-shrink-0">{img}{dot}</div>;
-}
+});
 
 /* ── ReadTick ───────────────────────────────────────────────────────────── */
 function ReadTick({ mine, seen }: { mine: boolean; seen: boolean }) {
   if (!mine) return null;
   return seen
-    ? <CheckCheck size={12} className="text-sky-300" />
-    : <Check size={12} className="text-white/50" />;
+    ? <CheckCheck size={14} className="chat-read-tick is-read" aria-label="Lida" />
+    : <Check size={14} className="chat-read-tick" aria-label="Enviada, ainda não lida" />;
 }
 
 interface MsgBubbleProps {
@@ -173,6 +167,9 @@ interface MsgBubbleProps {
   isGroup?: boolean;
   lastReadAt?: string;
   onEdit?: (msg: ChatMessage) => void;
+  onJump?: (id: string) => void;
+  onRetry?: () => void;
+  onDiscard?: () => void;
   onDelete?: (msg: ChatMessage) => void;
   onReply?: (msg: ChatMessage) => void;
   onForward?: (msg: ChatMessage) => void;
@@ -186,10 +183,10 @@ interface MsgBubbleProps {
   isSelfConversation?: boolean;
 }
 
-function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, onReply, onForward, onReact, onPin, onImageClick, mentionMatcher, onMention, theme, isPinned, isSelfConversation }: MsgBubbleProps) {
+function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, onReply, onForward, onReact, onPin, onImageClick, mentionMatcher, onMention, theme, isPinned, isSelfConversation, onJump, onRetry, onDiscard }: MsgBubbleProps) {
   const age = Date.now() - new Date(message.created_at).getTime();
-  const canEdit = mine && !!onEdit && (isSelfConversation || age < 30 * 60 * 1000);
-  const canDelete = mine && !!onDelete && (isSelfConversation || age < 30 * 60 * 1000);
+  const canEdit = mine && !message.delivery_state && !!onEdit && (isSelfConversation || age < 30 * 60 * 1000);
+  const canDelete = mine && !message.delivery_state && !!onDelete && (isSelfConversation || age < 30 * 60 * 1000);
   const [showTooltip, setShowTooltip] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -256,7 +253,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   );
 
   const replyPreview = message.reply_to && (
-    <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1.5 ${mine ? 'border-white/40 bg-black/10' : 'border-orange-300 bg-orange-50'}`}>
+    <div role="button" tabIndex={0} aria-label="Ir para a mensagem respondida" onClick={() => message.reply_to && onJump?.(message.reply_to.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (message.reply_to) onJump?.(message.reply_to.id); } }} className={`cursor-pointer mb-1.5 rounded-lg border-l-2 px-2 py-1.5 ${mine ? 'border-white/40 bg-black/10' : 'border-orange-300 bg-orange-50'}`}>
       <p className="text-[11px] font-bold" style={{ color: bubbleText }}>{message.reply_to.sender?.name || 'Usuário'}</p>
       <p className="text-xs truncate" style={{ color: bubbleText }}>
         {message.reply_to.content?.startsWith('[IMAGE]') ? '📷 Foto'
@@ -292,7 +289,9 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {loadingReaders ? '...' : <Eye size={9} />}
         </button>
       )}
-      <ReadTick mine={mine} seen={seen} />
+      <ReadTick mine={mine && !message.delivery_state} seen={seen} />
+      {message.delivery_state === 'sending' && <span className="chat-delivery-pending"><Loader2 size={12} />Enviando?</span>}
+      {message.delivery_state === 'failed' && <span className="chat-delivery-failed">Não enviada <button type="button" onClick={onRetry}>Tentar novamente</button><button type="button" onClick={onDiscard}>Dispensar</button></span>}
     </div>{onReact && <ChatMessageReactions reactions={message.reactions || []} mine={mine} onReact={onReact}/>}</>
   );
 
@@ -321,7 +320,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     document.body
   );
 
-  const menuBtn = (
+  const menuBtn = message.delivery_state ? null : (
     <Popover open={showMenu} onOpenChange={setShowMenu}>
     <PopoverTrigger asChild>
     <button onClick={e => e.stopPropagation()} aria-label="Opções da mensagem" aria-expanded={showMenu}
@@ -337,13 +336,15 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   const swipeStyle = { transform: `translateX(${swipeDx}px)`, transition: swipeDx === 0 ? 'transform 0.2s' : 'none' };
 
   if (displayContent.startsWith('[AUDIO_MSG]')) {
+    const [audioSrc, ...audioCaption] = displayContent.slice(11).split('\n');
     return (
       <div className="relative group max-w-[85%]" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
         <div className={cn('rounded-2xl px-4 py-3 shadow-sm', mine ? 'rounded-tr-sm' : 'rounded-tl-sm')} style={bubbleStyle}>
           {!mine && <p className="chat-message-author mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
           {fwdHeader}
           {replyPreview}
-          <audio controls src={displayContent.slice(11)} className="w-full h-14" preload="none" style={{ minWidth: 0, maxWidth: '100%' }} />
+          <ChatAudioPlayer src={audioSrc} />
+          {!!audioCaption.length && <p className="chat-message-text mt-2"><LinkText text={audioCaption.join('\n')} mentionMatcher={mentionMatcher} onMention={onMention} /></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}{readersPopup}
@@ -354,7 +355,8 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
   if (displayContent.startsWith('[DOC|')) {
     const end = displayContent.indexOf(']');
     const fileName = end > 5 ? displayContent.slice(5, end) : 'Documento';
-    const src = end >= 0 ? displayContent.slice(end + 1) : displayContent;
+    const [src, ...captionLines] = (end >= 0 ? displayContent.slice(end + 1) : displayContent).split('\n');
+    const caption = captionLines.join('\n');
     const ext = fileName.split('.').pop()?.toUpperCase() || 'DOC';
     return (
       <div className="relative group max-w-[85%]" style={swipeStyle} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
@@ -362,10 +364,11 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {!mine && <p className="chat-message-author mb-1 text-sm font-bold text-slate-500 whitespace-nowrap">{message.sender?.name || 'Usuário'}</p>}
           {fwdHeader}
           {replyPreview}
-          <a href={src} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <a href={src} target="_blank" rel="noopener noreferrer" onClick={event => { event.preventDefault(); openMedia({url:src,name:fileName}); }} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0"><FileText size={20} className="text-orange-500" /></div>
             <div className="min-w-0"><p className="text-sm font-semibold text-slate-800 truncate max-w-[220px]">{fileName}</p><p className="text-xs text-orange-500 font-bold">{ext}</p></div>
           </a>
+          {caption && <p className="chat-message-text mt-2"><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention} /></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}{readersPopup}
@@ -442,6 +445,124 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
     </div>
   );
 }
+
+type ConversationAction = 'avatar' | 'select' | 'menu-open' | 'menu-close' | 'pin' | 'mute' | 'archive';
+type ConversationHandler = (action: ConversationAction, conversation: ChatConversation, event?: React.MouseEvent) => void;
+function useConversationHandler(handler: ConversationHandler): ConversationHandler {
+  const current = useRef(handler);
+  useLayoutEffect(() => { current.current = handler; });
+  return useCallback((action, conversation, event) => current.current(action, conversation, event), []);
+}
+interface ConversationRowProps {
+  conv: ChatConversation; draft?: string; selected: boolean; menuOpen: boolean; busy: boolean; darkMode: boolean;
+  myId?: string; usersById: Map<string,User>; typing?: Map<string,{name:string;ts:number;isRecording?:boolean}>; onAction: ConversationHandler;
+}
+const ChatConversationRow = memo(function ChatConversationRow({conv,draft,selected,menuOpen,busy,darkMode,myId,usersById,typing,onAction}: ConversationRowProps) {
+  return (
+            <div key={conv.id} className={cn(
+              'chat-conversation-row group relative w-full border-b flex items-center gap-3 transition-colors',
+              darkMode ? 'border-[hsl(var(--muted))] hover:bg-[hsl(var(--card))]' : 'border-slate-50 hover:bg-slate-50',
+              conv.unread_count > 0 && 'has-unread',
+              selected && (darkMode ? 'bg-[hsl(var(--muted))]' : 'bg-orange-50'),
+            )}>
+              {/* Avatar: click → profile (direct) or select (group) */}
+              <button
+                onClick={() => onAction('avatar', conv)}
+                className="chat-conversation-avatar pl-4 py-3 flex-shrink-0 hover:opacity-80 transition-opacity"
+                title={conv.type === 'direct' ? 'Ver perfil' : undefined}
+              >
+                <ConvAvatar conv={conv} usersById={usersById} />
+              </button>
+              {/* Body: click → select conversation */}
+              <button onClick={() => onAction('select', conv)} className="chat-conversation-body min-w-0 flex-1 text-left pr-2 py-3" aria-current={selected ? 'true' : undefined} title={conv.name || 'Minhas notas'}>
+                <div className="chat-conversation-summary flex items-center gap-1.5">
+                  <p className={cn("chat-conversation-name min-w-0 whitespace-normal break-words text-[15px] font-bold leading-5", darkMode ? "text-[hsl(var(--foreground))]" : "text-slate-800")}>{conv.type === 'direct' && !conv.other_participant ? 'Minhas notas' : (conv.name || 'Conversa direta')}</p>
+                  {conv.last_message?.created_at && <time className='chat-conversation-time' dateTime={conv.last_message.created_at}>{conversationTime(conv.last_message.created_at)}</time>}
+                </div>
+                <div className='chat-conversation-bottom'>
+                  {!draft && (() => { const delivery = chatDelivery(conv, myId); return delivery ? <span title={delivery.label} aria-label={delivery.label} className={cn('chat-conversation-delivery', delivery.read && 'is-read')}>{delivery.read ? <CheckCheck size={14} /> : <Check size={14} />}<span className="sr-only">{delivery.label}</span></span> : null; })()}
+                  <p className='chat-conversation-preview truncate'>{(()=>{const ct=typing;if(ct&&ct.size>0){const us=Array.from(ct.values());const rec=us.some(u=>u.isRecording);return <span className="text-orange-500 italic">{rec?'🎤 Gravando áudio...':`${us.map(u=>u.name).join(', ')} ${us.length===1?'está':'estão'} digitando...`}</span>;}return draft?<><span className='chat-draft-label'>Rascunho: </span>{draft}</>:conversationPreview(conv,myId);})()}</p>
+                  {conv.is_pinned && <Pin size={12} className='text-orange-400 flex-shrink-0' aria-label='Conversa fixada'/>}
+                  {conv.is_muted && <BellOff size={12} className='text-slate-400 flex-shrink-0' aria-label='Conversa silenciada'/>}
+                  {conv.unread_count > 0 && <span className={cn('chat-conversation-unread',conv.is_muted && 'is-muted')} aria-label={`${conv.unread_count} mensagens não lidas`}>{conv.unread_count>99?'99+':conv.unread_count}</span>}
+                </div>
+              </button>
+              <Popover open={menuOpen} onOpenChange={open=>onAction(open?'menu-open':'menu-close',conv)}>
+                <PopoverTrigger asChild>
+                  <button type='button' className='chat-conversation-more' title='Opções da conversa' aria-label={`Opções da conversa ${conv.name || 'Minhas notas'}`} disabled={busy}><MoreVertical size={18}/></button>
+                </PopoverTrigger>
+                <PopoverContent align='end' sideOffset={6} collisionPadding={12} className='chat-conversation-options' aria-label={`Ações da conversa ${conv.name || 'Minhas notas'}`}>
+                  <button type='button' disabled={busy} onClick={event=>onAction('pin',conv,event)}><Pin size={17}/><span>{conv.is_pinned?'Desafixar conversa':'Fixar conversa'}</span></button>
+                  <button type='button' disabled={busy} onClick={event=>onAction('mute',conv,event)}>{conv.is_muted?<Bell size={17}/>:<BellOff size={17}/>}<span>{conv.is_muted?'Reativar notificações':'Silenciar conversa'}</span></button>
+                  <button type='button' disabled={busy} onClick={()=>onAction('archive',conv)}><Archive size={17}/><span>{conv.is_archived?'Desarquivar conversa':'Arquivar conversa'}</span></button>
+                </PopoverContent>
+              </Popover>
+            </div>
+);
+});
+
+type HistoryAction = 'attention' | 'profile' | 'image' | 'edit' | 'delete' | 'reply' | 'forward' | 'pin' | 'react' | 'jump' | 'retry' | 'discard';
+type HistoryHandler = (action: HistoryAction, message: ChatMessage, value?: string | null) => void | Promise<void>;
+function useHistoryHandler(handler: HistoryHandler): HistoryHandler {
+  const current = useRef(handler);
+  useLayoutEffect(() => { current.current = handler; });
+  return useCallback((action, message, value) => current.current(action, message, value), []);
+}
+interface HistoryRowsProps {
+  displayedMessages: ChatMessage[]; myId?: string; usersById: Map<string, User>;
+  isGroup: boolean; isSelfConversation: boolean; lastReadAt?: string; pinnedMessageId?: string;
+  requestedMessage: string | null; showAttention: boolean; theme: ChatTheme;
+  mentionMatcher: MentionMatcher; openMentionProfile(id: string): void; onAction: HistoryHandler;
+}
+type HistoryMessageProps = Omit<HistoryRowsProps, 'displayedMessages'> & { message: ChatMessage; newDay: boolean; continuation: boolean };
+const ChatHistoryMessage = memo(function ChatHistoryMessage({ message, newDay, continuation, myId, usersById, isGroup, isSelfConversation, lastReadAt, pinnedMessageId, requestedMessage, showAttention, theme, mentionMatcher, openMentionProfile, onAction }: HistoryMessageProps) {
+  const mine = message.sender_id === myId;
+  return (
+                  <Fragment key={message.id}>
+                  {newDay && <div className="chat-day-divider"><time dateTime={message.created_at}>{new Date(message.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</time></div>}
+                  <div id={`chat-message-${message.id}`} data-conversation-id={message.conversation_id} className={cn('chat-message-row flex gap-2', mine && 'justify-end', continuation && 'is-continuation',requestedMessage===message.id && 'chat-message-attention')}>
+                    {showAttention && !message.is_deleted && !message.delivery_state && <button type='button' className='chat-attention-pick' aria-label={`Chamar atenção para a mensagem de ${message.sender?.name || 'participante'}: ${message.content.startsWith('[')?'Mídia ou arquivo':message.content.slice(0,100)}`} onClick={()=>onAction('attention',message)}><span><Bell size={16}/>Selecionar mensagem</span></button>}
+                    {!mine && (
+                      <button
+                        onClick={() => onAction('profile',message)}
+                        className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                        aria-label={`Ver perfil de ${message.sender?.name || "usuário"}`}
+                      >
+                        <AchievementAvatar userId={message.sender_id} name={message.sender?.name || 'Usuário'}
+                          photo={usersById.get(message.sender_id || '')?.photo_url || message.sender?.photo_url} size={36} />
+                      </button>
+                    )}
+                    <MessageBubble
+                      message={message} mine={mine} lastReadAt={lastReadAt} theme={theme}
+                      isGroup={isGroup}
+                      isSelfConversation={isSelfConversation}
+                      mentionMatcher={mentionMatcher} onMention={openMentionProfile}
+                      onJump={id => onAction('jump',message,id)} onRetry={() => onAction('retry',message)} onDiscard={() => onAction('discard',message)}
+                      onImageClick={source => onAction('image',message,source)}
+                      onEdit={mine ? msg => onAction('edit',msg) : undefined}
+                      onDelete={mine ? msg => onAction('delete',msg) : undefined}
+                      onReply={message.delivery_state ? undefined : msg => onAction('reply',msg)}
+                      onForward={msg => onAction('forward',msg)}
+                      onReact={message.delivery_state ? undefined : async emoji => { await onAction('react',message,emoji); }}
+                      onPin={msg => onAction('pin',msg)}
+                      isPinned={pinnedMessageId === message.id}
+                    />
+                  </div>
+                  </Fragment>
+);
+});
+
+const ChatHistoryRows = memo(function ChatHistoryRows({ displayedMessages, myId, usersById, isGroup, isSelfConversation, lastReadAt, pinnedMessageId, requestedMessage, showAttention, theme, mentionMatcher, openMentionProfile, onAction }: HistoryRowsProps) {
+  return <>{displayedMessages.map((message, index) => {
+                const previous = displayedMessages[index - 1];
+                const newDay = !previous || dayKey(previous.created_at) !== dayKey(message.created_at);
+                const continuation = !newDay && previous?.sender_id === message.sender_id
+                  && new Date(message.created_at).getTime() - new Date(previous.created_at).getTime() < 5 * 60_000;
+                return <ChatHistoryMessage key={message.id} message={message} newDay={newDay} continuation={continuation} myId={myId} usersById={usersById}
+                  isGroup={isGroup} isSelfConversation={isSelfConversation} lastReadAt={lastReadAt} pinnedMessageId={pinnedMessageId} requestedMessage={requestedMessage}
+                  showAttention={showAttention} theme={theme} mentionMatcher={mentionMatcher} openMentionProfile={openMentionProfile} onAction={onAction} />;
+})}</>;
+});
 
 /* ── GroupSettings ──────────────────────────────────────────────────────── */
 function GroupSettings({
@@ -739,25 +860,7 @@ function UserProfileModal({ profileUser, conversations, onClose, onChat }: {
         )}
       </div>
 
-      {lightboxSrc && (
-        <div
-          className="fixed inset-0 z-[600] flex items-center justify-center bg-black/90"
-          onClick={() => setLightboxSrc(null)}
-        >
-          <img
-            src={lightboxSrc}
-            alt=""
-            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-            onClick={e => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setLightboxSrc(null)}
-            className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center"
-          >
-            <X size={20} />
-          </button>
-        </div>
-      )}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 
@@ -785,6 +888,7 @@ export function Chat() {
   const [chatParams, setChatParams] = useSearchParams();
   const requestedConversation = chatParams.get('conversa');
   const requestedMessage=chatParams.get('mensagem');
+  const navigationKey = useLocation().key;
   const [showAttention,setShowAttention]=useState(false);
   const [attentionMessage,setAttentionMessage]=useState<ChatMessage|null>(null);
   const [attentionFeedback,setAttentionFeedback]=useState('');
@@ -803,15 +907,52 @@ export function Chat() {
   const selectedId=requestedConversation;
   const selectedJarvis = selectedId === JARVIS_CONVERSATION_ID;
   const workspace = getChatWorkspace(user?.id || null);
+  useEffect(() => () => workspace.drafts.flush(), [workspace, selectedId]);
   const drafts = useSyncExternalStore(workspace.drafts.subscribe, workspace.drafts.getSnapshot);
   const jarvisState = useSyncExternalStore(workspace.jarvis.subscribe, workspace.jarvis.getSnapshot);
   const messageText = selectedId ? drafts[selectedId]?.text || '' : '';
   const setMessageText = useCallback((value: string | ((previous: string) => string)) => {
     if (selectedId) workspace.drafts.set(selectedId, value);
   }, [workspace, selectedId]);
-  const sendingConversations = useRef(new Set<string>());
+  const attachmentKeys = useRef(new WeakMap<File,string>());
+  const attachmentUrls = useRef(new WeakMap<File,string>());
+  const attachmentLock = useRef(false);
+  const [attachmentSending, setAttachmentSending] = useState(false);
+  const outgoing = useSyncExternalStore(workspace.outbox.subscribe, workspace.outbox.getSnapshot);
   const [sendFailure, setSendFailure] = useState<{ conversationId: string; message: string } | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerSizeFrame = useRef<number | null>(null);
+  const visibleRead = useRef<() => void>(() => undefined);
+  const readMessageKey = useRef('');
+  const mediaJump = useRef<{ until: number; id: string | null }>({ until: 0, id: null });
+  const mentionDirectory = useRef(new Map<string, { at: number; request: Promise<GroupParticipant[]> }>());
+  useEffect(() => () => { if (composerSizeFrame.current !== null) cancelAnimationFrame(composerSizeFrame.current); }, []);
+  function alignMentionMedia() {
+    if (mediaJump.current.id && Date.now() < mediaJump.current.until) document.getElementById('chat-message-' + mediaJump.current.id)?.scrollIntoView({ block: 'center' });
+  }
+  function resizeComposer() {
+    if (composerSizeFrame.current !== null) return;
+    composerSizeFrame.current = requestAnimationFrame(() => {
+      composerSizeFrame.current = null;
+      const textarea = composerRef.current;
+      if (!textarea) return;
+      const oldHeight = textarea.clientHeight;
+      textarea.style.height = 'auto';
+      const height = Math.min(textarea.scrollHeight, 120);
+      textarea.style.height = height + 'px';
+      if (height !== oldHeight && atBottomRef.current && messagesContainerRef.current) messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    });
+  }
+  function loadMentionDirectory(id: string) {
+    let cached = mentionDirectory.current.get(id);
+    if (!cached || Date.now() - cached.at > 60000) {
+      cached = { at: Date.now(), request: getGroupParticipants(id) };
+      mentionDirectory.current.set(id, cached);
+    }
+    const request = conversationRequests.capture(id, 'mentions');
+    void cached.request.then(rows => { if (conversationRequests.accept(request)) setMentionParticipants(rows); }).catch(() => { mentionDirectory.current.delete(id); });
+  }
+
   const composerFocusRequested = useRef(true);
   const [composerFocusToken, setComposerFocusToken] = useState(0);
   const currentConversation=useRef<string|null>(selectedId);
@@ -832,7 +973,7 @@ export function Chat() {
     autoSelectFirst.current=false;
     currentConversation.current=id;
     conversationRequests.select(id);
-    setChatParams(params=>{const next=new URLSearchParams(params);if(id)next.set('conversa',id);else next.delete('conversa');next.delete('mensagem');next.delete('atencao');return next;},{replace:true});
+    setChatParams(params=>{const next=new URLSearchParams(params);if(id)next.set('conversa',id);else next.delete('conversa');next.delete('mensagem');next.delete('atencao');next.delete('mencao');return next;},{replace:true});
   },[setChatParams,conversationRequests]);
   const selectConversationRef=useRef(setSelectedId);
   useLayoutEffect(()=>{
@@ -879,8 +1020,10 @@ export function Chat() {
   const [forwardingSending, setForwardingSending] = useState(false);
 
   // Notifications
-  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('chat_sound_enabled') !== 'false');
-  useEffect(()=>{ localStorage.setItem('chat_sound_enabled', String(soundEnabled)); if(!soundEnabled)stopNotificationSound();},[soundEnabled]);
+  const [soundEnabled, setSoundEnabled] = useState(() => user?.id ? notificationSoundEnabled(user.id) : true);
+  useEffect(() => { if (user?.id) setSoundEnabled(notificationSoundEnabled(user.id)); }, [user?.id]);
+  function toggleSound() { const enabled = !soundEnabled; setSoundEnabled(enabled); if (user?.id) setNotificationSound(user.id, enabled); }
+  useEffect(() => { if (!soundEnabled) stopNotificationSound(); }, [soundEnabled]);
   useEffect(()=>()=>stopNotificationSound(),[]);
   const [browserNotifications, setBrowserNotifications] = useState(
     typeof Notification !== 'undefined' && Notification.permission === 'granted'
@@ -945,7 +1088,7 @@ export function Chat() {
   }, [peopleOpen]);
 
   const { palette: appearance } = useAppearance();
-  const theme: ChatTheme = { bubbleColor: appearance.chat.outgoing, bgColor: appearance.chat.background, bgImage: appearance.chat.wallpaper, textColor: appearance.chat.outgoingText };
+  const theme: ChatTheme = useMemo(() => ({ bubbleColor: appearance.chat.outgoing, bgColor: appearance.chat.background, bgImage: appearance.chat.wallpaper, textColor: appearance.chat.outgoingText }), [appearance.chat.outgoing, appearance.chat.background, appearance.chat.wallpaper, appearance.chat.outgoingText]);
   const { dark: darkMode } = useDarkMode();
 
   // User profile modal
@@ -955,12 +1098,17 @@ export function Chat() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
 
   // File attachment preview
   const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'document'; raw: File } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  useEffect(() => () => { if (pendingFile?.src.startsWith('blob:')) URL.revokeObjectURL(pendingFile.src); }, [pendingFile]);
+  useEffect(() => {
+    if (!pendingFile) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && !(event.target as HTMLElement)?.closest('.nex-media-dialog')) { setPendingFile(null); setPendingCaption(''); } };
+    window.addEventListener('keydown',close); return () => window.removeEventListener('keydown',close);
+  },[pendingFile]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Editing
@@ -1045,9 +1193,9 @@ export function Chat() {
     const next = await getConversations();
     if(request<conversationsApplied.current)return next;
     conversationsApplied.current=request;
-    setConversations(next);
+    setConversations(previous => reuseChatSnapshot(previous, preserveConversationReads(previous, next)));
     const firstActive = next.find(c => !c.is_archived);
-    if (autoSelectFirst.current && !currentConversation.current && firstActive) selectConversationRef.current(firstActive.id);
+    if (autoSelectFirst.current && !currentConversation.current && firstActive && window.innerWidth >= 768) selectConversationRef.current(firstActive.id);
     return next;
   }, []);
 
@@ -1060,28 +1208,29 @@ export function Chat() {
     });
     if (!result || !conversationRequests.accept(request)) return;
     const { messages: next, hasMore } = result;
+    workspace.outbox.reconcile(next);
     setMessagesLoading(false); setMessagesError('');
     const previousIds = knownMessageIdsRef.current;
     const incoming = next.filter(m => !previousIds.has(m.id) && m.sender_id !== user?.id);
     knownMessageIdsRef.current = new Set(next.map(m => m.id));
-    setMessages(previous => mergeChatMessages(previous.filter(message=>message.conversation_id===conversationId), next.filter(message=>message.conversation_id===conversationId)));
+    setMessages(previous => mergeChatMessages(previous.every(message => message.conversation_id === conversationId) ? previous : previous.filter(message=>message.conversation_id===conversationId), next.filter(message=>message.conversation_id===conversationId)));
     setHasMoreMessages(hasMore);
     const convIsMuted = selectedMuted;
     if (notify && incoming.length && !firstLoadRef.current && !convIsMuted && (document.hidden || !document.hasFocus())) {
       const last = incoming[incoming.length - 1];
       const title = last.sender?.name || selectedConversation?.name || 'Nova mensagem';
-      if (soundEnabled) playNotificationSound();
+      if (soundEnabled) playNotificationSound(user?.id);
       const body = last.content?.startsWith('[AUDIO_MSG]') ? '🎤 Áudio'
         : last.content?.startsWith('[STICKER]') ? '🎭 Figurinha'
         : last.content?.startsWith('[IMAGE]') ? '📷 Foto'
         : last.content?.startsWith('[VIDEO]') ? '🎬 Vídeo'
         : last.content ?? '';
       setToast({ id: last.id, title, body, conversationId });
-      setTimeout(() => setToast(cur => cur?.id === last.id ? null : cur), 6000);
+      setTimeout(() => setToast(cur => cur?.id === last.id ? null : cur), 3000);
       // Desktop delivery is centralized in Web Push for every module.
     }
     firstLoadRef.current = false;
-  }, [browserNotifications, selectedConversation?.name, soundEnabled, user?.id, selectedMuted,conversationRequests]);
+  }, [browserNotifications, selectedConversation?.name, soundEnabled, user?.id, selectedMuted,conversationRequests,workspace]);
 
   const loadOlderMessages = useCallback(async () => {
     if (!selectedId || loadingOlder || !hasMoreMessages) return;
@@ -1173,7 +1322,7 @@ export function Chat() {
     composerFocusRequested.current = true;
     setMobileView('messages');
     loadersRef.current.loadMessages(selectedId, false);
-    markConversationRead(selectedId).catch(() => {});
+
     const iv = setInterval(() => { void loadersRef.current.loadMessages(selectedId, true); void loadersRef.current.loadConversations().catch(()=>undefined); }, 3500);
     return () => clearInterval(iv);
   }, [selectedId]);
@@ -1181,6 +1330,7 @@ export function Chat() {
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
         mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
         mediaRecorderRef.current = null;
       }
@@ -1214,7 +1364,7 @@ export function Chat() {
     prependScrollRef.current = null;
     initialScrollRef.current = false;
     lastMessageRef.current = last?.id ?? null;
-  }, [messages, messagesLoading, selectedId, user?.id, mobileView, messageSearch]);
+  }, [messages, messagesLoading, selectedId, user?.id, mobileView, messageSearch, outgoing]);
 
   useEffect(()=>{
     if(!selectedId || selectedId === JARVIS_CONVERSATION_ID || !requestedMessage || (requestedConversation && selectedId!==requestedConversation) || messagesLoading) return;
@@ -1227,23 +1377,47 @@ export function Chat() {
   },[selectedId,requestedMessage,requestedConversation,messagesLoading,conversationRequests]);
 
   useLayoutEffect(()=>{
-    if(!requestedMessage || messagesLoading || (requestedConversation && selectedId!==requestedConversation) || focusedMessage.current===`${selectedId}:${requestedMessage}`)return;
+    if(!requestedMessage || messagesLoading || (requestedConversation && selectedId!==requestedConversation) || focusedMessage.current===`${navigationKey}:${selectedId}:${requestedMessage}`)return;
     const target=document.getElementById(`chat-message-${requestedMessage}`);
     if(!target)return;
     target.scrollIntoView({block:'center'});atBottomRef.current=false;
-    focusedMessage.current=`${selectedId}:${requestedMessage}`;setShowScrollBtn(true);
-  },[messages,requestedMessage,requestedConversation,selectedId,messagesLoading]);
+    focusedMessage.current=`${navigationKey}:${selectedId}:${requestedMessage}`;mediaJump.current={until:Date.now()+2000,id:requestedMessage};setShowScrollBtn(true);
+  },[messages,requestedMessage,requestedConversation,selectedId,messagesLoading,navigationKey]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
     // Images can change row height after the request finishes. Follow only if
     // the user was already at the bottom; never pull them away from history.
-    const observer = new ResizeObserver(() => { if (atBottomRef.current) container.scrollTop = container.scrollHeight; });
+    const observer = new ResizeObserver(() => { if (atBottomRef.current) container.scrollTop = container.scrollHeight; else alignMentionMedia(); });
     observer.observe(container);
     container.querySelectorAll('.chat-message-row').forEach(row => observer.observe(row));
     return () => observer.disconnect();
   }, [messages, mobileView]);
+
+  useEffect(() => wsEventBus.subscribe(event => {
+    if (event.type !== 'message:read' || typeof event.conversationId !== 'string' || typeof event.readBy !== 'string' || typeof event.lastReadAt !== 'string') return;
+    setConversations(previous => applyChatRead(previous, event));
+  }), []);
+  useEffect(() => {
+    const last = messages.at(-1);
+    const mark = () => {
+      if (!selectedId || selectedJarvis || !last || last.conversation_id !== selectedId || messagesLoading || currentConversation.current !== selectedId || mobileView !== 'messages' || document.hidden || !document.hasFocus() || !atBottomRef.current) return;
+      const key = selectedId + ':' + last.id;
+      if (readMessageKey.current === key) return;
+      readMessageKey.current = key;
+      void markConversationRead(selectedId).catch(() => { if (readMessageKey.current === key) readMessageKey.current = ''; });
+    };
+    visibleRead.current = mark; mark();
+    window.addEventListener('focus', mark); document.addEventListener('visibilitychange', mark);
+    return () => { visibleRead.current = () => undefined; window.removeEventListener('focus', mark); document.removeEventListener('visibilitychange', mark); };
+  }, [selectedId, selectedJarvis, messages, messagesLoading, mobileView]);
+  useLayoutEffect(() => {
+    mediaJump.current.until = 0;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const animation = messagesContainerRef.current?.animate?.([{ opacity: .8, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 130, easing: 'ease-out' });
+    return () => animation?.cancel();
+  }, [selectedId]);
 
   async function handleArchiveConversation(conversation: ChatConversation) {
     if (archiveBusyRef.current || conversationActionsLock.current.has(conversation.id)) return;
@@ -1279,39 +1453,33 @@ export function Chat() {
 
   async function handleSend(e?: FormEvent) {
     e?.preventDefault();
+    const conversationId = selectedId;
+    if (!conversationId || selectedJarvis) return;
     if (pendingFile) {
-      if (!selectedId) return;
-      const prefix = pendingFile.type === 'image' ? '[IMAGE]' : pendingFile.type === 'video' ? '[VIDEO]' : `[DOC|${pendingFile.raw.name}]`;
+      if (attachmentLock.current) return;
+      const file = pendingFile, caption = pendingCaption, replyId = replyingTo?.id;
+      attachmentLock.current = true; setAttachmentSending(true); setSendFailure(null);
+      const key = attachmentKeys.current.get(file.raw) || crypto.randomUUID(); attachmentKeys.current.set(file.raw,key);
       try {
-        const url = await uploadChatMedia(pendingFile.raw);
-        await sendChatMessage(selectedId, `${prefix}${url}${pendingCaption ? '\n' + pendingCaption : ''}`, replyingTo?.id);
-        setPendingCaption('');
-        setReplyingTo(null);
-      } catch {
-        alert('Erro ao enviar arquivo. Tente novamente.');
-      }
-      await Promise.all([loadMessages(selectedId), loadConversations()]);
-      setPendingFile(null);
+        let url = attachmentUrls.current.get(file.raw);
+        if (!url) { url = await uploadChatMedia(file.raw); attachmentUrls.current.set(file.raw,url); }
+        const prefix = file.type === 'image' ? '[IMAGE]' : file.type === 'video' ? '[VIDEO]' : `[DOC|${file.raw.name}]`;
+        const message = await sendChatMessage(conversationId, prefix + url + (caption ? '\n' + caption : ''), replyId, key, user?.id);
+        if (currentConversation.current === conversationId) { setMessages(previous => mergeChatMessages(previous,[message])); setPendingFile(previous => previous === file ? null : previous); setPendingCaption(previous => previous === caption ? '' : previous); setReplyingTo(null); }
+        void loadConversations().catch(() => undefined);
+      } catch { setSendFailure({conversationId,message:'Não foi possível confirmar o envio do anexo. Tente novamente.'}); }
+      finally { attachmentLock.current = false; setAttachmentSending(false); }
       return;
     }
-    const conversationId = selectedId;
-    if (!conversationId || selectedJarvis || !messageText.trim()) return;
-    const lockKey = user?.id + ':' + conversationId;
-    if (sendingConversations.current.has(lockKey)) return;
     const draft = workspace.drafts.capture(conversationId);
-    sendingConversations.current.add(lockKey);
-    setSendFailure(null);
-    try {
-      await sendChatMessage(conversationId, messageText.trim().slice(0, 8000), replyingTo?.id);
-      workspace.drafts.clearIfUnchanged(conversationId, draft);
-      if (currentConversation.current === conversationId) setReplyingTo(null);
-      // A refresh failure must not turn an acknowledged send into a duplicate retry.
-      await Promise.allSettled([loadMessages(conversationId), loadConversations()]);
-    } catch (error) {
-      setSendFailure({ conversationId, message: error instanceof Error ? error.message : 'Não foi possível enviar. Seu rascunho foi mantido.' });
-    } finally {
-      sendingConversations.current.delete(lockKey);
-    }
+    if (!draft?.text.trim()) return;
+    const id = workspace.outbox.enqueue({conversationId,content:draft.text,replyToId:replyingTo?.id,replyTo:replyingTo ? {id:replyingTo.id,content:replyingTo.content,sender:replyingTo.sender} : null});
+    if (id) { atBottomRef.current = true; setShowScrollBtn(false); workspace.drafts.clearIfUnchanged(conversationId,draft); setReplyingTo(null); composerFocusRequested.current = true; }
+  }
+
+  function goToMessage(conversationId: string, messageId: string) {
+    focusedMessage.current = ''; setMessageSearch(''); setShowMsgSearch(false); setPeopleOpen(false); setSidebarMenuOpen(false); setMobileView('messages');
+    setChatParams(params => { const next=new URLSearchParams(params); next.set('conversa',conversationId); next.set('mensagem',messageId); return next; },{replace:true});
   }
 
   function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
@@ -1337,25 +1505,37 @@ export function Chat() {
     }
   }
 
+  const recordingStart = useRef(0);
+  function cancelRecording() {
+    recordingStart.current++;
+    const recorder = mediaRecorderRef.current;
+    if (recorder) { recorder.onstop = null; recorder.stream.getTracks().forEach(track => track.stop()); }
+    stopRecording();
+  }
+  useEffect(() => () => cancelRecording(), [selectedId]); // Cancel capture when leaving its conversation.
   async function startRecording() {
+    if (!selectedId || mediaRecorderRef.current) return;
+    const owner = selectedId;
+    const request = ++recordingStart.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (request !== recordingStart.current || currentConversation.current !== owner) { stream.getTracks().forEach(track => track.stop()); return; }
       const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
         .find(t => MediaRecorder.isTypeSupported(t)) || '';
       const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      const chunks: Blob[] = [];
+      mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         if (cancelRecordingRef.current) { cancelRecordingRef.current = false; return; }
         if (!selectedId) return;
         const actualMime = (mr.mimeType || 'audio/webm').split(';')[0];
         const ext = actualMime.includes('ogg') ? 'ogg' : actualMime.includes('mp4') ? 'mp4' : 'webm';
-        const blob = new Blob(audioChunksRef.current, { type: actualMime });
+        const blob = new Blob(chunks, { type: actualMime });
         try {
           const file = new File([blob], `audio.${ext}`, { type: actualMime });
           const url = await uploadChatMedia(file);
-          await sendChatMessage(selectedId, `[AUDIO_MSG]${url}`);
+          await sendChatMessage(selectedId, `[AUDIO_MSG]${url}`, undefined, undefined, user?.id);
           await Promise.all([loadMessages(selectedId), loadConversations()]);
         } catch { alert('Erro ao enviar áudio. Tente novamente.'); }
       };
@@ -1385,7 +1565,7 @@ export function Chat() {
   }
 
   function stopRecording() {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
     mediaRecorderRef.current = null;
     setIsRecording(false);
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
@@ -1562,11 +1742,12 @@ export function Chat() {
 
   // Filtered messages (search)
   const displayedMessages = useMemo(() => {
-    const currentMessages=messages.filter(message=>message.conversation_id===selectedId);
+    const serverMessages=messages.filter(message=>message.conversation_id===selectedId);
+    const currentMessages=user ? mergeChatOutbox(serverMessages,outgoing,selectedId,user) : serverMessages;
     if (!messageSearch.trim()) return currentMessages;
     const q = messageSearch.toLowerCase();
     return currentMessages.filter(m => m.content?.toLowerCase().includes(q));
-  }, [messages, messageSearch,selectedId]);
+  }, [messages, messageSearch,selectedId,outgoing,user]);
 
   // Right panel users split
   const { onlineUsers, offlineUsers } = useMemo(() => {
@@ -1574,6 +1755,37 @@ export function Chat() {
     const all = users.filter(u => u.id !== user?.id).filter(u => !q || u.name.toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
     return { onlineUsers: all.filter(u => u.online), offlineUsers: all.filter(u => !u.online) };
   }, [users, user?.id, userSearch]);
+
+  const onConversationAction = useConversationHandler((action, conversation, event) => {
+    if (action === 'menu-open') { setOpenConvActionsId(conversation.id); return; }
+    if (action === 'menu-close') { setOpenConvActionsId(null); return; }
+    if (action === 'avatar' && conversation.type === 'direct') { openProfileFromConv(conversation); return; }
+    if (action === 'select' || action === 'avatar') { setSelectedId(conversation.id); setMobileView('messages'); setMentionQuery(null); setMentionParticipants([]); return; }
+    setOpenConvActionsId(null);
+    if (action === 'pin' && event) void handlePinConversation(conversation.id, event);
+    if (action === 'mute' && event) void handleToggleMute(conversation.id, event);
+    if (action === 'archive') void handleArchiveConversation(conversation);
+  });
+  const onHistoryAction = useHistoryHandler((action, message, value) => {
+    if (message.conversation_id !== currentConversation.current) return;
+    if (action === 'retry' && message.client_message_id) { workspace.outbox.retry(message.client_message_id); return; }
+    if (action === 'discard' && message.client_message_id) { workspace.outbox.discard(message.client_message_id); return; }
+    if (action === 'jump' && value) { goToMessage(message.conversation_id,value); return; }
+    if (action === 'attention') setAttentionMessage(message);
+    else if (action === 'image') setLightboxSrc(value || null);
+    else if (action === 'edit') { setEditingMsg(message); setEditText(message.content); }
+    else if (action === 'delete') void handleDeleteMessage(message);
+    else if (action === 'reply') setReplyingTo(message);
+    else if (action === 'forward') { setForwardingMsg(message); setForwardSearch(''); }
+    else if (action === 'pin') void handlePinMessage(message);
+    else if (action === 'profile') {
+      const sender = usersById.get(message.sender_id || '');
+      if (sender) setProfileUser(sender);
+      else if (message.sender) setProfileUser({ id: message.sender.id, name: message.sender.name, email: '', photo_url: message.sender.photo_url, online: false, status: 'active', created_at: '', updated_at: '' } as User);
+    } else if (action === 'react') return setChatReaction(message.conversation_id, message.id, value || null).then(reactions => {
+      if (currentConversation.current === message.conversation_id) setMessages(previous => previous.map(item => item.id === message.id ? { ...item, reactions } : item));
+    }).catch(() => setAttentionFeedback('Não foi possível atualizar a reação.'));
+  });
 
   const canSend = !selectedConversation?.broadcast_mode || ['owner', 'admin'].includes(selectedConversation?.my_role || '');
   useLayoutEffect(() => {
@@ -1592,25 +1804,14 @@ export function Chat() {
       style={{'--chat-message-font-size':`${14*fontScale/100}px`} as CSSProperties}
     >
       {/* Lightbox */}
-      {lightboxSrc && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
-          onClick={() => setLightboxSrc(null)}>
-          <button onClick={() => setLightboxSrc(null)}
-            className="absolute top-4 right-4 h-10 w-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 z-10">
-            <X size={20} />
-          </button>
-          <img src={lightboxSrc} alt="foto"
-            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
-            onClick={e => e.stopPropagation()} />
-        </div>
-      )}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
 
       {showAttention && attentionMessage && selectedConversation && <ChatAttentionDialog key={`${selectedConversation.id}:${attentionMessage.id}`} conversationId={selectedConversation.id} name={selectedConversation.name || 'Conversa'} group={selectedConversation.type==='group'} message={messages.find(item=>item.id===attentionMessage.id) || attentionMessage} onClose={()=>setAttentionMessage(null)} onSent={count=>{setShowAttention(false);setAttentionMessage(null);setAttentionFeedback(`Atenção solicitada para ${count} participante(s).`);}}/>}
       {attentionFeedback && <div className='chat-attention-feedback' role='status'>{attentionFeedback}<button onClick={()=>setAttentionFeedback('')} aria-label='Fechar aviso'><X size={18}/></button></div>}
       {/* Toast */}
       {toast && (
-        <button onClick={() => { setSelectedId(toast.conversationId); setToast(null); }}
-          className="fixed bottom-5 right-5 z-[80] w-80 rounded-xl border border-orange-200 bg-white p-4 text-left shadow-2xl">
+        <button onClick={() => { goToMessage(toast.conversationId,toast.id); setToast(null); }}
+          key={toast.id} className="chat-transient-toast fixed bottom-5 right-5 z-[80] w-80 rounded-xl border border-orange-200 bg-white p-4 text-left shadow-2xl">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600"><MessageCircle size={18} /></div>
             <div className="min-w-0 flex-1">
@@ -1641,8 +1842,8 @@ export function Chat() {
                 <PopoverTrigger asChild><button className='chat-icon-button' title='Opções do chat' aria-label='Opções do chat'><MoreVertical size={20}/></button></PopoverTrigger>
                 <PopoverContent align='end' sideOffset={8} className='chat-sidebar-options'>
                   <p>Preferências do chat</p>
-                  <button onClick={()=>setSoundEnabled(value=>!value)} aria-pressed={soundEnabled}>{soundEnabled?<Bell size={18}/>:<BellOff size={18}/>}<span>Som das mensagens</span><small>{soundEnabled?'Ativado':'Desativado'}</small></button>
-                  <button type='button' onClick={playNotificationSound} disabled={!soundEnabled} aria-label='Testar som de mensagem'><Play size={18}/><span>Testar som</span><small>Quatro toques</small></button>
+                  <button onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled?<Bell size={18}/>:<BellOff size={18}/>}<span>Som das mensagens</span><small>{soundEnabled?'Ativado':'Desativado'}</small></button>
+                  <button type='button' onClick={() => playNotificationSound(user?.id)} disabled={!soundEnabled} aria-label='Testar som de mensagem'><Play size={18}/><span>Testar som</span><small>Toque de destaque</small></button>
                   <button onClick={requestBrowserNotifications}><Bell size={18}/><span>Notificações do computador</span><small>{browserNotifications?'Ativadas':'Ativar'}</small></button>
                   <button onClick={()=>{setSidebarMenuOpen(false);setShowTheme(true);}}><Palette size={18}/><span>Personalizar chat</span></button>
                 </PopoverContent>
@@ -1744,49 +1945,9 @@ export function Chat() {
               </span>
             </button>
           </div>}
-          {filteredConversations.length || showJarvisConversation ? filteredConversations.map(conv => (
-            <div key={conv.id} className={cn(
-              'chat-conversation-row group relative w-full border-b flex items-center gap-3 transition-colors',
-              darkMode ? 'border-[hsl(var(--muted))] hover:bg-[hsl(var(--card))]' : 'border-slate-50 hover:bg-slate-50',
-              conv.unread_count > 0 && 'has-unread',
-              selectedId === conv.id && (darkMode ? 'bg-[hsl(var(--muted))]' : 'bg-orange-50'),
-            )}>
-              {/* Avatar: click → profile (direct) or select (group) */}
-              <button
-                onClick={() => {
-                  if (conv.type === 'direct') openProfileFromConv(conv);
-                  else { setSelectedId(conv.id); setMobileView('messages'); }
-                }}
-                className="chat-conversation-avatar pl-4 py-3 flex-shrink-0 hover:opacity-80 transition-opacity"
-                title={conv.type === 'direct' ? 'Ver perfil' : undefined}
-              >
-                <ConvAvatar conv={conv} usersById={usersById} />
-              </button>
-              {/* Body: click → select conversation */}
-              <button onClick={() => { setSelectedId(conv.id); setMobileView('messages'); setMentionQuery(null); setMentionParticipants([]); }} className="chat-conversation-body min-w-0 flex-1 text-left pr-2 py-3" aria-current={selectedId === conv.id ? 'true' : undefined} title={conv.name || 'Minhas notas'}>
-                <div className="chat-conversation-summary flex items-center gap-1.5">
-                  <p className={cn("chat-conversation-name min-w-0 whitespace-normal break-words text-[15px] font-bold leading-5", darkMode ? "text-[hsl(var(--foreground))]" : "text-slate-800")}>{conv.type === 'direct' && !conv.other_participant ? 'Minhas notas' : (conv.name || 'Conversa direta')}</p>
-                  {conv.last_message?.created_at && <time className='chat-conversation-time' dateTime={conv.last_message.created_at}>{conversationTime(conv.last_message.created_at)}</time>}
-                </div>
-                <div className='chat-conversation-bottom'>
-                  <p className='chat-conversation-preview truncate'>{(()=>{const ct=typingByConv.get(conv.id);if(ct&&ct.size>0){const us=Array.from(ct.values());const rec=us.some(u=>u.isRecording);return <span className="text-orange-500 italic">{rec?'🎤 Gravando áudio...':`${us.map(u=>u.name).join(', ')} ${us.length===1?'está':'estão'} digitando...`}</span>;}return drafts[conv.id]?.text?<><span className='chat-draft-label'>Rascunho: </span>{drafts[conv.id].text}</>:conversationPreview(conv,user?.id);})()}</p>
-                  {conv.is_pinned && <Pin size={12} className='text-orange-400 flex-shrink-0' aria-label='Conversa fixada'/>}
-                  {conv.is_muted && <BellOff size={12} className='text-slate-400 flex-shrink-0' aria-label='Conversa silenciada'/>}
-                  {conv.unread_count > 0 && <span className={cn('chat-conversation-unread',conv.is_muted && 'is-muted')} aria-label={`${conv.unread_count} mensagens não lidas`}>{conv.unread_count>99?'99+':conv.unread_count}</span>}
-                </div>
-              </button>
-              <Popover open={openConvActionsId===conv.id} onOpenChange={open=>setOpenConvActionsId(open?conv.id:null)}>
-                <PopoverTrigger asChild>
-                  <button type='button' className='chat-conversation-more' title='Opções da conversa' aria-label={`Opções da conversa ${conv.name || 'Minhas notas'}`} disabled={conversationActionsBusy.has(conv.id)}><MoreVertical size={18}/></button>
-                </PopoverTrigger>
-                <PopoverContent align='end' sideOffset={6} collisionPadding={12} className='chat-conversation-options' aria-label={`Ações da conversa ${conv.name || 'Minhas notas'}`}>
-                  <button type='button' disabled={conversationActionsBusy.has(conv.id)} onClick={event=>{setOpenConvActionsId(null);void handlePinConversation(conv.id,event);}}><Pin size={17}/><span>{conv.is_pinned?'Desafixar conversa':'Fixar conversa'}</span></button>
-                  <button type='button' disabled={conversationActionsBusy.has(conv.id)} onClick={event=>{setOpenConvActionsId(null);void handleToggleMute(conv.id,event);}}>{conv.is_muted?<Bell size={17}/>:<BellOff size={17}/>}<span>{conv.is_muted?'Reativar notificações':'Silenciar conversa'}</span></button>
-                  <button type='button' disabled={conversationActionsBusy.has(conv.id)} onClick={()=>{setOpenConvActionsId(null);void handleArchiveConversation(conv);}}><Archive size={17}/><span>{conv.is_archived?'Desarquivar conversa':'Arquivar conversa'}</span></button>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )) : (
+          {filteredConversations.length || showJarvisConversation ? filteredConversations.map(conv => <ChatConversationRow key={conv.id} conv={conv} draft={drafts[conv.id]?.text}
+            selected={selectedId === conv.id} menuOpen={openConvActionsId === conv.id} busy={conversationActionsBusy.has(conv.id)} darkMode={darkMode}
+            myId={user?.id} usersById={usersById} typing={typingByConv.get(conv.id)} onAction={onConversationAction} />) : (
             <div className="chat-list-empty"><Search size={28} /><strong>Nenhuma conversa encontrada</strong><p>{conversationSearch || conversationFilter !== 'all' ? 'Ajuste a busca ou os filtros.' : 'Encontre uma pessoa da equipe para começar.'}</p>{(conversationSearch || conversationFilter !== 'all') && <button type="button" onClick={() => { setConversationSearch(''); setConversationFilter('all'); }}>Limpar filtros</button>}</div>
           )}
         </div>
@@ -1914,7 +2075,7 @@ export function Chat() {
             {selectedConversation.pinned_message && (
               <div className="chat-pinned-message flex-shrink-0 flex items-center gap-3" aria-label="Mensagem fixada">
                 <Pin size={16} className="flex-shrink-0" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 cursor-pointer" role="button" tabIndex={0} aria-label="Ir para a mensagem fixada" onClick={() => goToMessage(selectedConversation.id,selectedConversation.pinned_message!.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); goToMessage(selectedConversation.id,selectedConversation.pinned_message!.id); } }}>
                   <p className="chat-pinned-label">Mensagem fixada</p>
                   <p className="chat-pinned-preview truncate">
                     {selectedConversation.pinned_message.content?.startsWith('[IMAGE]') ? '📷 Foto'
@@ -1929,7 +2090,7 @@ export function Chat() {
 
             {showAttention && <div className='chat-attention-selection' role='status'><Bell size={20}/><span>Selecione a mensagem na conversa para chamar atenção.</span><button onClick={()=>{setShowAttention(false);setAttentionMessage(null);}}>Cancelar</button></div>}
             {/* Messages */}
-            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging',showAttention && 'is-selecting-attention')} data-custom-wallpaper={!!theme.bgImage} aria-label="Mensagens da conversa" onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
+            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging',showAttention && 'is-selecting-attention')} data-custom-wallpaper={!!theme.bgImage} aria-label="Mensagens da conversa" onWheelCapture={() => { mediaJump.current.until = 0; }} onTouchMoveCapture={() => { mediaJump.current.until = 0; }} onLoadCapture={alignMentionMedia} onLoadedMetadataCapture={alignMentionMedia} onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); if (atBottom) visibleRead.current(); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
               backgroundColor: theme.bgColor,
               backgroundImage: theme.bgImage ? `url(${theme.bgImage})` : undefined,
               backgroundPosition: theme.bgImage ? 'center' : undefined,
@@ -1947,56 +2108,10 @@ export function Chat() {
                   </button>
                 </div>
               )}
-              {displayedMessages.length ? displayedMessages.map((message, index) => {
-                const mine = message.sender_id === user?.id;
-                const previous = displayedMessages[index - 1];
-                const newDay = !previous || dayKey(previous.created_at) !== dayKey(message.created_at);
-                const continuation = !newDay && previous?.sender_id === message.sender_id
-                  && new Date(message.created_at).getTime() - new Date(previous.created_at).getTime() < 5 * 60_000;
-                const lastReadAt = selectedConversation?.other_participant?.last_read_at;
-                return (
-                  <Fragment key={message.id}>
-                  {newDay && <div className="chat-day-divider"><time dateTime={message.created_at}>{new Date(message.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</time></div>}
-                  <div id={`chat-message-${message.id}`} data-conversation-id={message.conversation_id} className={cn('chat-message-row flex gap-2', mine && 'justify-end', continuation && 'is-continuation',requestedMessage===message.id && 'chat-message-attention')}>
-                    {showAttention && !message.is_deleted && <button type='button' className='chat-attention-pick' aria-label={`Chamar atenção para a mensagem de ${message.sender?.name || 'participante'}: ${message.content.startsWith('[')?'Mídia ou arquivo':message.content.slice(0,100)}`} onClick={()=>setAttentionMessage(message)}><span><Bell size={16}/>Selecionar mensagem</span></button>}
-                    {!mine && (
-                      <button
-                        onClick={() => {
-                          const sender = users.find(u => u.id === message.sender_id);
-                          if (sender) { setProfileUser(sender); return; }
-                          if (message.sender) {
-                            const s = message.sender;
-                            setProfileUser({ id: s.id ?? message.sender_id, name: s.name, email: '', photo_url: s.photo_url, online: false, status: 'active', created_at: '', updated_at: '' } as User);
-                          }
-                        }}
-                        className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                        aria-label={`Ver perfil de ${message.sender?.name || "usuário"}`}
-                      >
-                        <AchievementAvatar userId={message.sender_id} name={message.sender?.name || 'Usuário'}
-                          photo={usersById.get(message.sender_id || '')?.photo_url || message.sender?.photo_url} size={36} />
-                      </button>
-                    )}
-                    <MessageBubble
-                      message={message} mine={mine} lastReadAt={lastReadAt} theme={theme}
-                      isGroup={selectedConversation?.type === 'group'}
-                      isSelfConversation={selectedConversation?.type === 'direct' && !selectedConversation?.other_participant}
-                      mentionMatcher={mentionMatcher} onMention={openMentionProfile}
-                      onImageClick={setLightboxSrc}
-                      onEdit={mine ? (msg) => { setEditingMsg(msg); setEditText(msg.content); } : undefined}
-                      onDelete={mine ? handleDeleteMessage : undefined}
-                      onReply={setReplyingTo}
-                      onForward={(msg) => { setForwardingMsg(msg); setForwardSearch(''); }}
-                      onReact={async emoji=>{
-                        const reactions=await setChatReaction(message.conversation_id,message.id,emoji);
-                        if(currentConversation.current===message.conversation_id)setMessages(previous=>previous.map(item=>item.id===message.id?{...item,reactions}:item));
-                      }}
-                      onPin={handlePinMessage}
-                      isPinned={selectedConversation?.pinned_message?.id === message.id}
-                    />
-                  </div>
-                  </Fragment>
-                );
-              }) : (
+              {displayedMessages.length ? <ChatHistoryRows displayedMessages={displayedMessages} myId={user?.id} usersById={usersById}
+                isGroup={selectedConversation.type === 'group'} isSelfConversation={selectedConversation.type === 'direct' && !selectedConversation.other_participant}
+                lastReadAt={selectedConversation.other_participant?.last_read_at} pinnedMessageId={selectedConversation.pinned_message?.id}
+                requestedMessage={requestedMessage} showAttention={showAttention} theme={theme} mentionMatcher={mentionMatcher} openMentionProfile={openMentionProfile} onAction={onHistoryAction} /> : (
                 <div className='chat-thread-status' role='status' aria-live='polite'>
                   {messagesLoading ? 'Carregando mensagens…' : messageSearch ? 'Nenhuma mensagem encontrada.' : messagesError ? 'Mensagens indisponíveis no momento.' : 'Nenhuma mensagem ainda.'}
                 </div>
@@ -2077,15 +2192,18 @@ export function Chat() {
                   </div>
                   {/* Footer */}
                   <div className="p-3 bg-slate-800">
+                    <button type="button" className="chat-edit-attachment" onClick={() => openMedia({url:pendingFile.src || URL.createObjectURL(pendingFile.raw),name:pendingFile.raw.name,type:pendingFile.raw.type,temporary:!pendingFile.src})}>Ampliar anexo</button>
+                    {pendingFile.type === 'image' && <button type="button" disabled={attachmentSending} className="chat-edit-attachment" onClick={() => { const original=pendingFile; void editImage(original.raw).then(file => { if (file && file !== original.raw) setPendingFile(current => current === original ? {src:URL.createObjectURL(file),type:'image',raw:file} : current); }); }}><Pencil size={16} />Cortar e marcar imagem</button>}
+                    {sendFailure?.conversationId === selectedId && <p className="chat-send-error" role="alert">{sendFailure.message}</p>}
                     <p className="text-[10px] text-slate-400 mb-1.5 px-1">{pendingFile.raw.name} · {(pendingFile.raw.size / 1024 / 1024).toFixed(1)} MB</p>
                     <div className="flex gap-2">
-                      <input value={pendingCaption} onChange={e => setPendingCaption(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } if (e.key === 'Escape') { setPendingFile(null); setPendingCaption(''); } }}
-                        placeholder="Adicionar legenda..." autoFocus
-                        className="flex-1 h-10 rounded-xl bg-slate-700 border border-slate-600 text-white placeholder-slate-400 px-3 text-sm outline-none focus:border-orange-400" />
-                      <button onClick={() => handleSend()}
+                      <ChatCaptionInput disabled={attachmentSending} value={pendingCaption} onChange={setPendingCaption} group={selectedConversation.type === 'group'}
+                        participants={selectedConversation.type === 'group' ? mentionParticipants : selectedConversation.other_participant ? [selectedConversation.other_participant] : []}
+                        onNeedParticipants={() => { if (selectedConversation.type === 'group') loadMentionDirectory(selectedConversation.id); }}
+                        onSend={() => void handleSend()} onCancel={() => { setPendingFile(null); setPendingCaption(''); }} />
+                      <button disabled={attachmentSending} aria-label="Enviar anexo" onClick={() => handleSend()}
                         className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full bg-orange-500 hover:bg-orange-600 text-white">
-                        <Send size={16} />
+                        {attachmentSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                       </button>
                     </div>
                   </div>
@@ -2105,17 +2223,12 @@ export function Chat() {
             {canSend && !pendingFile && (
               <div className="chat-input-bar border-t border-slate-100 bg-white p-3 flex-shrink-0">
                 {isRecording && (
-                  <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-                    <div className="flex items-end gap-[2px] flex-1 min-w-0 h-8">
-                      {(waveformBars.length > 0 ? waveformBars : Array.from({length:20},()=>20)).map((v,i)=>(
-                        <span key={i} className="flex-1 rounded-sm bg-red-500 transition-all duration-75"
-                          style={{height:`${Math.max(4,(v/255)*100)}%`,opacity:waveformBars.length>0?1:0.3}} />
-                      ))}
-                    </div>
-                    <span className="text-sm font-semibold text-red-700 flex-shrink-0">{recordingSeconds}s</span>
-                    <button onClick={stopRecording} className="ml-2 h-8 px-3 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600 flex-shrink-0">Enviar</button>
-                    <button onClick={() => { cancelRecordingRef.current = true; mediaRecorderRef.current?.stop(); mediaRecorderRef.current = null; setIsRecording(false); if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; } if (audioCtxRef.current) { audioCtxRef.current.close().catch(()=>{}); audioCtxRef.current = null; } analyserRef.current = null; setWaveformBars([]); }} className="h-8 px-3 rounded-lg border border-red-200 text-red-600 text-xs font-bold flex-shrink-0">Cancelar</button>
+                  <div className="chat-recording-panel" role="status" aria-label="Gravando áudio">
+                    <span className="chat-recording-mic"><Mic size={18} /></span>
+                    <time>{Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, '0')}</time>
+                    <div className="chat-recording-wave" aria-hidden="true">{(waveformBars.length ? waveformBars : Array(20).fill(12)).map((value, index) => <span key={index} style={{ height: Math.max(12, value / 255 * 100) + '%' }} />)}</div>
+                    <button type="button" onClick={cancelRecording} aria-label="Cancelar gravação" title="Cancelar gravação"><Trash2 size={18} /></button>
+                    <button type="button" onClick={stopRecording} aria-label="Enviar gravação" title="Enviar gravação"><Send size={18} /></button>
                   </div>
                 )}
                 {(()=>{const ct=selectedId?typingByConv.get(selectedId):null;if(!ct||ct.size===0)return null;const us=Array.from(ct.values());return(<div className="px-1 pb-1 flex items-center gap-1.5 text-xs text-slate-400 italic"><span className="flex gap-[3px] items-end"><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'0ms'}}/><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'150ms'}}/><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'300ms'}}/></span>{us.map(u=>u.name).join(', ')} {us.length===1?'está':'estão'} digitando...</div>);})()}
@@ -2222,16 +2335,13 @@ export function Chat() {
                   })()}
                   <textarea ref={composerRef} value={messageText} onChange={e => {
                     setMessageText(e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-                    const c = messagesContainerRef.current;
-                    if (c && atBottomRef.current) c.scrollTop = c.scrollHeight;
+                    resizeComposer();
                     const val = e.target.value;
                     const atIdx = val.lastIndexOf('@');
                     if (atIdx >= 0 && (atIdx === 0 || val[atIdx - 1] === ' ') && selectedConversation?.type === 'group') {
                       setMentionQuery(val.slice(atIdx + 1));
                       if (mentionParticipants.length === 0) {
-                        getGroupParticipants(selectedConversation.id).then(setMentionParticipants).catch(() => {});
+                        loadMentionDirectory(selectedConversation.id);
                       }
                     } else {
                       setMentionQuery(null);

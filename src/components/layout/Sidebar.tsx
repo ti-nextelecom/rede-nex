@@ -25,7 +25,7 @@ import {
   FolderKanban,
   Receipt,
   Activity,
-  Wrench,
+  Wrench, KeyRound,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../lib/auth';
@@ -52,6 +52,7 @@ const baseNavItems = [
   { label: 'Formulários', icon: ClipboardList, to: '/formularios' },
   { label: 'Assinatura', icon: FileSignature, to: '/assinatura' },
   { label: 'Quadro', icon: Square, to: '/lousas' },
+  { label: 'Cofre de senhas', icon: KeyRound, to: '/senhas' },
   { label: 'Notas', icon: BookText, to: '/notas' },
   { label: 'Analytics', icon: BarChart3, to: '/analytics' },
   { label: 'Gestão T.I.', icon: Activity, to: '/gestao-ti' },

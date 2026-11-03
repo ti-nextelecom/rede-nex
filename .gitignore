@@ -33,3 +33,4 @@ coverage/
 *.bak
 *.bak_*
 server/_debug_ical.js
+server/firebase-service-account.json

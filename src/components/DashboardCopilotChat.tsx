@@ -32,7 +32,14 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
   onVoiceStateChange?: (state: JarvisVoiceState) => void;
 }) {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ChatMessage[]>([welcome]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === 'undefined' || !userName) return [welcome];
+    try {
+      const stored = localStorage.getItem(`nex:jarvis-dash:v1:${encodeURIComponent(userName)}`);
+      if (stored) { const parsed = JSON.parse(stored); if (Array.isArray(parsed) && parsed.length > 0) return parsed; }
+    } catch {}
+    return [welcome];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -46,6 +53,10 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
   const voiceState: JarvisVoiceState = listening ? 'listening' : speechState !== 'idle' ? speechState : loading ? 'thinking' : 'idle';
   useEffect(() => { onVoiceStateChange?.(voiceState); }, [voiceState, onVoiceStateChange]);
   const convModeRef = useRef(false);
+  useEffect(() => {
+    if (!userName || messages.length <= 1) return;
+    try { localStorage.setItem(`nex:jarvis-dash:v1:${encodeURIComponent(userName)}`, JSON.stringify(messages.slice(-80))); } catch {}
+  }, [messages, userName]);
   const voiceEnabledRef = useRef(true);
   const inputId = useId();
   const lastMessageId = messages[messages.length - 1]?.id;
@@ -159,22 +170,25 @@ export function DashboardCopilotChat({ briefing: _briefing, autoStartConversatio
     recognition.lang = 'pt-BR';
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    recognition.continuous = false;
+    recognition.continuous = true;
     let finalTranscript = '';
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
     recognition.onstart = () => setListening(true);
-    recognition.onerror = () => { setListening(false); finalTranscript = ''; setInput(''); };
+    recognition.onerror = () => { if (silenceTimer) clearTimeout(silenceTimer); setListening(false); finalTranscript = ''; setInput(''); };
     recognition.onresult = (event: any) => {
+      let full = '';
       let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) { full += event.results[i][0].transcript; }
+        else { interim += event.results[i][0].transcript; }
       }
-      setInput(finalTranscript + interim);
+      finalTranscript = full;
+      setInput(full + interim);
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => { recognition.stop(); }, 1500);
     };
     recognition.onend = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
       setListening(false);
       const text = finalTranscript.trim();
       finalTranscript = '';
