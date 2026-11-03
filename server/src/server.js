@@ -38,7 +38,7 @@ import {
   toggleMuteConversation, updateConversation, updateParticipantRole,
 } from './chat.repository.js';
 import {
-  addChecklist, addChecklistItem, addTaskComment, createTask, deleteChecklist,
+  addChecklist, addChecklistItem, addTaskComment, deleteTaskComment, createTask, deleteChecklist,
   deleteChecklistItem, deleteTask, getTask, getTaskByProtocol, listTasks, updateChecklist, updateChecklistItem, updateTask,
   listCustomLists, createCustomList, renameCustomList, deleteCustomList,
   listTaskTemplates, getTaskTemplate, createTaskTemplate, shareTaskTemplate, deleteTaskTemplate,
@@ -1029,6 +1029,19 @@ async function route(req, res) {
         const task = await addTaskComment(taskId, user.id, payload.content);
         await notifyTaskActivity(existing, user, 'Novo comentário em uma tarefa sua', notifyUsers).catch(error => console.error('[Task notification]', error.message));
         return sendJson(req, res, 201, { data: task });
+      }
+
+      if (segments[3] === 'comments' && segments[4] && req.method === 'DELETE') {
+        const existing = await getTask(taskId);
+        if (!existing) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
+        if (!canAccessTaskFiles(existing, user, ADMIN_ROLES)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
+        try {
+          const deleted = await deleteTaskComment(segments[4], user.id, ADMIN_ROLES.includes(user.role_name));
+          return deleted ? sendJson(req, res, 200, { data: await getTask(taskId) }) : sendError(req, res, 404, 'NOT_FOUND', 'Comentário não encontrado');
+        } catch (e) {
+          if (e.statusCode) return sendError(req, res, e.statusCode, 'FORBIDDEN', e.message);
+          throw e;
+        }
       }
 
       if (segments[3] === 'checklists') {
@@ -2914,6 +2927,20 @@ Instruções:
         {
           type: 'function',
           function: {
+            name: 'encontrar_ou_criar_conversa_dm',
+            description: 'Encontra ou cria uma conversa DM com outro usuario pelo nome ou e-mail. Use SEMPRE antes de enviar_mensagem quando tiver apenas o nome do destinatario.',
+            parameters: {
+              type: 'object',
+              properties: {
+                q: { type: 'string', description: 'Nome ou e-mail do usuario para buscar' }
+              },
+              required: ['q']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
             name: 'navegar_para',
             description: 'Navega para uma pagina da Rede Nex. Use SEMPRE que o usuario pedir para abrir, ir para ou acessar uma secao. Exemplos: abrir tarefas, ir para projetos, mostrar calendario.',
             parameters: {
@@ -3078,6 +3105,14 @@ Instruções:
           const { id, ...body } = args;
           await updateUser(id, body);
           return { sucesso: true };
+        }
+        if (name === 'encontrar_ou_criar_conversa_dm') {
+          const usuarios = unwrap(await listUsers({ search: args.q || '', limit: 5 }));
+          if (!usuarios.length) return { erro: 'Usuario "' + args.q + '" nao encontrado' };
+          const target = usuarios[0];
+          if (target.id === user.id) return { erro: 'Nao e possivel criar conversa consigo mesmo' };
+          const conv = await createConversation(user.id, { type: 'direct', participant_ids: [target.id] });
+          return { conversation_id: conv?.id, usuario: { id: target.id, name: target.name, email: target.email } };
         }
         if (name === 'navegar_para') { navigateTo = args.rota; return { sucesso: true, mensagem: args.mensagem }; }
         return { erro: 'Ferramenta não disponível para este usuário' };

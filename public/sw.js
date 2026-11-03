@@ -1,6 +1,13 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
+// Responde ao bindNotificationUser — sem isso a subscription nunca é salva no servidor
+self.addEventListener('message', e => {
+  if (e.data?.type === 'NEX_NOTIFICATION_USER') {
+    e.ports[0]?.postMessage({ ok: true });
+  }
+});
+
 self.addEventListener('push', e => {
   if (!e.data) return;
   let data = {};

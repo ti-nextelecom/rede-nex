@@ -92,7 +92,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   if (loading || (user && appearanceStatus === 'loading')) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center gap-4">
-        <img src="/assets/images/favicon_copa.png" alt="Rede Nex" className="h-16 w-16 rounded-2xl animate-pulse" />
+        <img src="/assets/images/logo_nex.png" alt="Rede Nex" className="h-16 w-16 rounded-2xl animate-pulse" />
         <span className="text-slate-400 text-sm">Carregando...</span>
       </div>
     );

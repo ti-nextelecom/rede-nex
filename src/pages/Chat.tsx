@@ -1195,7 +1195,7 @@ export function Chat() {
     conversationsApplied.current=request;
     setConversations(previous => reuseChatSnapshot(previous, preserveConversationReads(previous, next)));
     const firstActive = next.find(c => !c.is_archived);
-    if (autoSelectFirst.current && !currentConversation.current && firstActive) selectConversationRef.current(firstActive.id);
+    if (autoSelectFirst.current && !currentConversation.current && firstActive && window.innerWidth >= 768) selectConversationRef.current(firstActive.id);
     return next;
   }, []);
 
