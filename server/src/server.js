@@ -22,6 +22,9 @@ import { pushConfiguration, savePushSubscription, startPushWorker } from './brow
 import { createHrRouter } from './hr.js';
 import { jrhUploadsDir, downloadsDir } from './runtimePaths.js';
 import { releaseId } from './release.js';
+import { getMaintenance, setMaintenance, clearMaintenance } from './maintenance.mjs';
+import { createArchitectureRouter } from './architecture.mjs';
+import { createBehavioralRouter } from './behavioral-profiles.mjs';
 import { runAuthorizedTaskAction } from './task-actions.mjs';
 import { parseRequestCookies, requestOriginAllowed, passwordResetOrigin, createRateLimiter } from './http-security.mjs';
 import { changePassword, createPasswordResetToken, getUserByToken, heartbeat, listOnlineUsers, login, logout, resetPasswordByToken, updateMyProfile } from './auth.repository.js';
@@ -311,6 +314,8 @@ function validateRequired(payload, fields) {
 
 const handleVaultRoutes = createVaultRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
+const handleArchitectureRoutes = createArchitectureRouter({ pool, requireUser, sendJson, sendError, readJson });
+const handleBehavioralRoutes = createBehavioralRouter({ pool, requireUser, sendJson, sendError, readJson });
 
 async function route(req, res) {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !requestOriginAllowed(req.headers.origin, allowedOrigins)) {
@@ -332,6 +337,8 @@ async function route(req, res) {
   try {
     if (await handleHrRoutes(req, res, path)) return;
     if (await handleVaultRoutes(req, res, path)) return;
+    if (await handleArchitectureRoutes(req, res, path)) return;
+    if (await handleBehavioralRoutes(req, res, path)) return;
     if (req.method === 'GET' && path === '/api/health') {
       await pool.query('select 1');
       return sendJson(req, res, 200, { status: 'ok', service: 'rede-nex-api', release: releaseId });
@@ -752,7 +759,6 @@ async function route(req, res) {
               return sendError(req, res, 400, 'VALIDATION_ERROR', 'content ou attachment_url obrigatorio');
             }
             const message = await sendMessage(user.id, conversationId, payload.content, payload.attachment_url || null, payload.reply_to_id || null, payload.client_message_id || null);
-            const xpMsg = message && !message.replayed ? await awardXP(user.id, 'send_message', message.id).catch(() => null) : null;
             if (message && !message.replayed) {
               const wsNotif = JSON.stringify({
                 type: 'message:incoming',
@@ -761,6 +767,7 @@ async function route(req, res) {
                 senderPhoto: user.photo_url,
                 preview: (payload.content || (payload.attachment_url ? '[arquivo]' : '')).slice(0, 100),
                 conversationId,
+                message,
               });
               pool.query(
                 'SELECT user_id FROM chat_participants WHERE conversation_id = $1 AND user_id != $2',
@@ -774,6 +781,7 @@ async function route(req, res) {
                 }
               }).catch(() => {});
             }
+            const xpMsg = message && !message.replayed ? await awardXP(user.id, 'send_message', message.id).catch(() => null) : null;
             return message ? sendJson(req, res, 201, { data: message, gamification: xpMsg }) : sendError(req, res, 404, 'NOT_FOUND', 'Conversa não encontrada');
           }
         }
@@ -3166,6 +3174,34 @@ Instruções:
       return sendJson(req, res, 200, { reply });
     }
 
+    // Maintenance alert system
+    if (req.method === 'GET' && path === '/api/maintenance') {
+      const data = await getMaintenance();
+      return sendJson(req, res, 200, { data });
+    }
+
+    if (req.method === 'POST' && path === '/api/admin/maintenance-alert') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      const payload = await readJson(req);
+      const mins = Math.max(1, parseInt(payload.minutes || 5));
+      const scheduledAt = new Date(Date.now() + mins * 60 * 1000).toISOString();
+      await setMaintenance({ scheduledAt, minutesRemaining: mins, message: payload.message || null });
+      await notifyUsers({
+        actorId: actor.id, actorName: actor.name, actorPhotoUrl: actor.photo_url || null,
+        title: '⚠️ Manutencao programada',
+        message: `O sistema entrara em manutencao em aproximadamente ${mins} minuto${mins !== 1 ? 's' : ''}. Salve seu trabalho.`,
+        type: 'warning', link: null, userIds: null,
+      });
+      return sendJson(req, res, 200, { ok: true, scheduledAt, minutesRemaining: mins });
+    }
+
+    if (req.method === 'DELETE' && path === '/api/admin/maintenance-alert') {
+      const actor = await requireAdmin(req, res);
+      if (!actor) return;
+      await clearMaintenance();
+      return sendJson(req, res, 200, { ok: true });
+    }
     return sendError(req, res, 404, 'NOT_FOUND', 'Rota não encontrada');
   } catch (error) {
     if (error?.statusCode) {

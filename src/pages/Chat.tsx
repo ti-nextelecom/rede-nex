@@ -1323,8 +1323,20 @@ export function Chat() {
     setMobileView('messages');
     loadersRef.current.loadMessages(selectedId, false);
 
-    const iv = setInterval(() => { void loadersRef.current.loadMessages(selectedId, true); void loadersRef.current.loadConversations().catch(()=>undefined); }, 3500);
-    return () => clearInterval(iv);
+    const unsub = wsEventBus.subscribe((wsMsg) => {
+      if (wsMsg.type !== 'message:incoming') return;
+      if (wsMsg.conversationId === selectedId) {
+        if (wsMsg.message) {
+          setMessages(previous => mergeChatMessages(previous, [wsMsg.message as any]));
+          knownMessageIdsRef.current.add(String((wsMsg.message as any).id));
+        } else {
+          void loadersRef.current.loadMessages(selectedId, true);
+        }
+      }
+      void loadersRef.current.loadConversations().catch(() => undefined);
+    });
+    const iv = setInterval(() => { void loadersRef.current.loadMessages(selectedId, true); void loadersRef.current.loadConversations().catch(()=>undefined); }, 15000);
+    return () => { clearInterval(iv); unsub(); };
   }, [selectedId]);
 
   useEffect(() => {

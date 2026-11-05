@@ -24,6 +24,7 @@ import type { CallState } from '../hooks/useVoiceCall';
 import { getRanking } from '../lib/gamificationApi';
 import type { User } from '../types';
 import type { RankingEntry } from '../lib/gamificationApi';
+import { wsEventBus } from '../lib/wsEventBus';
 
 interface IncomingToast { id: string; title: string; body: string; conversationId: string; }
 
@@ -1038,8 +1039,23 @@ export function Chat() {
     setHasMoreMessages(false);
     loadMessages(selectedId, false);
     markConversationRead(selectedId).catch(() => {});
-    const iv = setInterval(() => { loadMessages(selectedId, true); loadConversations(); }, 3500);
-    return () => clearInterval(iv);
+    const unsub = wsEventBus.subscribe((wsMsg) => {
+      if (wsMsg.type === 'message:incoming') {
+        if (wsMsg.conversationId === selectedId) {
+          if (wsMsg.message) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const newMsg = wsMsg.message as any;
+            setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+            knownMessageIdsRef.current.add(String(newMsg.id));
+          } else {
+            loadMessages(selectedId, true);
+          }
+        }
+        loadConversations();
+      }
+    });
+    const iv = setInterval(() => { loadMessages(selectedId, true); loadConversations(); }, 15000);
+    return () => { clearInterval(iv); unsub(); };
   }, [loadConversations, loadMessages, selectedId]);
 
   useEffect(() => {
@@ -1099,9 +1115,11 @@ export function Chat() {
 
   async function sendText(text: string) {
     if (!selectedId || !text.trim()) return;
-    await sendChatMessage(selectedId, text.trim().slice(0, 8000), replyingTo?.id);
+    const sent = await sendChatMessage(selectedId, text.trim().slice(0, 8000), replyingTo?.id);
     setReplyingTo(null);
-    await Promise.all([loadMessages(selectedId), loadConversations()]);
+    setMessages(prev => prev.some(m => m.id === sent.id) ? prev : [...prev, sent]);
+    knownMessageIdsRef.current.add(sent.id);
+    loadConversations();
   }
 
   async function handleSend(e?: FormEvent) {

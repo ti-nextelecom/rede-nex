@@ -14,6 +14,7 @@ import { Card } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import type { Role, User } from '../types';
 import { EmployeeAvatar } from '../components/EmployeeAvatar';
+import { BehavioralIdentity } from '../components/BehavioralIdentity';
 import './people-workspace.css';
 
 const ROLE_COLORS: Record<string, string> = {
@@ -337,8 +338,8 @@ export function Users() {
                 <Card key={user.id} className="people-card" data-status={user.status}>
                   <div className="people-card-top"><span className={`people-status ${user.status === 'active' ? 'is-active' : ''}`}>{user.status === 'active' ? 'Ativo' : 'Inativo'}</span><span className="people-presence" data-online={Boolean(user.online)}><i />{formatPresence(user)}</span></div>
                   <div className="people-card-main">
-                    <EmployeeAvatar name={user.name} photo={user.photo_url} />
-                    <div className="people-identity"><h3>{user.name}</h3><p>{user.position || 'Cargo não informado'}</p>
+                    <EmployeeAvatar userId={user.id} name={user.name} photo={user.photo_url} />
+                    <div className="people-identity"><h3>{user.name}</h3><p>{user.position || 'Cargo não informado'}</p><BehavioralIdentity userId={user.id} compact/>
                     {user.roles?.name && (
                       <span className={`people-role inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${ROLE_COLORS[user.roles.name] || 'people-role-default'}`}>
                         {user.roles.name}
@@ -398,9 +399,10 @@ export function Users() {
                       <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <EmployeeAvatar name={user.name} photo={user.photo_url} className="employee-avatar-small" />
+                            <EmployeeAvatar userId={user.id} name={user.name} photo={user.photo_url} className="employee-avatar-small" />
                             <div>
                               <p className="text-sm font-semibold text-slate-800">{user.name}</p>
+                              <BehavioralIdentity userId={user.id} compact/>
                               <p className="text-[11px] text-slate-600">{user.email}</p>
                             </div>
                           </div>

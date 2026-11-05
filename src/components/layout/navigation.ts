@@ -3,7 +3,7 @@ import {
   FolderKanban, FolderOpen, GraduationCap, HelpCircle, ListTodo,
   Megaphone, MessageCircle, Network, Newspaper, Receipt, ScrollText, Settings,
   Shield, KeyRound, Sparkles, Square, Trophy, Users, type LucideIcon,
-  Activity, RadioTower, LayoutDashboard,
+  Activity, RadioTower, LayoutDashboard, DraftingCompass, PawPrint,
 } from 'lucide-react';
 
 export type NavigationItem = { to: string; label: string; icon: LucideIcon; adminOnly?: boolean; rhOnly?: boolean };
@@ -30,6 +30,8 @@ export const NAVIGATION: NavigationItem[] = [
   { to: '/assinatura', label: 'Assinatura', icon: FileSignature },
   { to: '/lousas', label: 'Quadro', icon: Square },
   { to: '/senhas', label: 'Cofre de senhas', icon: KeyRound },
+  { to: '/arquitetura', label: 'Arquitetura', icon: DraftingCompass },
+  { to: '/perfil-comportamental', label: 'Perfil Comportamental', icon: PawPrint },
   { to: '/notas', label: 'Notas', icon: BookText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/prestacao-contas', label: 'Prestação de Contas', icon: Receipt },

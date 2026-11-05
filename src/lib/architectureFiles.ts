@@ -1,0 +1,32 @@
+import { escapeXml, floorSvg, planInventory, validatePlan, type PlanDocument } from '../../shared/architecture.mjs';
+export const fileName=(name:string)=>Array.from(name).map(character=>character.charCodeAt(0)<32?'-':character).join('').replace(/[<>:"/\\|?*]/g,'-').slice(0,100)||'planta';
+export function downloadFile(content:BlobPart,type:string,name:string){const url=URL.createObjectURL(new Blob([content],{type}));const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+export function exportPlanJson(plan:PlanDocument,title:string){downloadFile(JSON.stringify({format:'rede-nex-architecture',title,document:validatePlan(plan)},null,2),'application/json',fileName(title)+'.nexplan.json');}
+export function exportPlanSvg(plan:PlanDocument,floorId:string,title:string){downloadFile(floorSvg(plan,floorId,{title}),'image/svg+xml',fileName(title)+'.svg');}
+export async function exportPlanPng(plan:PlanDocument,floorId:string,title:string){
+  const svg=floorSvg(plan,floorId,{title}),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+  try {const image=new Image();image.src=url;await image.decode();const canvas=document.createElement('canvas'),ratio=Math.min(1,5000/Math.max(image.width,image.height));canvas.width=Math.round(image.width*ratio);canvas.height=Math.round(image.height*ratio);const context=canvas.getContext('2d');if(!context)throw Error('Não foi possível preparar a imagem.');context.drawImage(image,0,0,canvas.width,canvas.height);const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Não foi possível exportar.')),'image/png'));downloadFile(blob,'image/png',fileName(title)+'.png');}finally{URL.revokeObjectURL(url);}
+}
+export function exportInventory(plan:PlanDocument,title:string){const {items,cable}=planInventory(plan);const quote=(value:unknown)=>{let text=String(value);if(/^[=+\-@\t\r]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';};const lines=[['Equipamento','Modelo','Quantidade','Pavimentos'],...items.map(item=>[item.name,item.model,item.quantity,item.floors.join(', ')]),['Cabo / infraestrutura (m)','',cable,'Comprimento geométrico, sem folga']];downloadFile('\uFEFF'+lines.map(row=>row.map(quote).join(';')).join('\r\n'),'text/csv;charset=utf-8',fileName(title)+'-equipamentos.csv');}
+export function printPlan(plan:PlanDocument,floorId:string,title:string,client:string,paper:'A4'|'A3',scale:number) {
+  const sheet=paper==='A3'?{width:420,height:297}:{width:297,height:210};const width=plan.width*1000/scale,height=plan.height*1000/scale;
+  if(width>sheet.width-22||height>sheet.height-55)throw Error(`A prancha não cabe em ${paper} na escala 1:${scale}. Aumente o denominador da escala ou escolha A3.`);
+  const svg=floorSvg(plan,floorId,{title}),floor=plan.floors.find(item=>item.id===floorId)!;
+  const frame=document.createElement('iframe');frame.title='Imprimir planta';frame.style.cssText='position:fixed;width:1px;height:1px;left:-10000px;top:0;border:0';frame.setAttribute('sandbox','allow-same-origin allow-modals');
+  frame.onload=()=>{frame.contentWindow?.addEventListener('afterprint',()=>frame.remove(),{once:true});frame.contentWindow?.focus();frame.contentWindow?.print();};
+  frame.srcdoc=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeXml(title)}</title><style>@page{size:${paper} landscape;margin:10mm}*{box-sizing:border-box}body{margin:0;font:10pt Arial;color:#172033}header{height:18mm;display:flex;justify-content:space-between;border-bottom:1px solid #64748b}h1{font-size:15pt;margin:0 0 3mm}p{margin:0 0 2mm}main{height:${height}mm;width:${width}mm;margin:4mm auto}main svg{width:100%;height:100%}footer{border-top:1px solid #64748b;margin-top:4mm;padding-top:3mm;display:flex;justify-content:space-between;font-size:8pt}strong{color:#b45309}</style></head><body><header><div><h1>${escapeXml(title)}</h1><p>${escapeXml(client)} · ${escapeXml(floor.name)}</p></div><div><strong>REDE NEX / ARQUITETURA</strong><p>Planta baixa · Segurança e acesso</p><p>${paper} · Escala 1:${scale} · Unidade: metro</p></div></header><main>${svg}</main><footer><span>CAM: câmera · FAC: facial · NA / NF: fechaduras · BOT: botoeira · SW: switch · RCK: rack/NVR</span><span>Imprimir a 100%, sem ajuste automático de escala</span></footer></body></html>`;
+  document.body.append(frame);setTimeout(()=>frame.remove(),600000);
+}
+export async function referenceImage(file:File):Promise<{src:string;ratio:number}> {
+  if(file.size>20*1024*1024)throw Error('Escolha uma referência de até 20 MB.');
+  let canvas:HTMLCanvasElement;
+  if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)) {
+    const {pdfjs}=await import('react-pdf');pdfjs.GlobalWorkerOptions.workerSrc=new URL('pdfjs-dist/build/pdf.worker.min.mjs',import.meta.url).toString();
+    const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
+    try {const pdf=await task.promise,page=await pdf.getPage(1),base=page.getViewport({scale:1}),viewport=page.getViewport({scale:Math.min(2,2000/Math.max(base.width,base.height))});canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;const context=canvas.getContext('2d');if(!context)throw Error('Canvas indisponível.');await page.render({canvas,canvasContext:context,viewport}).promise;}finally{await task.destroy();}
+  } else {
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Use uma imagem PNG, JPEG, WebP ou a primeira página de um PDF.');
+    const url=URL.createObjectURL(file);try{const image=new Image();image.src=url;await image.decode();const scale=Math.min(1,2000/Math.max(image.width,image.height));canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));const context=canvas.getContext('2d');if(!context)throw Error('Canvas indisponível.');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);}finally{URL.revokeObjectURL(url);}
+  }
+  const src=canvas.toDataURL('image/jpeg',.8);if(src.length>1_500_000)throw Error('A referência ficou muito grande. Use uma imagem menor.');return {src,ratio:canvas.width/canvas.height};
+}
