@@ -7,6 +7,7 @@ import { getGamificationProfile, getMissions, type GamificationProfile, type Mis
 import { XPBar, BadgeGrid, MissionCard } from '../components/Gamification';
 import { getFeedPosts } from '../lib/appApi';
 import { AchievementAvatar } from '../components/AchievementAvatar';
+import { BehavioralProfileCard } from '../components/BehavioralProfileCard';
 import { AppearanceSettings } from '../components/AppearanceSettings';
 import { AvatarFramePicker } from '../components/AvatarFramePicker';
 import type { Post } from '../types';
@@ -139,6 +140,7 @@ export function Profile() {
 
           <h1 className="mt-4 text-2xl font-bold text-slate-900">{user?.name}</h1>
           <p className="text-sm text-slate-500">{form.position || role}</p>
+          <div className="mt-4"><BehavioralProfileCard userId={user?.id}/></div>
 
           {gamification && (
             <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200">

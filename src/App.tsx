@@ -9,6 +9,7 @@ import { HrAccessProvider } from './lib/hrAccess';
 import { GamificationToast } from './components/GamificationToast';
 import { GlobalNotifications } from './components/GlobalNotifications';
 import { GlobalCallOverlay } from './components/GlobalCallOverlay';
+import MaintenanceBanner from './components/MaintenanceBanner';
 import { WsManager } from './components/WsManager';
 import { Layout } from './components/layout/Layout';
 
@@ -46,6 +47,8 @@ const ResetPassword    = lazy(() => import('./pages/ResetPassword').then(m => ({
 const PainelTIPage = lazy(() => import('./pages/PainelTIPage').then(m => ({ default: m.PainelTIPage })));
 const NocPage = lazy(() => import('./pages/NocPage').then(m => ({ default: m.NocPage })));
 const ImplementacaoPage = lazy(() => import('./pages/ImplementacaoPage').then(m => ({ default: m.ImplementacaoPage })));
+const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then(m => ({ default: m.ArchitecturePage })));
+const BehavioralProfilePage = lazy(() => import('./pages/BehavioralProfilePage').then(m => ({ default: m.BehavioralProfilePage })));
 
 
 class RouteErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -116,6 +119,7 @@ function App() {
         <WsManager />
         <GlobalNotificationsMount />
         <GlobalCallOverlay />
+        <MaintenanceBanner />
         <PageErrorBoundary>
         <Suspense fallback={null}>
           <Routes>
@@ -154,6 +158,8 @@ function App() {
               <Route path="/gestao-ti" element={<Suspense fallback={<PageFallback />}><PainelTIPage /></Suspense>} />
               <Route path="/noc" element={<Suspense fallback={<PageFallback />}><NocPage /></Suspense>} />
               <Route path="/implementacao" element={<Suspense fallback={<PageFallback />}><ImplementacaoPage /></Suspense>} />
+              <Route path="/arquitetura" element={<Suspense fallback={<PageFallback />}><ArchitecturePage /></Suspense>} />
+              <Route path="/perfil-comportamental" element={<Suspense fallback={<PageFallback />}><BehavioralProfilePage /></Suspense>} />
             </Route>
           </Routes>
         </Suspense>

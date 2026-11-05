@@ -265,17 +265,6 @@ export async function sendMessage(userId, conversationId, content, attachmentUrl
 
   const inserted = await insertChatMessage(query, { userId, conversationId, content: cleanContent || '', attachmentUrl, replyToId, clientMessageId });
   const rows = [inserted.message];
-  if (inserted.inserted) {
-  const notices = buildChatNotices({ participants: participants.rows, actorId: userId, conversationId, message: rows[0] });
-  for (const notice of notices) {
-    await notifyUsers(notice);
-    sendFcmToUsers(notice.userIds, {
-      title: notice.title, body: notice.message,
-      data: { conversationId: String(conversationId), messageId: String(rows[0].id), link: notice.link },
-    }).catch(() => {});
-  }
-
-  }
   const { rows: msgRows } = await query(
     `select m.*, json_build_object('id', u.id, 'name', u.name, 'photo_url', u.photo_url, 'position', u.position) as sender
      from chat_messages m left join users u on u.id = m.sender_id where m.id = $1`,
@@ -283,6 +272,18 @@ export async function sendMessage(userId, conversationId, content, attachmentUrl
   );
   const result = msgRows[0] ?? null;
   if (result) Object.defineProperty(result,'replayed',{value:!inserted.inserted,enumerable:false});
+  if (inserted.inserted) {
+    const notices = buildChatNotices({ participants: participants.rows, actorId: userId, conversationId, message: result ?? rows[0] });
+    (async () => {
+      for (const notice of notices) {
+        await notifyUsers(notice);
+        sendFcmToUsers(notice.userIds, {
+          title: notice.title, body: notice.message,
+          data: { conversationId: String(conversationId), messageId: String(rows[0].id), link: notice.link },
+        }).catch(() => {});
+      }
+    })().catch(() => {});
+  }
   return result;
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AvatarFramesProvider } from '../AvatarFramesProvider';
+import { BehavioralProfilesProvider } from '../BehavioralProfilesProvider';
 import { MediaToolsHost } from '../media/MediaToolsHost';
 import { Navbar } from './Navbar';
 import { PasswordChangeGate } from './PasswordChangeGate';
@@ -11,7 +12,7 @@ import { pageTitle } from './navigation';
 import { JarvesWidget } from './JarvesWidget';
 import './responsive.css';
 
-const WORKSPACES = new Set(['/tarefas', '/projetos', '/bate-papo', '/copiloto', '/notas', '/wiki']);
+const WORKSPACES = new Set(['/tarefas', '/projetos', '/bate-papo', '/copiloto', '/notas', '/wiki', '/arquitetura', '/perfil-comportamental']);
 
 export function Layout() {
   const { pathname } = useLocation();
@@ -25,7 +26,7 @@ export function Layout() {
   }, [pathname]);
 
   return (
-    <AvatarFramesProvider><div className="nex-app">
+    <AvatarFramesProvider><BehavioralProfilesProvider><div className="nex-app">
       <a href="#conteudo-principal" className="nex-skip-link">Pular para o conteúdo</a>
 
       <MediaToolsHost />
@@ -36,7 +37,7 @@ export function Layout() {
         <div ref={contentRef} className="nex-page" data-page={pathname.slice(1) || 'dashboard'}><Outlet /></div>
       </main>
       <MobileBottomNav />
-      
-    </div></AvatarFramesProvider>
+
+    </div></BehavioralProfilesProvider></AvatarFramesProvider>
   );
 }

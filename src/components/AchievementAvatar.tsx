@@ -2,6 +2,9 @@ import { useId, useState } from 'react';
 import { resolveAvatarFrame, type AvatarFrame } from '../../shared/achievementFrames.mjs';
 import { useAvatarFrames } from '../lib/avatarFrames';
 import './achievement-frames.css';
+import { BehavioralAvatarSymbol } from './BehavioralIdentity';
+import { useBehavioralBadges } from '../lib/behavioralBadges';
+import { behavioralIdentity } from '../../shared/behavioralProfiles.mjs';
 
 function FrameArt({ frame }: { frame: AvatarFrame }) {
   const id = useId().replace(/:/g, '');
@@ -34,15 +37,18 @@ export function AchievementAvatar({ userId, name, photo, size = 40, frame: previ
   userId?: string; name: string; photo?: string | null; size?: number; frame?: string; level?: number; className?: string;
 }) {
   const { entries } = useAvatarFrames();
+  const behavioral=useBehavioralBadges();
+  const animal=preview===undefined?behavioralIdentity(userId?behavioral.get(userId):null):null;
   const entry = userId ? entries.get(userId) : undefined;
   const frame = resolveAvatarFrame(preview ?? entry?.frame_slug, previewLevel ?? entry?.level ?? 1);
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const initials = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'NX';
   return <span className={`achievement-avatar ${frame.motif === 'none' ? 'achievement-avatar--plain' : ''} ${className}`}
-    style={{ width: size, height: size }} role="img" aria-label={name} title={`${name} · ${frame.name}`} data-frame={frame.slug}>
+    style={{ width: size, height: size }} role="img" aria-label={`${name}${animal?' · Perfil comportamental: '+animal.name:''}`} title={`${name} · ${frame.name}${animal?' · '+animal.name:''}`} data-frame={frame.slug}>
     <span className="achievement-avatar__face">
       {photo && photo !== failedPhoto ? <img src={photo} alt="" loading="lazy" onError={() => setFailedPhoto(photo)} /> : <span>{initials}</span>}
     </span>
     {frame.motif !== 'none' && <FrameArt frame={frame} />}
+    {animal&&<BehavioralAvatarSymbol userId={userId} size={size>=70?28:size>=36?17:13}/>}
   </span>;
 }
