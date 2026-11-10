@@ -1101,7 +1101,7 @@ export function Chat() {
   const recordingTimerRef = useRef<number | null>(null);
 
   // File attachment preview
-  const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'document'; raw: File } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'audio' | 'document'; raw: File } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   useEffect(() => () => { if (pendingFile?.src.startsWith('blob:')) URL.revokeObjectURL(pendingFile.src); }, [pendingFile]);
   useEffect(() => {
@@ -1475,7 +1475,7 @@ export function Chat() {
       try {
         let url = attachmentUrls.current.get(file.raw);
         if (!url) { url = await uploadChatMedia(file.raw); attachmentUrls.current.set(file.raw,url); }
-        const prefix = file.type === 'image' ? '[IMAGE]' : file.type === 'video' ? '[VIDEO]' : `[DOC|${file.raw.name}]`;
+        const prefix = file.type === 'image' ? '[IMAGE]' : file.type === 'video' ? '[VIDEO]' : file.type === 'audio' ? '[AUDIO_MSG]' : `[DOC|${file.raw.name}]`;
         const message = await sendChatMessage(conversationId, prefix + url + (caption ? '\n' + caption : ''), replyId, key, user?.id);
         if (currentConversation.current === conversationId) { setMessages(previous => mergeChatMessages(previous,[message])); setPendingFile(previous => previous === file ? null : previous); setPendingCaption(previous => previous === caption ? '' : previous); setReplyingTo(null); }
         void loadConversations().catch(() => undefined);
@@ -1497,7 +1497,7 @@ export function Chat() {
   function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document';
+    const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document';
     const src = type !== 'document' ? URL.createObjectURL(file) : '';
     setPendingFile({ src, type, raw: file });
     e.target.value = '';
@@ -2102,7 +2102,7 @@ export function Chat() {
 
             {showAttention && <div className='chat-attention-selection' role='status'><Bell size={20}/><span>Selecione a mensagem na conversa para chamar atenção.</span><button onClick={()=>{setShowAttention(false);setAttentionMessage(null);}}>Cancelar</button></div>}
             {/* Messages */}
-            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging',showAttention && 'is-selecting-attention')} data-custom-wallpaper={!!theme.bgImage} aria-label="Mensagens da conversa" onWheelCapture={() => { mediaJump.current.until = 0; }} onTouchMoveCapture={() => { mediaJump.current.until = 0; }} onLoadCapture={alignMentionMedia} onLoadedMetadataCapture={alignMentionMedia} onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); if (atBottom) visibleRead.current(); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
+            <div ref={messagesContainerRef} className={cn('chat-message-history flex-1 space-y-3 overflow-y-auto px-8 py-5', isDragging && 'is-dragging',showAttention && 'is-selecting-attention')} data-custom-wallpaper={!!theme.bgImage} aria-label="Mensagens da conversa" onWheelCapture={() => { mediaJump.current.until = 0; }} onTouchMoveCapture={() => { mediaJump.current.until = 0; }} onLoadCapture={alignMentionMedia} onLoadedMetadataCapture={alignMentionMedia} onScroll={e => { const c = e.currentTarget; const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120; atBottomRef.current = atBottom; setShowScrollBtn(!atBottom); if (atBottom) visibleRead.current(); }} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
               backgroundColor: theme.bgColor,
               backgroundImage: theme.bgImage ? `url(${theme.bgImage})` : undefined,
               backgroundPosition: theme.bgImage ? 'center' : undefined,
@@ -2197,6 +2197,11 @@ export function Chat() {
                       ? <img src={pendingFile.src} alt="" className="max-h-[50vh] max-w-full object-contain rounded-lg" />
                       : pendingFile.type === 'video'
                         ? <video src={pendingFile.src} controls className="max-h-[50vh] max-w-full rounded-lg" />
+                        : pendingFile.type === 'audio'
+                          ? <div className="flex flex-col items-center gap-3 py-8">
+                              <Mic size={52} className="text-orange-400" />
+                              <p className="text-sm text-slate-300 text-center px-4 break-all">{pendingFile.raw.name}</p>
+                            </div>
                         : <div className="flex flex-col items-center gap-3 py-8">
                             <FileText size={52} className="text-orange-400" />
                             <p className="text-sm text-slate-300 text-center px-4 break-all">{pendingFile.raw.name}</p>
@@ -2299,7 +2304,7 @@ export function Chat() {
                     className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Enviar arquivo">
                     <Paperclip size={19} />
                   </button>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
 
                   {/* Reminder */}
                   <button type="button" onClick={() => setShowReminderModal(true)}
