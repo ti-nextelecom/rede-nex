@@ -1,7 +1,7 @@
 // Static content extracted from the user-supplied HTML. No source scripts are executed.
 export const BEHAVIORAL_SOURCE = {
-  "file": "NEX_Avatares_v21_Premium_v4.html",
-  "sha256": "3cdbda981991c4afa75e7e74249d49396f46cf30e9197bac02913055af6741e0",
+  "file": "NEX_Avatares_v22_quiz_fix_REVISADO-v3.html",
+  "sha256": "v22-quiz-fix-revisado-v3",
   "questionCount": 20,
   "profileCount": 10,
   "assets": {
@@ -62,27 +62,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 1,
     "weight": 2,
     "dimension": "autonomia",
-    "text": "Você recebe uma tarefa com objetivo claro, mas sem todos os passos detalhados. O que faz?",
+    "text": "Você recebe uma tarefa com objetivo claro, mas sem todos os passos detalhados. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Defino como vai ser feito e começo, não espero orientação quando o objetivo está claro."
+        "text": "Começo pela ação. Se o objetivo está claro, decido como executar e parto direto."
       },
       {
         "key": "A",
-        "text": "Levanto as informações e planejo antes de agir, não me movo sem entender o contexto, mesmo que demore."
+        "text": "Levanto as informações que faltam antes de qualquer passo. Preciso entender o contexto para definir o plano de ação."
       },
       {
         "key": "L",
-        "text": "Busco o processo existente e, se não houver, peço orientação antes de agir, não invento do zero."
+        "text": "Busco um processo existente ou peço orientação antes de começar. Prefiro ter um caminho definido antes de dar o primeiro passo."
       },
       {
         "key": "G",
-        "text": "Consulto alguém que já fez isso, não avanço sem antes ter uma referência de alguém do time."
+        "text": "Converso com alguém que já passou por algo parecido. Trabalhar com referência de quem viveu algo semelhante torna a execução mais sólida."
       },
       {
         "key": "F",
-        "text": "Mergulho sozinho no problema e desenvolvo minha solução, não preciso saber como os outros fariam."
+        "text": "Monto minha abordagem com base no que já domino sobre o problema. Se o objetivo está claro, não preciso de um roteiro para começar."
       }
     ]
   },
@@ -90,27 +90,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 2,
     "weight": 2,
     "dimension": "autonomia",
-    "text": "Seu gestor está inacessível por 2 horas e você tem uma decisão para tomar dentro da sua área de atuação. O que faz?",
+    "text": "Seu gestor está inacessível por 2 horas e você tem uma decisão para tomar dentro da sua área. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Decido e executo, não fico travado esperando validação de cada passo dentro da minha área."
+        "text": "Decido e executo. Dentro da minha área, tenho autonomia para isso e uso direto."
       },
       {
         "key": "A",
-        "text": "Mapeio as variáveis disponíveis antes de decidir, não bato o martelo sem ter o cenário minimamente claro."
+        "text": "Mapeio as variáveis disponíveis e decido quando tiver clareza suficiente do cenário."
       },
       {
         "key": "L",
-        "text": "Aguardo o gestor, prefiro não decidir sem alinhamento, mesmo que isso tome mais tempo."
+        "text": "Aguardo o gestor. Prefiro garantir o alinhamento a tomar uma decisão fora do acordado."
       },
       {
         "key": "G",
-        "text": "Consulto alguém de confiança antes de agir, não me sinto confortável decidindo sozinho sem checar com alguém."
+        "text": "Consulto alguém de confiança antes de agir. Tomar decisões com respaldo de quem eu confio faz parte do meu jeito de trabalhar."
       },
       {
         "key": "F",
-        "text": "Avalio os impactos técnicos e decido por conta própria, a lógica do problema me diz o que fazer."
+        "text": "Avalio os impactos técnicos e decido por conta própria. A lógica do problema me diz o que fazer."
       }
     ]
   },
@@ -118,27 +118,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 3,
     "weight": 1.5,
     "dimension": "proatividade",
-    "text": "Você termina uma tarefa atribuída a você 2 horas antes do prazo. O que faz?",
+    "text": "Você termina uma tarefa atribuída a você 2 horas antes do prazo. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Já começo a próxima prioridade, tempo parado não é opção para mim."
+        "text": "Já começo a próxima prioridade. Tempo parado é tempo que poderia estar sendo usado."
       },
       {
         "key": "A",
-        "text": "Reviso antes de fechar, não entrego sem passar pelo que fiz, não aceito meu próprio trabalho sem revisão."
+        "text": "Uso o tempo para verificar se o resultado está dentro do escopo e se tem algum risco que não foi considerado."
       },
       {
         "key": "L",
-        "text": "Comunico ao gestor e aguardo a próxima tarefa, não me autoatribuo demandas, prefiro que venha pelo canal correto."
+        "text": "Comunico ao gestor e aguardo a próxima tarefa. Prefiro que a demanda venha pelo canal correto."
       },
       {
         "key": "G",
-        "text": "Ofereço ajuda ao time, não consigo ficar parado enquanto um colega está sobrecarregado."
+        "text": "Ofereço ajuda ao time. Se tem alguém sobrecarregado, faz mais sentido ajudar do que ficar parado."
       },
       {
         "key": "F",
-        "text": "Aproveito para aprofundar algo técnico, prefiro ir mais fundo no que já faço do que começar outra coisa."
+        "text": "Reviso o que fiz antes de fechar. Preciso que o trabalho passe pelo meu crivo antes de considerar concluído."
       }
     ]
   },
@@ -146,27 +146,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 4,
     "weight": 2,
     "dimension": "responsabilidade",
-    "text": "Você identifica um erro seu que pode afetar o resultado de uma entrega. O que faz?",
+    "text": "Você identifica um erro seu que pode afetar o resultado de uma entrega. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Corrijo imediatamente, não fico fazendo análise do erro quando o que importa é resolver e seguir em frente."
+        "text": "Corrijo imediatamente e sigo. O que importa é resolver e retomar o quanto antes."
       },
       {
         "key": "A",
-        "text": "Mapeio o impacto antes de agir, não corrijo sem entender o que exatamente foi afetado e quem depende disso."
+        "text": "Mapeio o impacto antes de agir. Preciso entender exatamente o que foi afetado antes de tomar qualquer passo."
       },
       {
         "key": "L",
-        "text": "Corrijo dentro do processo e comunico ao gestor, não faço correção sem deixar rastro formal."
+        "text": "Corrijo dentro do processo e comunico ao gestor. Registrar formalmente o que aconteceu é parte da correção para mim."
       },
       {
         "key": "G",
-        "text": "Comunico ao time antes de tudo, não consigo agir sozinho num erro sem avisar quem pode ser impactado."
+        "text": "Aviso o time antes de qualquer ação. Checar o impacto no time antes de agir é o ponto de partida."
       },
       {
         "key": "F",
-        "text": "Vou direto à causa raiz, não me satisfaz corrigir o sintoma sem entender o que originou o erro."
+        "text": "Analiso o que foi feito e onde a lógica falhou. Preciso entender meu próprio raciocínio antes de propor a correção."
       }
     ]
   },
@@ -174,27 +174,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 5,
     "weight": 1.5,
     "dimension": "resolucao",
-    "text": "Você está no meio de uma atividade e encontra um problema que não estava previsto e não tem no manual. O que faz?",
+    "text": "No meio de uma atividade você encontra um problema que não estava previsto e não tem no manual. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Improviso com o que tenho, não fico esperando processo quando o resultado está em jogo."
+        "text": "Improviso com o que tenho. Quando o resultado está em jogo, adapto com o que está disponível e sigo."
       },
       {
         "key": "A",
-        "text": "Mapeio o cenário antes de qualquer ação, não ajo sem entender o problema por inteiro, mesmo que demore."
+        "text": "Mapeio o cenário antes de qualquer ação. Entender o problema por inteiro é o pré-requisito para qualquer passo."
       },
       {
         "key": "L",
-        "text": "Aciono o processo de escalonamento, não improviso quando existe alguém responsável por esse tipo de decisão."
+        "text": "Aciono o processo de escalonamento. Quando existe alguém responsável por esse tipo de decisão, acionar é o caminho correto."
       },
       {
         "key": "G",
-        "text": "Chamo alguém com experiência, não quero tomar uma decisão assim sozinho sem ao menos checar com quem já passou por isso."
+        "text": "Chamo alguém com experiência. Decisão desse tipo fica mais segura com quem já viveu algo parecido."
       },
       {
         "key": "F",
-        "text": "Estudo o problema e resolvo do zero, esse tipo de desafio sem manual é exatamente onde trabalho melhor."
+        "text": "Estudo o problema e resolvo do zero. Situações sem manual são exatamente onde me sinto mais útil."
       }
     ]
   },
@@ -202,27 +202,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 6,
     "weight": 1,
     "dimension": "comunicacao",
-    "text": "Você está executando uma tarefa longa e demorada. Como você comunica o andamento?",
+    "text": "Você está executando uma tarefa longa. Como você comunica o andamento?",
     "options": [
       {
         "key": "T",
-        "text": "Comunico quando tenho resultado concreto, não mando update só para mostrar que estou trabalhando."
+        "text": "Aviso quando tenho resultado para mostrar. Se não tem entrega concreta, não tem o que reportar."
       },
       {
         "key": "A",
-        "text": "Dou uma atualização estruturada quando há algo relevante, não mando mensagem sem dados concretos sobre o que mudou."
+        "text": "Reporto quando tenho um retrato claro: o que avançou, o que falta e se tem algo que pode impactar o prazo."
       },
       {
         "key": "L",
-        "text": "Sigo o protocolo de update estabelecido, não improviso na comunicação, se há um padrão, é ele que vale."
+        "text": "Sigo o padrão de comunicação definido. Se há um protocolo, é ele que vale."
       },
       {
         "key": "G",
-        "text": "Mando updates regulares, não consigo avançar sabendo que as pessoas ao redor não têm ideia de como está andando."
+        "text": "Mando atualizações com frequência. Quem está ao redor precisa saber como está andando."
       },
       {
         "key": "F",
-        "text": "Comunico quando há algo técnico relevante para reportar, não mando update vazio só para manter contato."
+        "text": "Compartilho o que precisa ser compartilhado. Nem tudo precisa ser repassado no momento que acontece."
       }
     ]
   },
@@ -234,23 +234,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Ouço e argumento se discordar, não aceito crítica sem entender se ela se sustenta."
+        "text": "Ouço com atenção e argumento quando discordo. Preciso entender se a crítica se sustenta antes de ajustar."
       },
       {
         "key": "A",
-        "text": "Peço detalhes para entender onde errei, não aceito feedback vago, preciso saber exatamente o que foi diferente do esperado."
+        "text": "Peço detalhes para entender onde errei. Preciso saber exatamente o que foi diferente do esperado."
       },
       {
         "key": "L",
-        "text": "Aceito, anoto e ajusto, não fico questionando o feedback quando vem do gestor, faz sentido ouvir e corrigir."
+        "text": "Aceito, anoto e ajusto. Faz sentido ouvir e corrigir quando vem do gestor."
       },
       {
         "key": "G",
-        "text": "Fico atento ao tom da conversa, não me sinto bem enquanto não me certifico de que não ficou mal-entendido depois."
+        "text": "Fico atento ao tom da conversa e cuido da relação. Me sinto bem quando saio do feedback sem ruído aberto."
       },
       {
         "key": "F",
-        "text": "Apresento o embasamento da minha decisão técnica, não mudo de abordagem porque alguém preferiu diferente, mudo quando o raciocínio falhar."
+        "text": "Apresento o embasamento da minha decisão técnica. Preciso de um argumento técnico mais sólido que o meu para revisar a abordagem."
       }
     ]
   },
@@ -258,27 +258,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 8,
     "weight": 2,
     "dimension": "priorizacao",
-    "text": "Você recebe duas demandas urgentes ao mesmo tempo, de origens diferentes. O que faz?",
+    "text": "Você recebe duas demandas urgentes ao mesmo tempo, de origens diferentes. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Avalio e priorizo a de maior resultado, não fico esperando validação, começo pela que mais impacta."
+        "text": "Avalio e priorizo a de maior resultado. Começo pela que mais impacta, sem esperar validação."
       },
       {
         "key": "A",
-        "text": "Mapeio o impacto das duas antes de qualquer passo, não priorizo no chute, preciso de dados para decidir."
+        "text": "Mapeio o impacto das duas antes de qualquer passo. Com os dados em mãos, a decisão de prioridade fica clara."
       },
       {
         "key": "L",
-        "text": "Levo ao gestor, não defino sozinho o que é mais urgente quando vem de origens diferentes, ele tem a visão completa."
+        "text": "Levo ao gestor. Ele tem a visão completa para definir o que é mais urgente nesse caso."
       },
       {
         "key": "G",
-        "text": "Comunico os dois solicitantes antes de agir, não consigo começar sem antes garantir que ninguém ficará sem retorno."
+        "text": "Aviso os dois solicitantes antes de agir. Garantir que ninguém ficará sem resposta é o ponto de partida para mim."
       },
       {
         "key": "F",
-        "text": "Defino sozinho pela criticidade técnica, o que mais impacta o serviço vai primeiro, sem precisar de aprovação para isso."
+        "text": "Defino sozinho pela criticidade técnica. O que mais impacta o serviço vai primeiro."
       }
     ]
   },
@@ -286,27 +286,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 9,
     "weight": 1.5,
     "dimension": "processo",
-    "text": "Um procedimento que você conhece bem para de funcionar numa situação real. O que faz?",
+    "text": "Um procedimento que você conhece bem deixa de funcionar numa situação real. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Faço o que é necessário para entregar, o objetivo importa mais que o processo quando o processo falhou."
+        "text": "Faço o que é necessário para entregar. O objetivo importa mais que o processo quando o processo falhou."
       },
       {
         "key": "A",
-        "text": "Primeiro preciso saber se é pontual ou sistêmico, não ajo sem essa resposta, ela muda completamente o que fazer."
+        "text": "Verifico se é uma falha isolada ou se tem impacto em outras partes do processo. Preciso documentar o que encontrei antes de sugerir qualquer ajuste."
       },
       {
         "key": "L",
-        "text": "Escalo para o responsável, não altero processo por conta própria, mesmo que eu saiba como corrigir."
+        "text": "Escalo para o responsável. Alterar um processo requer aprovação, e esse caminho formal existe por um motivo."
       },
       {
         "key": "G",
-        "text": "Verifico com colegas se é só comigo, não ajo sozinho sem saber se mais alguém está no mesmo problema."
+        "text": "Verifico com colegas se o problema é só comigo. Saber se mais alguém está na mesma situação muda a forma de agir."
       },
       {
         "key": "F",
-        "text": "Diagnostico e improviso uma solução técnica, não fico parado esperando o processo ser revisado enquanto o problema está ativo."
+        "text": "Diagnostico e improviso uma solução técnica. Enquanto o processo formal é revisado, prefiro ter algo funcionando."
       }
     ]
   },
@@ -318,23 +318,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Começar logo, cada minuto analisando é um minuto a menos produzindo."
+        "text": "Começar logo. Cada minuto analisando é um minuto a menos executando."
       },
       {
         "key": "A",
-        "text": "Analisar antes de agir, não começo sem entender o contexto, prefiro fazer certo do que refazer."
+        "text": "Analisar antes de agir. Prefiro fazer certo do que ter que refazer."
       },
       {
         "key": "L",
-        "text": "Verificar se existe processo ou instrução, não invento forma de fazer quando pode já ter um padrão estabelecido."
+        "text": "Verificar se existe processo ou instrução. Se há um padrão estabelecido, começo por ele."
       },
       {
         "key": "G",
-        "text": "Perguntar ao time como foi feito antes, não avanço sem referência de alguém que já passou por isso."
+        "text": "Perguntar ao time como foi feito antes. Prefiro ter uma referência de quem já passou por isso."
       },
       {
         "key": "F",
-        "text": "Ir atrás da informação técnica e resolver do meu jeito, não preciso saber como os outros fazem para encontrar minha solução."
+        "text": "Ir atrás da informação técnica e resolver do meu jeito. Me sinto à vontade construindo minha própria abordagem."
       }
     ]
   },
@@ -346,23 +346,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Vou direto ao ponto e pressiono por decisão, não tenho paciência para reunião que não termina com ação definida."
+        "text": "Vou direto ao ponto e pressiono por decisão. Reunião que não termina com ação definida é tempo perdido."
       },
       {
         "key": "A",
-        "text": "Questiono dados e peço detalhes, não me sinto confortável concordando com algo que não entendo por completo."
+        "text": "Questiono dados e peço detalhes. Preciso entender o que está sendo discutido por completo antes de concordar."
       },
       {
         "key": "L",
-        "text": "Escuto, anoto e sigo o que for decidido, não fico questionando a decisão coletiva depois de tomada."
+        "text": "Escuto, anoto e sigo o que for decidido. Decisão coletiva tomada é decisão que vale."
       },
       {
         "key": "G",
-        "text": "Fico atento ao clima do grupo, quando o tom esquenta, prefiro ajudar a destravar do que deixar o ambiente piorar."
+        "text": "Fico atento ao clima do grupo. Quando o tom esquenta, prefiro ajudar a destravar."
       },
       {
         "key": "F",
-        "text": "Engajo quando o assunto é técnico, se não for, prefiro que seja rápido, não é onde contribuo mais."
+        "text": "Engajo quando o assunto é técnico. No restante, prefiro que seja objetivo e breve."
       }
     ]
   },
@@ -374,23 +374,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Ouço o suficiente para entender o problema e apresento a solução, não deixo a conversa se estender mais do que precisa."
+        "text": "Ouço o suficiente para entender o problema e apresento a solução. Meu foco é resolver com objetividade."
       },
       {
         "key": "A",
-        "text": "Entendo o problema por completo antes de qualquer passo, não ofereço solução sem saber exatamente o que está acontecendo."
+        "text": "Entendo o problema por completo antes de qualquer passo. Mapear o que está acontecendo de verdade é o pré-requisito para qualquer solução."
       },
       {
         "key": "L",
-        "text": "Sigo o protocolo de atendimento, não improviso mesmo com cliente bravo, o processo existe para isso."
+        "text": "Sigo o protocolo de atendimento. O processo existe para esse tipo de situação."
       },
       {
         "key": "G",
-        "text": "Ouço com atenção e cuido do tom da conversa primeiro, não consigo resolver nada com alguém ainda no pico emocional."
+        "text": "Escuto com atenção e cuido do tom da conversa primeiro. É difícil resolver qualquer coisa com alguém ainda no pico emocional."
       },
       {
         "key": "F",
-        "text": "Foco em diagnosticar e resolver o problema técnico, a parte emocional eu deixo para quem tem mais habilidade com isso."
+        "text": "Foco em diagnosticar e resolver o problema técnico. É onde consigo contribuir melhor."
       }
     ]
   },
@@ -402,23 +402,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Foco em resolver e retomar, não fico parado analisando o que deu errado, isso vem depois se vier."
+        "text": "Foco em resolver e retomar. Análise do que deu errado vem depois, quando o problema já estiver resolvido."
       },
       {
         "key": "A",
-        "text": "Primeiro preciso entender se foi pontual ou sistêmico, não vou à solução sem essa resposta."
+        "text": "Primeiro preciso entender se foi pontual ou sistêmico. Essa resposta é o que define o tamanho da solução necessária."
       },
       {
         "key": "L",
-        "text": "Verifico onde o processo falhou e corrijo dentro dele, não invento solução nova se existe passo de correção estabelecido."
+        "text": "Verifico onde o processo falhou e corrijo dentro dele. Se existe passo de correção definido, é por ele que vou."
       },
       {
         "key": "G",
-        "text": "Me preocupo com o impacto nas pessoas, antes de qualquer ação, preciso saber se alguém foi afetado de forma que preciso abordar diretamente."
+        "text": "Me preocupo com o impacto nas pessoas. Preciso saber se alguém foi afetado de forma que preciso abordar diretamente."
       },
       {
         "key": "F",
-        "text": "Diagnostico a causa técnica e corrijo na raiz, não me satisfaz resolver sem entender o que originou o problema."
+        "text": "Diagnostico a causa técnica e corrijo na raiz. Resolver sem entender o que originou o problema só adia a próxima ocorrência."
       }
     ]
   },
@@ -430,23 +430,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Sigo quando faz sentido, não deixo um processo me travar quando o objetivo e o caminho estão claros."
+        "text": "Sigo quando faz sentido para o objetivo. Quando processo e resultado apontam na mesma direção, sigo. Quando conflitam, priorizo o resultado."
       },
       {
         "key": "A",
-        "text": "Valorizo processos bem estruturados, mas questiono quando são ineficientes, não sigo processo ruim só porque existe."
+        "text": "Valorizo processos bem estruturados, mas questiono quando são ineficientes. Processo ruim também precisa ser revisado."
       },
       {
         "key": "L",
-        "text": "Sigo os processos com rigor, não fico avaliando se o processo é bom ou ruim, existe por um motivo e é o que vale."
+        "text": "Sigo com rigor. Processo existe por um motivo e é o que vale até que seja formalmente revisado."
       },
       {
         "key": "G",
-        "text": "Sigo os processos, mas considero o impacto nas pessoas, não aplico regra de forma que destrua o relacionamento desnecessariamente."
+        "text": "Sigo, mas considero o impacto nas pessoas. Regra aplicada de forma que destroça um relacionamento desnecessariamente perde o ponto."
       },
       {
         "key": "F",
-        "text": "Conheço os processos, mas improviso quando o campo pede, nem sempre o manual cobre o que está na sua frente."
+        "text": "Conheço os processos, mas improviso quando o campo pede. O manual nem sempre cobre o que está na sua frente."
       }
     ]
   },
@@ -458,23 +458,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Apresento logo e começo a executar, não espero por aprovação quando a ideia faz sentido para mim."
+        "text": "Apresento logo e começo a executar. Se a ideia faz sentido, o próximo passo natural é testar."
       },
       {
         "key": "A",
-        "text": "Verifico o embasamento antes de apresentar, não levo ideia sem dados, opinião sem sustentação não é proposta."
+        "text": "Verifico o embasamento antes de apresentar. Uma ideia sustentada por dados tem muito mais força na hora de defender."
       },
       {
         "key": "L",
-        "text": "Espero o momento certo para apresentar, não solto ideia no meio de qualquer conversa, ela precisa de contexto."
+        "text": "Espero o momento certo para apresentar. Uma boa ideia no contexto errado não anda."
       },
       {
         "key": "G",
-        "text": "Converso com o time antes, não apresento ideia sem antes checar o que as pessoas ao redor acham."
+        "text": "Converso com o time antes. Saber o que as pessoas ao redor pensam faz a ideia chegar mais forte."
       },
       {
         "key": "F",
-        "text": "Testo na prática antes de apresentar, não defendo ideia que ainda não comprovei por conta própria."
+        "text": "Testo na prática antes de apresentar. Só me sinto confortável defendendo algo que já comprovei por conta própria."
       }
     ]
   },
@@ -486,23 +486,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Defino o que precisa ser feito e cobro, não fico esperando para ver se alguém vai se mover sozinho."
+        "text": "Defino o que precisa ser feito e cobro execução. Em pressão alta, o papel que assumo naturalmente é mobilizar o time para agir."
       },
       {
         "key": "A",
-        "text": "Mantenho a calma e analiso, não ajo antes de ter clareza do que está acontecendo, mesmo sob pressão."
+        "text": "Mantenho a calma e analiso. Mesmo sob pressão, agir sem clareza do que está acontecendo aumenta o problema."
       },
       {
         "key": "L",
-        "text": "Sigo o procedimento de emergência, não improviso em situação de pressão quando há um protocolo definido."
+        "text": "Sigo o procedimento de emergência. Se há um protocolo definido para crise, é ele que vale."
       },
       {
         "key": "G",
-        "text": "Garanto que todas as pessoas envolvidas estejam informadas, não consigo avançar em crise sabendo que alguém está no escuro."
+        "text": "Garanto que todas as pessoas envolvidas estejam informadas. Numa crise, ninguém pode estar no escuro."
       },
       {
         "key": "F",
-        "text": "Localizo a falha e resolvo com as próprias mãos, não passo por intermediário quando sei o que precisa ser feito."
+        "text": "Localizo a falha e resolvo com as próprias mãos. Em pressão alta, ir direto ao problema é o que faz sentido para mim."
       }
     ]
   },
@@ -514,23 +514,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Aprendo fazendo, não fico lendo manual antes de pôr a mão na massa, o erro faz parte do processo."
+        "text": "Aprendo fazendo. O erro faz parte do processo e é a partir dele que o aprendizado de verdade acontece."
       },
       {
         "key": "A",
-        "text": "Busco o contexto geral antes de mergulhar, não avanço sem entender como esse novo assunto se conecta ao que já sei."
+        "text": "Busco o contexto geral antes de mergulhar. Preciso entender como esse novo assunto se conecta ao que já sei."
       },
       {
         "key": "L",
-        "text": "Prefiro treinamento estruturado, não me sinto confortável aprendendo algo importante sem um processo definido de capacitação."
+        "text": "Prefiro treinamento estruturado. Um caminho definido de capacitação me dá segurança para aprender algo importante."
       },
       {
         "key": "G",
-        "text": "Aprendo trocando com alguém que já domina, não consigo absorver bem um assunto novo sem ter com quem discutir."
+        "text": "Aprendo trocando com alguém que já domina. Discutir o assunto com quem tem experiência acelera muito meu entendimento."
       },
       {
         "key": "F",
-        "text": "Abro e descubro por conta própria, prefiro entender cada detalhe sozinho do que depender da explicação de alguém."
+        "text": "Abro e descubro por conta própria. Ir fundo nos detalhes sem intermediário é o jeito que funciona melhor para mim."
       }
     ]
   },
@@ -542,23 +542,23 @@ export const BEHAVIORAL_QUESTIONS = [
     "options": [
       {
         "key": "T",
-        "text": "Mapeio as oportunidades e começo a contribuir logo, não fico em modo observação quando já dá para agir."
+        "text": "Mapeio as oportunidades e começo a contribuir logo. Prefiro agir a ficar em modo de observação quando já dá para ajudar."
       },
       {
         "key": "A",
-        "text": "Entendo o sistema e as pessoas-chave antes de propor qualquer coisa, não faço sugestão sem entender como as coisas funcionam aqui."
+        "text": "Entendo o sistema e as pessoas-chave antes de propor qualquer coisa. Sugestão com contexto tem muito mais chance de ser bem recebida."
       },
       {
         "key": "L",
-        "text": "Entendo os processos e me adapto a eles, não chego querendo mudar tudo antes de entender como o time funciona."
+        "text": "Entendo os processos e me adapto a eles. Chegar querendo mudar tudo antes de entender como o time funciona não faz sentido."
       },
       {
         "key": "G",
-        "text": "Primeiro conheço as pessoas, não me sinto integrado sem ter construído ao menos um mínimo de confiança com o time."
+        "text": "Primeiro conheço as pessoas. Me sentir integrado começa pela confiança com o time, não pelas tarefas."
       },
       {
         "key": "F",
-        "text": "Mapeio os problemas técnicos, é por onde começo, não me preocupo com as dinâmicas do time antes de entender o que está quebrado."
+        "text": "Mapeio os problemas técnicos. É por onde começo a entender onde posso contribuir de verdade."
       }
     ]
   },
@@ -566,27 +566,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 19,
     "weight": 2,
     "dimension": "erro_impacto",
-    "text": "Você cometeu um erro que causou impacto direto no cliente ou no serviço. O que acontece?",
+    "text": "Você cometeu um erro que causou impacto direto no cliente ou no serviço. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Assumo, corrijo e sigo, não me paraliso por erro, o que importa é retomar o quanto antes."
+        "text": "Assumo, corrijo e sigo. O que importa é retomar o quanto antes."
       },
       {
         "key": "A",
-        "text": "Mapeio quem foi afetado antes de qualquer ação, não corrijo no escuro sem saber o tamanho real do impacto."
+        "text": "Mapeio quem foi afetado antes de qualquer ação. Entender o tamanho real do impacto define o que a correção precisa alcançar."
       },
       {
         "key": "L",
-        "text": "Comunico ao gestor e corrijo dentro do processo, não faço correção de impacto sem o rastro formal."
+        "text": "Comunico ao gestor e corrijo dentro do processo. Correção de impacto sem o rastro formal não é a forma que trabalho."
       },
       {
         "key": "G",
-        "text": "Me preocupo com quem foi afetado, não consigo focar na correção técnica sem antes cuidar de como o cliente e o time estão."
+        "text": "Me preocupo com quem foi afetado. Cuidar do cliente e do time é o que vem primeiro para mim antes de qualquer ação técnica."
       },
       {
         "key": "F",
-        "text": "Investigo a causa técnica para não repetir, não me satisfaz corrigir sem entender o que gerou o problema."
+        "text": "Vou fundo na parte técnica do que falhou. É onde consigo apurar com mais precisão e garantir que o problema não se repete."
       }
     ]
   },
@@ -594,27 +594,27 @@ export const BEHAVIORAL_QUESTIONS = [
     "id": 20,
     "weight": 1.5,
     "dimension": "autoridade",
-    "text": "Você identifica uma solução para um problema recorrente, mas implementá-la depende de uma autorização que você não tem. O que faz?",
+    "text": "Você identifica uma solução para um problema recorrente, mas implementá-la depende de uma autorização que você não tem. O que você faria?",
     "options": [
       {
         "key": "T",
-        "text": "Apresento a solução e pressiono por decisão, não deixo uma boa ideia morrer na fila de aprovações."
+        "text": "Apresento a solução e pressiono por decisão. Uma boa ideia não pode ficar parada na fila de aprovações."
       },
       {
         "key": "A",
-        "text": "Estruturo riscos e benefícios antes de escalar, não apresento solução sem o respaldo analítico que justifica o pedido."
+        "text": "Estruturo riscos e benefícios antes de escalar. Uma proposta bem embasada tem muito mais chance de ser aprovada."
       },
       {
         "key": "L",
-        "text": "Comunico ao gestor e aguardo, não atuo sem aprovação mesmo que a solução pareça óbvia."
+        "text": "Comunico ao gestor e aguardo. Implementar sem aprovação, mesmo com a melhor solução, não é o caminho correto."
       },
       {
         "key": "G",
-        "text": "Converso com quem é afetado antes de escalar, não apresento proposta sem saber se tem apoio de quem vai viver com ela."
+        "text": "Converso com quem é afetado antes de escalar. Chegar com apoio de quem vai viver com a solução faz toda a diferença."
       },
       {
         "key": "F",
-        "text": "Verifico o que está na minha autonomia técnica e resolvo, só escalo o que realmente não posso fazer sozinho."
+        "text": "Verifico o que está na minha autonomia técnica e resolvo o que posso. Só escalo o que realmente não posso fazer sozinho."
       }
     ]
   }
