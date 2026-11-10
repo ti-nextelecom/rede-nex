@@ -936,7 +936,7 @@ export function Chat() {
   const recordingTimerRef = useRef<number | null>(null);
 
   // File attachment preview
-  const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'document'; raw: File } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'audio' | 'document'; raw: File } | null>(null);
   const [, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1126,7 +1126,7 @@ export function Chat() {
     e?.preventDefault();
     if (pendingFile) {
       if (!selectedId) return;
-      const prefix = pendingFile.type === 'image' ? '[IMAGE]' : pendingFile.type === 'video' ? '[VIDEO]' : `[DOC|${pendingFile.raw.name}]`;
+      const prefix = pendingFile.type === 'image' ? '[IMAGE]' : pendingFile.type === 'video' ? '[VIDEO]' : pendingFile.type === 'audio' ? '[AUDIO_MSG]' : `[DOC|${pendingFile.raw.name}]`;
       try {
         const url = await uploadChatMedia(pendingFile.raw);
         await sendChatMessage(selectedId, `${prefix}${url}${pendingCaption ? '\n' + pendingCaption : ''}`, replyingTo?.id);
@@ -1150,7 +1150,7 @@ export function Chat() {
   function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document';
+    const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document';
     const src = type !== 'document' ? URL.createObjectURL(file) : '';
     setPendingFile({ src, type, raw: file });
     e.target.value = '';
@@ -1594,7 +1594,7 @@ export function Chat() {
             )}
 
             {/* Messages */}
-            <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto px-8 py-5" onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
+            <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto px-8 py-5" onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file && selectedId) { const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document'; setPendingFile({ src: type !== 'document' ? URL.createObjectURL(file) : '', type, raw: file }); } }} style={{
               background: theme.bgImage
                 ? `url(${theme.bgImage}) center/cover`
                 : (darkMode && theme.bgColor === DEFAULT_THEME.bgColor ? '#0d1418' : theme.bgColor),
@@ -1709,6 +1709,8 @@ export function Chat() {
                   ? <img src={pendingFile.src} alt="" className="h-16 w-16 rounded-lg object-cover" />
                   : pendingFile.type === 'video'
                     ? <video src={pendingFile.src} className="h-16 w-16 rounded-lg object-cover" />
+                    : pendingFile.type === 'audio'
+                      ? <div className="h-16 w-16 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center"><Mic size={28} className="text-orange-400" /></div>
                     : <div className="h-16 w-16 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center"><FileText size={28} className="text-orange-400" /></div>}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-700 truncate">{pendingFile.raw.name}</p>
@@ -1785,7 +1787,7 @@ export function Chat() {
                     className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Enviar arquivo">
                     <Paperclip size={19} />
                   </button>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
 
                   {mentionQuery !== null && mentionParticipants.length > 0 && (
                     <div className="absolute bottom-14 left-12 z-30 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">

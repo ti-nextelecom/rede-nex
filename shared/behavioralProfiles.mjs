@@ -1,6 +1,6 @@
 import { BEHAVIORAL_PROFILES, BEHAVIORAL_QUESTIONS, BEHAVIORAL_SOURCE } from './behavioralProfileContent.mjs';
 export { BEHAVIORAL_PROFILES, BEHAVIORAL_QUESTIONS, BEHAVIORAL_SOURCE };
-export const BEHAVIORAL_VERSION='nex-v21-premium-v5.0';
+export const BEHAVIORAL_VERSION='nex-v22-quiz-fix-v1.0';
 export const BEHAVIORAL_KEYS=['T','A','L','G','F'];
 export const BEHAVIORAL_MODES=['pure','traits','hybrid','blend','balanced'];
 export const BEHAVIORAL_HYBRIDS={A_L:'orca',L_A:'orca',G_L:'cisne',L_G:'cisne',T_G:'leao',G_T:'leao',A_T:'onca',T_A:'onca',T_F:'puma',F_T:'puma'};

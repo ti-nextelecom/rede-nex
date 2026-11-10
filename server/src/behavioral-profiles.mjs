@@ -24,8 +24,8 @@ export function behavioralRepository(pool){
     start:(userId,payload)=>{
       allowed(payload,['expected_latest_id','restart','expected_draft_revision']);if(payload.expected_latest_id!==null&&!uuid(payload.expected_latest_id))throw fail(400,'Referência da última avaliação inválida.');
       return transaction(userId,async client=>{const latest=await latestId(client,userId);if(latest!==payload.expected_latest_id)throw fail(409,'Seu perfil foi atualizado em outra sessão. Atualize antes de iniciar uma avaliação.');const current=await draft(client,userId);
-        if(current&&payload.restart!==true)return current;
-        if(current){if(current.revision!==payload.expected_draft_revision)throw fail(409,'O rascunho mudou em outra sessão. Atualize antes de reiniciar.');return (await client.query("UPDATE public.behavioral_drafts SET attempt_id=$2,questionnaire_version=$3,answers='{}',revision=revision+1,started_at=now(),updated_at=now() WHERE user_id=$1 RETURNING *",[userId,randomUUID(),BEHAVIORAL_VERSION])).rows[0];}
+        if(current&&!payload.restart&&current.questionnaire_version===BEHAVIORAL_VERSION)return current;
+        if(current){if(payload.restart&&current.revision!==payload.expected_draft_revision)throw fail(409,'O rascunho mudou em outra sessão. Atualize antes de reiniciar.');return (await client.query("UPDATE public.behavioral_drafts SET attempt_id=$2,questionnaire_version=$3,answers='{}',revision=revision+1,started_at=now(),updated_at=now() WHERE user_id=$1 RETURNING *",[userId,randomUUID(),BEHAVIORAL_VERSION])).rows[0];}
         return (await client.query('INSERT INTO public.behavioral_drafts(user_id,questionnaire_version) VALUES($1,$2) RETURNING *',[userId,BEHAVIORAL_VERSION])).rows[0];
       },{write:true});
     },
