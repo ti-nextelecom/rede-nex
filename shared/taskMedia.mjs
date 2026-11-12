@@ -58,3 +58,17 @@ export function taskDescriptionParts(content) {
   if (previous < content.length) parts.push({ kind: 'text', text: content.slice(previous) });
   return parts;
 }
+
+// Templates keep instructions and ordinary links, without embedding task media.
+export function taskDescriptionWithoutMedia(content, files = []) {
+  const known = new Set(files.map(file => safeTaskFileUrl(file?.file_url)).filter(Boolean));
+  const isMedia = value => {
+    const url = safeTaskFileUrl(value);
+    return Boolean(url && (known.has(url) || /^\/(uploads\/|api\/media\/)/.test(url)));
+  };
+  return String(content || '')
+    .replace(/!\[[^\]\r\n]*\]\([^\r\n)]*\)/g, '')
+    .replace(/\[([^\]\r\n]*)\]\(([^)\r\n]+)\)/g, (match, _label, url) => isMedia(url) ? '' : match)
+    .replace(/https?:\/\/[^\s<>]+|\/(?:uploads|api\/media)\/[^\s<>]+/g, value => isMedia(value) ? '' : value)
+    .replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, '\n\n').trim();
+}

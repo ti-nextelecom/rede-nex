@@ -22,7 +22,7 @@ type AuthContextValue = {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
   uploadCover: (file: File) => Promise<void>;
-  updateProfile: (input: Partial<Pick<User, 'name' | 'email' | 'phone' | 'position' | 'bio' | 'google_ical_url' | 'photo_url'>>) => Promise<void>;
+  updateProfile: (input: Partial<Pick<User, 'name' | 'email' | 'phone' | 'position' | 'bio' | 'google_ical_url' | 'photo_url' | 'anydesk_id'>>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refreshUser();
   }
 
-  async function updateProfile(input: Partial<Pick<User, 'name' | 'email' | 'phone' | 'position' | 'bio' | 'google_ical_url' | 'photo_url'>>) {
+  async function updateProfile(input: Partial<Pick<User, 'name' | 'email' | 'phone' | 'position' | 'bio' | 'google_ical_url' | 'photo_url' | 'anydesk_id'>>) {
     const response = await apiPut<ApiResponse<LoginResult['user']>>('/users/me', input);
     if (response.data) setUser(response.data);
   }

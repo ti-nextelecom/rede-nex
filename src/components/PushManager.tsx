@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { App } from '@capacitor/app';
 import { useAuth } from '../lib/auth';
 import { chatMessageLink, chatNotificationTarget } from '../../shared/chatMessageLinks.mjs';
 
@@ -26,7 +27,17 @@ export function PushManager() {
       const data = action.notification.data;
       if (typeof cid === 'string') { const target = chatNotificationTarget(data?.link); window.location.href = chatMessageLink(cid, typeof data?.messageId === 'string' ? data.messageId : target?.messageId, target?.mention); }
     });
-    return () => { PushNotifications.removeAllListeners(); };
+    let cleanupAppUrl: (() => void) | undefined;
+    App.addListener('appUrlOpen', event => {
+      if (event.url.startsWith('rede-nex://chat/')) {
+        const cid = event.url.replace('rede-nex://chat/', '');
+        if (cid) window.location.href = chatMessageLink(cid);
+      }
+    }).then(h => { cleanupAppUrl = () => h.remove(); }).catch(() => {});
+    return () => {
+      PushNotifications.removeAllListeners();
+      cleanupAppUrl?.();
+    };
   }, [user?.id]);
 
   return null;

@@ -183,7 +183,8 @@ export async function updateMyProfile(userId, input) {
         position = nullif($5, ''),
         bio = nullif($6, ''),
         google_ical_url = nullif($7, ''),
-        photo_url = coalesce(nullif($8, ''), photo_url)
+        photo_url = coalesce(nullif($8, ''), photo_url),
+        anydesk_id = nullif($9, '')
       where id = $1
       returning *
     `,
@@ -196,6 +197,7 @@ export async function updateMyProfile(userId, input) {
       input.bio ?? null,
       input.google_ical_url ?? null,
       input.photo_url ?? null,
+      input.anydesk_id ?? null,
     ]
   );
 

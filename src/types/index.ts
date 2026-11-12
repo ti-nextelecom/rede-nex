@@ -32,6 +32,8 @@ export interface User {
   must_change_password?: boolean;
   cover_url?: string;
   google_ical_url?: string | null;
+  anydesk_id?: string | null;
+  anydesk_id?: string | null;
   last_seen_at?: string;
   last_login_at?: string;
   online?: boolean;

@@ -7,3 +7,6 @@ export function normalizeTaskBlueprint(input?: unknown): TaskBlueprint;
 export function blueprintFromTask(task: unknown, files?: unknown[]): TaskBlueprint;
 export function blueprintFromTemplate(template: unknown): TaskBlueprint;
 export function blueprintPeople(blueprint: TaskBlueprint, creatorId?: string): {participants: string[]; observers: string[]};
+
+export function taskTemplateBlueprint(input?: unknown): TaskBlueprint;
+export function cloneTaskBlueprint(task: unknown, files?: unknown[]): TaskBlueprint;

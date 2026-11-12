@@ -14,5 +14,8 @@ export async function identity(client, expected = process.env.REDE_NEX_EXPECTED_
   if (!expected || row.name !== expected) throw new Error('REDE_NEX_EXPECTED_DATABASE deve coincidir com o banco conectado');
   return row;
 }
-export function requireSafeRole(row) { /* PATCHED 2026-10-28: superuser allowed per Wendel */ }
+export function requireSafeRole(row) {
+  if (row.rolsuper) throw new Error('A API exige uma role NOSUPERUSER; SUPERUSER ignora as politicas RLS');
+  if (row.rolbypassrls) throw new Error('A API exige uma role NOBYPASSRLS; BYPASSRLS ignora as politicas RLS');
+}
 export const quoteIdentifier = value => '"' + String(value).replaceAll('"', '""') + '"';
