@@ -40,8 +40,17 @@ public class MessagingService extends com.capacitorjs.plugins.pushnotifications.
         String body = data.getOrDefault("body", notification != null && notification.getBody() != null ? notification.getBody() : "Nova mensagem");
         String conversationId = data.get("conversationId");
         String senderAvatar = data.get("senderAvatar");
+        String senderName = data.getOrDefault("senderName", "");
+        boolean isGroup = "true".equals(data.get("isGroup"));
+        String conversationName = data.getOrDefault("conversationName", "");
         boolean chat = conversationId != null && conversationId.matches("[0-9a-fA-F-]{36}");
         String link = data.getOrDefault("link", "/");
+
+        // Groups: title = group name, body = "Sender: message"
+        // Private: title = sender name (from FCM title field), body = message
+        String displayTitle = (isGroup && !conversationName.isEmpty()) ? conversationName : title;
+        String displayBody = (isGroup && !senderName.isEmpty()) ? senderName + ": " + body : body;
+
         Uri target = chat ? new Uri.Builder().scheme("rede-nex").authority("chat").appendPath(conversationId)
             .appendQueryParameter("mensagem", data.getOrDefault("messageId", ""))
             .appendQueryParameter("mencao", "true".equals(data.get("mention")) ? "1" : "0").build()
@@ -51,10 +60,16 @@ public class MessagingService extends com.capacitorjs.plugins.pushnotifications.
         Intent tapIntent = new Intent(this, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(target)
             .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent tapPending = PendingIntent.getActivity(this, id, tapIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_nex).setContentTitle(title).setContentText(body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setSmallIcon(R.drawable.ic_stat_nex).setContentTitle(displayTitle).setContentText(displayBody)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(displayBody)).setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true).setContentIntent(tapPending);
+
+        // App logo as initial large icon (shown immediately; replaced by sender avatar if download succeeds)
+        Bitmap appLogo = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
+        if (appLogo != null) builder.setLargeIcon(appLogo);
+
         if (chat) {
             RemoteInput remoteInput = new RemoteInput.Builder(KEY_REPLY).setLabel("Responder...").build();
             Intent replyIntent = new Intent(this, ReplyReceiver.class).setAction(ACTION_REPLY);
@@ -66,7 +81,6 @@ public class MessagingService extends com.capacitorjs.plugins.pushnotifications.
         }
         NotificationManager mgr = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
         if (mgr != null) {
-            // Show the alert immediately; a slow avatar must not delay delivery.
             mgr.notify(id, builder.build());
             Bitmap avatar = downloadBitmap(senderAvatar);
             if (avatar != null) mgr.notify(id, builder.setLargeIcon(avatar).setOnlyAlertOnce(true).build());
@@ -81,7 +95,6 @@ public class MessagingService extends com.capacitorjs.plugins.pushnotifications.
             conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(1500); conn.setReadTimeout(2000);
             conn.setInstanceFollowRedirects(false);
-            // Uploaded avatars are private. Never forward the app cookie to an external host.
             if ("rede.nextelecom.net.br".equalsIgnoreCase(url.getHost()) && (url.getPort() == -1 || url.getPort() == 443)) {
                 String cookie = CookieManager.getInstance().getCookie("https://rede.nextelecom.net.br");
                 if (cookie != null) conn.setRequestProperty("Cookie", cookie);
