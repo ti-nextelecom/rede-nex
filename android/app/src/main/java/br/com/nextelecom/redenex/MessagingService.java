@@ -4,12 +4,17 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.RemoteInput;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -26,6 +31,7 @@ public class MessagingService extends FirebaseMessagingService {
         String title = data.getOrDefault("title", "Rede Nex");
         String body = data.getOrDefault("body", "Nova mensagem");
         String conversationId = data.get("conversationId");
+        String senderAvatar = data.get("senderAvatar");
 
         ensureChannel();
         int id = notifCounter.getAndIncrement();
@@ -44,6 +50,11 @@ public class MessagingService extends FirebaseMessagingService {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(tapPending);
+
+        if (senderAvatar != null && !senderAvatar.isEmpty()) {
+            Bitmap avatar = downloadBitmap(senderAvatar);
+            if (avatar != null) builder.setLargeIcon(avatar);
+        }
 
         if (conversationId != null) {
             RemoteInput remoteInput = new RemoteInput.Builder(KEY_REPLY)
@@ -68,6 +79,24 @@ public class MessagingService extends FirebaseMessagingService {
 
         NotificationManager mgr = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (mgr != null) mgr.notify(id, builder.build());
+    }
+
+    private Bitmap downloadBitmap(String urlString) {
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(5000);
+            conn.setDoInput(true);
+            conn.connect();
+            InputStream input = conn.getInputStream();
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            input.close();
+            conn.disconnect();
+            return bitmap;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void ensureChannel() {

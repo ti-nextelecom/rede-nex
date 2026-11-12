@@ -279,7 +279,7 @@ export async function sendMessage(userId, conversationId, content, attachmentUrl
         await notifyUsers(notice);
         sendFcmToUsers(notice.userIds, {
           title: notice.title, body: notice.message,
-          data: { conversationId: String(conversationId), messageId: String(rows[0].id), link: notice.link },
+          data: { conversationId: String(conversationId), messageId: String(rows[0].id), link: notice.link, senderAvatar: mine.photo_url ? (mine.photo_url.startsWith('http') ? mine.photo_url : 'https://rede.nextelecom.net.br' + mine.photo_url) : '' },
         }).catch(() => {});
       }
     })().catch(() => {});
