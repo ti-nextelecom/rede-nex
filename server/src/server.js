@@ -154,6 +154,17 @@ const ALLOWED_UPLOAD_MIME = new Set(['image/jpeg','image/jpg','image/png','image
 const MAX_JSON_BYTES = Number(process.env.MAX_JSON_BYTES || 32 * 1024 * 1024);
 const allowedOrigins = new Set((process.env.CORS_ORIGINS || 'http://127.0.0.1:5173,http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean));
 
+async function notifyMentionsInTask(content, task, actor, sendFn) {
+  const rawParts = content.split('@').slice(1);
+  if (!rawParts.length) return;
+  const candidates = rawParts.map(p => p.split('\n')[0].trim().toLowerCase()).filter(Boolean);
+  if (!candidates.length) return;
+  const { rows } = await pool.query("SELECT id, lower(trim(name)) AS lname FROM users WHERE status='active' AND id != $1", [actor.id]);
+  const matched = rows.filter(u => candidates.some(c => c === u.lname || c.startsWith(u.lname + ' ') || c.startsWith(u.lname + ','))).map(u => u.id);
+  if (!matched.length) return;
+  await sendFn({ actorId: actor.id, actorName: actor.name, actorPhotoUrl: actor.photo_url, title: 'Você foi mencionado em uma tarefa', message: task.title, type: 'task', link: '/tarefas?tarefa=' + encodeURIComponent(task.id), userIds: matched });
+}
+
 function getRealIP(req) {
   const remote = req.socket.remoteAddress || '0.0.0.0';
   // Canonical deployment: Nginx is on loopback. Do not trust headers from arbitrary LAN clients.
@@ -1013,6 +1024,7 @@ async function route(req, res) {
         const error = validateRequired(payload, ['content']);
         if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
         const task = await addTaskComment(taskId, user.id, payload.content);
+        await notifyMentionsInTask(payload.content, existing, user, notifyUsers).catch(e => console.error('[Mention notification]', e.message));
         await notifyTaskActivity(existing, user, 'Novo comentário em uma tarefa sua', notifyUsers).catch(error => console.error('[Task notification]', error.message));
         return sendJson(req, res, 201, { data: task });
       }
