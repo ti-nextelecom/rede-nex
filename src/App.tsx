@@ -12,6 +12,7 @@ import { GamificationToast } from './components/GamificationToast';
 import { GlobalNotifications } from './components/GlobalNotifications';
 import { GlobalCallOverlay } from './components/GlobalCallOverlay';
 import MaintenanceBanner from './components/MaintenanceBanner';
+import { UpdateBanner } from './components/UpdateBanner';
 import { WsManager } from './components/WsManager';
 import { Layout } from './components/layout/Layout';
 
@@ -124,6 +125,7 @@ function App() {
         <GlobalNotificationsMount />
         <GlobalCallOverlay />
         <MaintenanceBanner />
+        <UpdateBanner />
         <PageErrorBoundary>
         <Suspense fallback={null}>
           <Routes>

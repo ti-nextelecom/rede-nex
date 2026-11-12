@@ -24,7 +24,8 @@
     "deploy:backup": "node server/scripts/backup.mjs",
     "release:build": "node scripts/build-release.mjs",
     "apk:sync": "node scripts/build-android.mjs sync",
-    "apk:debug": "node scripts/build-android.mjs debug"
+    "apk:debug": "node scripts/build-android.mjs debug",
+    "postbuild": "node -e \"require('fs').writeFileSync('dist/version.json', JSON.stringify({ts:Date.now()}))\""
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",

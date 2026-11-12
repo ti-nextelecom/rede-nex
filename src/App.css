@@ -1,1 +1,37 @@
 /* App-level styles */
+
+/* ── UpdateBanner ── */
+.update-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 20px;
+  background: #FFC107;
+  color: #1a1500;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  animation: update-banner-in 0.3s ease;
+}
+@keyframes update-banner-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.update-banner button {
+  flex-shrink: 0;
+  background: #1a1500;
+  color: #FFC107;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: .02em;
+  transition: opacity 0.15s;
+}
+.update-banner button:hover { opacity: 0.85; }
