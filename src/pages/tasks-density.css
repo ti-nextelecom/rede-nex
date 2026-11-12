@@ -63,3 +63,19 @@
 @media (min-width: 1024px) and (pointer: coarse) {
   .tasks-workspace :is(.tasks-summary button,.tasks-views button,.tasks-hero > button,.tasks-search select,.tasks-search input) { min-height: 44px; height: auto; }
 }
+
+/* Each task occupies its own row, including duty-shift lists and the planner. */
+.tasks-workspace .tasks-vertical-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; list-style: none; padding: 0; margin: 0; }
+.tasks-workspace .tasks-vertical-list > li { min-width: 0; }
+.tasks-workspace .tasks-vertical-list .task-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; padding: 12px 14px; }
+.tasks-workspace .tasks-vertical-list .task-card > :not([hidden]) ~ :not([hidden]) { margin: 0; }
+.tasks-workspace .tasks-vertical-list .task-card-title { display: block; -webkit-line-clamp: unset; overflow-wrap: anywhere; font-size: 14px; }
+.tasks-workspace .tasks-vertical-list .task-card-badges { justify-content: flex-end; }
+.tasks-workspace .tasks-vertical-list .task-card-dates { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.tasks-workspace .tasks-vertical-list .task-card-footer { border: 0; padding: 0; gap: 14px; }
+.tasks-workspace .tasks-vertical-list .task-card:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+@media (max-width: 639px) {
+  .tasks-workspace .tasks-vertical-list .task-card { display: flex; flex-direction: column; align-items: stretch; padding: 12px; }
+  .tasks-workspace .tasks-vertical-list .task-card-title { font-size: 15px; }
+  .tasks-workspace .tasks-vertical-list .task-card-badges { justify-content: flex-start; }
+}

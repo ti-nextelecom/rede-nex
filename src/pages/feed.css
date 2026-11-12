@@ -6,7 +6,7 @@
   max-width: 1500px;
   margin-inline: auto;
   color: hsl(var(--foreground));
-  font-family: "Segoe UI", Inter, sans-serif;
+  font-family: var(--nex-font-sans);
   letter-spacing: normal;
 }
 .feed-page :is(h1, h2, h3, p, button, span) { overflow-wrap: normal; word-break: normal; letter-spacing: normal; }
@@ -83,7 +83,7 @@
 .feed-reaction-control-sm { min-height: 30px; font-size: 11px; }
 .feed-reaction-control-sm .feed-reaction-main { min-height: 28px; padding: 4px 7px; }
 .feed-reaction-control-sm .feed-reaction-trigger { min-width: 28px; min-height: 28px; }
-.feed-reaction-popover { width: min(350px, calc(100vw - 32px)); padding: 13px; border: 1px solid hsl(var(--primary) / 0.302); border-radius: 15px; background: hsl(var(--muted)); color: hsl(var(--foreground)); font-family: "Segoe UI", Inter, sans-serif; box-shadow: 0 20px 45px rgba(0,0,0,.4); }
+.feed-reaction-popover { width: min(350px, calc(100vw - 32px)); padding: 13px; border: 1px solid hsl(var(--primary) / 0.302); border-radius: 15px; background: hsl(var(--muted)); color: hsl(var(--foreground)); font-family: var(--nex-font-sans); box-shadow: 0 20px 45px rgba(0,0,0,.4); }
 .feed-reaction-popover p { margin: 0 0 10px; color: hsl(var(--foreground)); font-size: 12px; font-weight: 750; }
 .feed-reaction-options { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 4px; }
 .feed-reaction-option { display: grid; align-content: center; justify-items: center; gap: 4px; min-height: 63px; padding: 6px 2px; border: 1px solid transparent; border-radius: 10px; color: hsl(var(--foreground)); font-size: 11px; font-weight: 700; }

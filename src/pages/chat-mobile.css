@@ -1,0 +1,25 @@
+﻿/* Give the text field the full width; attachment and sending stay on the action row. */
+@media (max-width: 767px) {
+  .chat-shell .chat-input-bar { padding: 8px 8px max(8px, env(safe-area-inset-bottom)); }
+  .chat-shell .chat-composer-form { display: grid; grid-template-columns: 44px 44px minmax(0, 1fr) 44px 44px; align-items: center; gap: 6px; }
+  .chat-shell .chat-composer-form > textarea { grid-column: 1 / -1; grid-row: 1; width: 100%; min-height: 44px; max-height: 110px; padding: 10px 12px; font-size: 16px !important; line-height: 1.4; }
+  .chat-shell .chat-composer-form > :is(button, .chat-attach-button) { min-width: 44px !important; width: 44px; min-height: 44px !important; height: 44px; padding: 0; }
+  .chat-shell .chat-composer-form > .chat-attach-button { grid-column: 1; grid-row: 2; }
+  .chat-shell .chat-composer-form > .chat-tools-toggle { grid-column: 2; grid-row: 2; }
+  .chat-shell .chat-composer-form > .chat-record-button { grid-column: 4; grid-row: 2; }
+  .chat-shell .chat-composer-form > .chat-send-button { grid-column: 5; grid-row: 2; min-width: 44px !important; }
+  .chat-shell .chat-composer-tools.is-open { bottom: calc(100% + 8px); left: 0; max-width: 100%; gap: 4px; padding: 6px; }
+  .chat-shell .chat-composer-tools button { width: 44px; min-width: 44px !important; min-height: 44px !important; height: 44px; }
+  .chat-shell .chat-composer-mentions { bottom: calc(100% + 8px); left: 0; width: min(320px, 100%); max-height: min(240px, 35dvh); overflow-y: auto; }
+  .chat-shell :is(.chat-emoji-panel, .chat-sticker-panel) { max-height: min(310px, 45dvh); overflow-y: auto; }
+  .chat-shell .chat-thread-header { min-width: 0; padding: 8px 10px; gap: 8px; }
+  .chat-shell .chat-thread-identity { min-width: 0; }
+  .chat-shell .chat-thread-identity > button { font-size: 16px; }
+  .chat-shell .chat-thread-actions { flex-basis: 100%; width: 100%; min-width: 0; max-width: 100%; flex-wrap: nowrap; justify-content: flex-start; gap: 5px; padding-top: 6px; padding-bottom: 2px; overflow-x: auto; overscroll-behavior-x: contain; }
+  .chat-shell .chat-thread-actions > button:has(> svg:only-child) { flex: none; width: 44px; min-width: 44px; min-height: 44px; height: 44px; }
+  .chat-shell .chat-thread-actions > div { flex: none; }
+  .chat-shell .chat-conversation-filters > button { min-height: 44px; height: 44px; white-space: normal; line-height: 1.2; }
+  .chat-shell .chat-conversation-filters .chat-archive-filter { margin-left: 0; justify-self: stretch; }
+  .chat-shell .chat-message-history { padding: 12px 10px; }
+  .chat-shell .chat-message-row > .group { max-width: 92% !important; }
+}

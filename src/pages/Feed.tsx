@@ -579,13 +579,14 @@ function SocialPost({
 
           <div className="flex items-center gap-2 pt-1">
             <AchievementAvatar userId={currentUserId} name="Eu" photo={currentUserAvatar} size={32} />
-            <div className="flex-1 flex items-center gap-1.5 bg-slate-50 rounded-full border border-slate-200 px-3 focus-within:border-orange-400 transition-colors">
+            <div data-field-shell="comment">
               <input
                 ref={commentInputRef}
+                data-field-part="input" enterKeyHint="send"
                 value={commentDraft}
                 onChange={event => onCommentChange(event.target.value)}
                 onKeyDown={event => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault();
                     onComment();
                   }

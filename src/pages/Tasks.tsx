@@ -1,8 +1,8 @@
 import {
-  FormEvent, useCallback, useEffect, useMemo, useRef, useState,
+  FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState,
 } from 'react';
 import {
-  Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Clock, Flag,
+  Calendar, CalendarDays, Filter, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Clock, Flag,
   FolderOpen, FolderPlus, GanttChartSquare, KanbanSquare, LayoutList, ListTodo, Loader2, MessageSquare,
   Link, Pencil, Plus, RowsIcon, Trash2, User, X,
   BookmarkPlus,
@@ -25,7 +25,7 @@ import { TaskComposer } from '../components/TaskComposer';
 import { ChecklistPeopleFields } from '../components/TaskPeoplePicker';
 import { TaskModelSharing, TaskSharingFields } from '../components/TaskModelSharing';
 import { blueprintFromTemplate, normalizeTaskBlueprint, type TaskBlueprint } from '../../shared/taskBlueprint.mjs';
-import { canManageTask, canRemoveTaskFile, distinctObserverIds, taskLink } from '../../shared/taskCollaboration.mjs';
+import { canManageTask, canToggleTaskChecklist, canRemoveTaskFile, distinctObserverIds, taskLink } from '../../shared/taskCollaboration.mjs';
 import { uploadChatMedia } from '../lib/chatApi';
 import { TASK_UPLOAD_ACCEPT, taskUploadType, safeTaskFileUrl, taskMediaKind, descriptionImageMarkdown } from '../../shared/taskMedia.mjs';
 import { dayKey, isFinished, isTaskMine } from '../../shared/personalWork.mjs';
@@ -36,6 +36,7 @@ import './task-detail.css';
 import './task-conversation.css';
 import './people-workspace.css';
 import './tasks-density.css';
+import './tasks-mobile.css';
 
 /* ── types ─────────────────────────────────────────────────────────────── */
 interface ChecklistItem { id: string; content: string; completed: boolean; assignee_id?: string; assignee?: TaskUser; sort_order: number; participant_ids?: string[]; observer_ids?: string[]; }
@@ -59,6 +60,7 @@ interface Task {
   protocol?: string;
 }
 
+interface TaskCloneDraft {source_task_id:string;custom_list_id:string|null;blueprint:TaskBlueprint}
 interface CustomList { id: string; name: string; position: number; created_at: string; }
 interface TaskTemplate { id: string; title: string; description: string; priority: string; category: string; created_by?: string; created_at: string; assigned_to?: string | null; assignee_ids?: string[]; checklist_items?: unknown[]; task_snapshot?: TaskBlueprint; shared_user_ids?: string[]; can_manage?: boolean; is_shared: boolean; assigned_user?: { id: string; name: string; photo_url?: string } | null; }
 const templateApi = {
@@ -77,6 +79,7 @@ const listApi = {
 };
 
 const api = {
+  cloneDraft: (id:string)=>apiGet<{data:TaskCloneDraft}>(`/tasks/${id}/clone`).then(result=>result.data),
   list: () => apiGet<{ data: Task[] }>('/tasks').then(r => r.data ?? []),
   create: (input: object) => apiPost<{ data: Task }>('/tasks', input).then(r => r.data!),
   update: async (id: string, input: object) => {
@@ -85,8 +88,8 @@ const api = {
     return r.data!;
   },
   remove: (id: string) => apiDelete(`/tasks/${id}`),
-  addChecklist: (taskId: string, title: string) =>
-    apiPost<{ data: Task }>(`/tasks/${taskId}/checklists`, { title }).then(r => r.data!),
+  addChecklist: (taskId: string, title: string, items: string[] = []) =>
+    apiPost<{ data: Task }>(`/tasks/${taskId}/checklists`, { title, items }).then(r => r.data!),
   deleteChecklist: (taskId: string, clId: string) =>
     apiDeleteJson<{ data: Task }>(`/tasks/${taskId}/checklists/${clId}`).then(r => r.data),
   addItem: (taskId: string, clId: string, content: string, people: object = {}) =>
@@ -121,10 +124,6 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
 };
 const PRIORITY_LABELS: Record<string, string> = { low: 'Baixa', normal: 'Normal', high: 'Alta', urgent: 'Urgente' };
-const PRIORITY_COLORS: Record<string, string> = {
-  low: 'text-slate-500 dark:text-slate-400', normal: 'text-blue-500 dark:text-blue-400',
-  high: 'text-orange-500 dark:text-orange-400', urgent: 'text-red-600 dark:text-red-400',
-};
 const KANBAN_COLS = [
   { id: 'overdue', label: 'Vencido', color: 'border-t-red-500' },
   { id: 'today', label: 'Vencimento hoje', color: 'border-t-orange-500' },
@@ -523,11 +522,13 @@ interface TaskDetailProps {
   onUpdate: (t: Task) => void; onDelete: (id: string) => void;
   customLists?: CustomList[];
   onTemplatesChanged?: () => void;
+  onClone: (draft:TaskCloneDraft)=>void;
 }
 
-function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = [], onTemplatesChanged }: TaskDetailProps) {
+function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = [], onTemplatesChanged, onClone }: TaskDetailProps) {
   const { user: me } = useAuth();
   const canEdit = canManageTask(task, me);
+  const canCompleteChecklist = canToggleTaskChecklist(task, me);
   const [copyFeedback, setCopyFeedback] = useState({ text: '', error: false });
   const [checklistUploading, setChecklistUploading] = useState(false);
   const checklistUploadBusy = useRef(false);
@@ -538,6 +539,9 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
   const [pastingDescription, setPastingDescription] = useState(false);
   const descriptionInput = useRef<HTMLTextAreaElement>(null), descriptionImageInput = useRef<HTMLInputElement>(null), descriptionUploadBusy = useRef(false);
   const [newCl, setNewCl] = useState('');
+  const [newClItems,setNewClItems]=useState<string[]>(['']),[checklistFocus,setChecklistFocus]=useState<string|null>(null),[cloning,setCloning]=useState(false);
+  const cloneRequest=useRef(0),cloningRef=useRef(false);
+  useEffect(()=>()=>{cloneRequest.current++;},[]);
   const [addingCl, setAddingCl] = useState(false);
   const [newItems, setNewItems] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -623,9 +627,17 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
   }
 
   async function handleAddChecklist(e: FormEvent) {
-    e.preventDefault();
-    if (!newCl.trim()) return;
-    if (await runChange(() => api.addChecklist(task.id, newCl.trim()))) { setNewCl(''); setAddingCl(false); }
+    e.preventDefault();if(!newCl.trim())return;
+    const previous=new Set(task.checklists.map(group=>group.id));
+    const saved=await runChange(async()=>{const updated=await api.addChecklist(task.id,newCl.trim(),newClItems.map(text=>text.trim()).filter(Boolean));setChecklistFocus(updated.checklists.find(group=>!previous.has(group.id))?.id||null);return updated;});
+    if(saved){setNewCl('');setNewClItems(['']);setAddingCl(false);}
+  }
+  async function handleClone(){
+    if(cloningRef.current||changingRef.current||uploadCount.current||checklistUploadBusy.current)return;
+    cloningRef.current=true;const request=++cloneRequest.current;setCloning(true);setChangeError('');
+    try{const draft=await api.cloneDraft(task.id);if(request===cloneRequest.current)onClone(draft);}
+    catch(cause){if(request===cloneRequest.current)setChangeError(cause instanceof Error?cause.message:'Não foi possível preparar a cópia.');}
+    finally{cloningRef.current=false;if(request===cloneRequest.current)setCloning(false);}
   }
   async function handleToggleItem(cl: Checklist, item: ChecklistItem) {
     await runChange(() => api.toggleItem(task.id, cl.id, item.id, !item.completed));
@@ -891,6 +903,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                 disabled={!canEdit || saving || checklistUploading} title="Editar tarefa" aria-label="Editar tarefa">
                 <Pencil size={14} />
               </button>
+              <button type="button" onClick={()=>void handleClone()} disabled={cloning||saving||checklistUploading||uploadingFile} className="task-clone-button" title="Clonar tarefa" aria-label="Clonar tarefa">{cloning?<Loader2 size={15} className="animate-spin"/>:<Copy size={15}/>}<span>Clonar</span></button>
               <button
                 onClick={() => { setSaveModalTitle(task.title); setShowSaveModal(true); }}
                 className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 transition-all duration-200"
@@ -901,7 +914,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
               <button className="task-chat-open" onClick={() => setShowConversation(true)} aria-label="Abrir bate-papo da tarefa"><MessageSquare size={17} />Conversa</button>
               <button
                 onClick={() => setShowProps(p => !p)} aria-expanded={showProps}
-                className="sm:hidden h-8 px-2 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-xs font-semibold"
+                className="task-properties-toggle sm:hidden h-8 px-2 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-xs font-semibold"
               >
                 {showProps ? 'Voltar' : 'Configurar'}
               </button>
@@ -973,14 +986,14 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                       )}
                     </section>
 
-                    <fieldset disabled={!canEdit || saving || checklistUploading} className="task-checklists-section">
+                    <fieldset disabled={saving || checklistUploading} className="task-checklists-section" data-can-manage={canEdit}>
                       <div className="task-checklists-heading flex items-center justify-between mb-2">
                         <p className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
                           Checklists {totalItems > 0 && `(${doneItems}/${totalItems})`}
                         </p>
                         {copiedChecklist && (
                           <button
-                            disabled={saving} onClick={async () => {
+                            disabled={!canEdit || saving} onClick={async () => {
                               const saved = await runChange(() => appendTaskChecklists(task, [{ title: copiedChecklist.title, items: copiedChecklist.items.map(item => ({ content: item.content, assignee_id: item.assignee_id, participant_ids: item.participant_ids, observer_ids: item.observer_ids })) }], api));
                               if (saved) setCopiedChecklist(null);
                             }}
@@ -988,18 +1001,16 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                             <Copy size={13} /> Colar "{copiedChecklist.title}"
                           </button>
                         )}
-                        <button onClick={() => setAddingCl(true)} disabled={saving} className="task-add-checklist flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-semibold hover:text-orange-700 transition-colors">
+                        <button onClick={() => setAddingCl(true)} disabled={!canEdit || saving} className="task-add-checklist flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-semibold hover:text-orange-700 transition-colors">
                           <Plus size={16} /> Nova checklist
                         </button>
                       </div>
-                      {addingCl && (
-                        <form onSubmit={handleAddChecklist} className="mb-3 flex gap-2">
-                          <input autoFocus value={newCl} onChange={e => setNewCl(e.target.value)}
-                            placeholder="Nome da checklist" className="flex-1 h-9 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400 transition-colors" />
-                          <button type="submit" disabled={saving || !newCl.trim()} className="h-9 px-4 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-all duration-200">Criar</button>
-                          <button type="button" onClick={() => setAddingCl(false)} className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                            <X size={14} />
-                          </button>
+                      {addingCl && canEdit && (
+                        <form onSubmit={handleAddChecklist} className="task-new-checklist-form">
+                          <label>Nome da checklist<input autoFocus value={newCl} maxLength={200} onChange={e=>setNewCl(e.target.value)} aria-label="Nome da nova checklist" placeholder="Ex.: Instalação e testes"/></label>
+                          <div className="task-new-checklist-steps"><strong>Etapas da checklist</strong>{newClItems.map((content,index)=><div key={index}><span>{index+1}</span><input aria-label={`Etapa ${index+1} da nova checklist`} value={content} maxLength={500} placeholder="Descreva a etapa" onChange={e=>setNewClItems(previous=>previous.map((text,i)=>i===index?e.target.value:text))}/><button type="button" aria-label={`Remover etapa ${index+1}`} onClick={()=>setNewClItems(previous=>previous.length>1?previous.filter((_,i)=>i!==index):[''])}><X size={15}/></button></div>)}</div>
+                          <button type="button" className="task-new-checklist-add" disabled={newClItems.length+totalItems>=500} onClick={()=>setNewClItems(previous=>[...previous,''])}><Plus size={16}/>Adicionar etapa</button>
+                          <div className="task-new-checklist-actions"><button type="submit" disabled={saving||!newCl.trim()}>Criar checklist{newClItems.filter(text=>text.trim()).length>0?` com ${newClItems.filter(text=>text.trim()).length} etapa(s)`:''}</button><button type="button" onClick={()=>{setAddingCl(false);setNewCl('');setNewClItems(['']);}}>Cancelar</button></div>
                         </form>
                       )}
                       {task.checklists.map(cl => {
@@ -1022,7 +1033,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                                   className="text-sm font-bold flex-1 bg-transparent outline-none border-b border-orange-400 text-slate-700 dark:text-slate-200 dark:caret-white py-0.5 min-w-0"
                                 />
                               ) : (
-                                <button type="button" aria-label={`Renomear checklist ${cl.title}`}
+                                <button type="button" disabled={!canEdit} aria-label={`Renomear checklist ${cl.title}`}
                                   onClick={() => setEditingCl({ id: cl.id, title: cl.title })}
                                   className="text-sm font-bold text-slate-700 dark:text-slate-200 flex-1 cursor-text hover:text-orange-600 dark:hover:text-orange-400 select-none">
                                   {cl.title}
@@ -1032,7 +1043,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                               <button onClick={() => setCopiedChecklist(cl)} className="task-checklist-icon text-slate-400 hover:text-blue-500 transition-colors" title="Copiar etapas" aria-label={`Copiar checklist ${cl.title}`}>
                                 <Copy size={13} />
                               </button>
-                              <button disabled={saving} onClick={() => handleDeleteChecklist(cl.id)} className="task-checklist-icon text-slate-400 hover:text-red-500 transition-colors" aria-label={`Excluir checklist ${cl.title}`}>
+                              <button disabled={!canEdit || saving} onClick={() => handleDeleteChecklist(cl.id)} className="task-checklist-icon text-slate-400 hover:text-red-500 transition-colors" aria-label={`Excluir checklist ${cl.title}`}>
                                 <Trash2 size={13} />
                               </button>
                             </div>
@@ -1045,7 +1056,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                               {cl.items.map(item => (
                                 <div key={item.id} className="task-checklist-step">
                                 <div className="task-checklist-item flex items-center gap-2 group rounded-lg px-2 py-1 transition-all duration-150" data-completed={item.completed}>
-                                  <button onClick={() => handleToggleItem(cl, item)} disabled={saving} role="checkbox" aria-checked={item.completed} aria-label={item.content}
+                                  <button onClick={() => handleToggleItem(cl, item)} disabled={!canCompleteChecklist || saving} role="checkbox" aria-checked={item.completed} aria-label={item.content}
                                     className={cn('h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center transition-all duration-200 active:scale-90',
                                       item.completed ? 'bg-orange-500 border-orange-500 shadow-sm' : 'border-slate-300 dark:border-slate-600 hover:border-orange-400 bg-white dark:bg-slate-800')}>
                                     {item.completed && <span className="text-white text-[9px] font-bold">✓</span>}
@@ -1063,7 +1074,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                                       className="text-sm flex-1 bg-transparent outline-none border-b border-orange-400 dark:text-slate-200 dark:caret-white py-0.5 min-w-0"
                                     />
                                   ) : (
-                                    <button type="button" disabled={item.completed} aria-label={`Editar etapa ${item.content}`}
+                                    <button type="button" disabled={!canEdit || item.completed} aria-label={`Editar etapa ${item.content}`}
                                       onClick={() => !item.completed && setEditingItem({ clId: cl.id, itemId: item.id, content: item.content })}
                                       className={cn('text-sm flex-1 transition-all duration-200 dark:text-slate-300 select-none',
                                         item.completed
@@ -1073,27 +1084,27 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                                       {item.content}
                                     </button>
                                   )}
-                                  <ItemAssigneePicker users={users} value={item.assignee_id || ''} onChange={(id) => handleSetItemAssignee(cl, item, id)} />
-                                  <button onClick={() => handleDeleteItem(cl, item.id)} disabled={saving} aria-label={`Excluir etapa ${item.content}`}
+                                  <fieldset disabled={!canEdit} className="contents"><ItemAssigneePicker users={users} value={item.assignee_id || ''} onChange={(id) => handleSetItemAssignee(cl, item, id)} /></fieldset>
+                                  <button onClick={() => handleDeleteItem(cl, item.id)} disabled={!canEdit || saving} aria-label={`Excluir etapa ${item.content}`}
                                     className="task-checklist-remove text-slate-400 hover:text-red-500 transition-all duration-150 flex-shrink-0">
                                     <X size={12} />
                                   </button>
                                 </div>
-                                <ChecklistPeopleFields users={users} item={item} showResponsible={false} onChange={input => { void runChange(() => api.setItemPeople(task.id,cl.id,item.id,input)); }} />
+                                <fieldset disabled={!canEdit}><ChecklistPeopleFields users={users} item={item} showResponsible={false} onChange={input => { void runChange(() => api.setItemPeople(task.id,cl.id,item.id,input)); }} /></fieldset>
                                 <ChecklistItemMedia title={item.content} files={taskFiles.filter(file => file.checklist_item_id === item.id)} editable={canEdit} disabled={saving || checklistUploading} onUpload={files => uploadChecklistMedia(item.id, files)} onRemove={file => { void removeTaskFile(file); }} />
                                 </div>
                               ))}
                             </div>
-                            <div className="task-checklist-add mt-2 flex gap-2">
+                            <fieldset disabled={!canEdit} className="task-checklist-add mt-2 flex gap-2">
                               <input
-                                value={newItems[cl.id] || ''}
+                                autoFocus={checklistFocus===cl.id} value={newItems[cl.id] || ''}
                                 onChange={e => setNewItems(p => ({ ...p, [cl.id]: e.target.value }))}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddItem(cl); } }}
                                 aria-label={`Nova etapa em ${cl.title}`} placeholder="Adicionar uma etapa…" className="flex-1 h-8 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 text-xs outline-none focus:border-orange-400 transition-colors" />
                               <button onClick={() => handleAddItem(cl)} disabled={saving || !newItems[cl.id]?.trim()} aria-label={`Adicionar etapa em ${cl.title}`} className="h-8 px-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 hover:border-orange-200 transition-all duration-200">
                                 <Plus size={16} />
                               </button>
-                            </div>
+                            </fieldset>
                           </div>
                         );
                       })}
@@ -1161,7 +1172,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
       {showSaveModal && (
         <AccessibleModal title="Salvar tarefa como modelo" onClose={() => { if (!savingTemplate) setShowSaveModal(false); }} className="task-sharing-dialog task-copy-template-panel outline-none">
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">Salvar como modelo</h3>
-            <p className='task-role-help'>Copia descrição, planejamento, pessoas, checklists e anexos. Não copia comentários, histórico ou etapas concluídas.</p>
+            <p className='task-role-help'>Salva textos, planejamento, pessoas e checklists. Imagens e anexos não são copiados. As etapas do modelo começam pendentes.</p>
             {templateError && <p role='alert' className='task-form-error'>{templateError}</p>}
             <input
               autoFocus
@@ -1278,15 +1289,15 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
 }
 
 /* ── CreateTaskModal ────────────────────────────────────────────────────── */
-function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultListId = null, initialTitle = '', initialDescription = '', initialAssigneeIds, initialPriority = 'normal', initialDeadline = '', initialChecklists = [], template }: {
+function CreateTaskModal({ users, onCreate, onClose, customLists = [], defaultListId = null, initialTitle = '', initialDescription = '', initialAssigneeIds, initialPriority = 'normal', initialDeadline = '', initialChecklists = [], template, cloneDraft }: {
   users: UserType[]; onCreate: (task: Task) => void; onClose: () => void; customLists?: CustomList[]; defaultListId?: string | null;
   initialTitle?: string; initialDescription?: string; initialAssigneeIds?: string[]; initialPriority?: string; initialDeadline?: string;
-  initialChecklists?: unknown[]; template?: TaskTemplate | null;
+  initialChecklists?: unknown[]; template?: TaskTemplate | null; cloneDraft?:TaskCloneDraft|null;
 }) {
   const { user } = useAuth();
-  const initial = template ? blueprintFromTemplate(template) : normalizeTaskBlueprint({ title: initialTitle, description: initialDescription, assignee_ids: initialAssigneeIds || [], priority: initialPriority, deadline: taskDeadlineValue(initialDeadline), checklists: initialChecklists });
-  return <TaskComposer users={users} initial={{ ...initial, owner_id: initial.owner_id || user?.id || null }} currentUserId={user?.id} lists={customLists} defaultListId={defaultListId || ''} onClose={onClose}
-    onSubmit={async (draft, options) => { const saved = await api.create({ ...draft, custom_list_id: options.custom_list_id, ...(template ? { template_id: template.id } : {}) }); onCreate(saved); }} />;
+  const initial = cloneDraft ? cloneDraft.blueprint : template ? blueprintFromTemplate(template) : normalizeTaskBlueprint({ title: initialTitle, description: initialDescription, assignee_ids: initialAssigneeIds || [], priority: initialPriority, deadline: taskDeadlineValue(initialDeadline), checklists: initialChecklists });
+  return <TaskComposer users={users} isClone={!!cloneDraft} initial={{ ...initial, owner_id: initial.owner_id || user?.id || null }} currentUserId={user?.id} lists={customLists} defaultListId={(cloneDraft?.custom_list_id&&customLists.some(list=>list.id===cloneDraft.custom_list_id)?cloneDraft.custom_list_id:defaultListId)||''} onClose={onClose}
+    onSubmit={async (draft, options) => { const saved = await api.create({ ...draft, custom_list_id: options.custom_list_id, ...(template ? { template_id: template.id } : {}), ...(cloneDraft?{clone_source_id:cloneDraft.source_task_id}:{}) }); onCreate(saved); }} />;
 }
 
 /* ── KanbanView ──────────────────────────────────────────────────────────── */
@@ -1326,62 +1337,9 @@ function KanbanView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) =>
 
 /* ── ListView ────────────────────────────────────────────────────────────── */
 function ListView({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => void }) {
-  return (
-    <>
-    <div className="tasks-mobile-cards">
-      {tasks.map(task => <TaskCard key={task.id} task={task} onClick={() => onSelect(task)} />)}
-      {!tasks.length && <p className="nex-empty-state">Nenhuma tarefa encontrada. Ajuste os filtros ou crie uma tarefa.</p>}
-    </div>
-    <div className="tasks-desktop-table rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto shadow-sm">
-      <table className="w-full text-sm min-w-[600px]">
-        <thead>
-          <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
-            <th className="px-4 py-3 text-left text-xs font-bold text-blue-600 dark:text-blue-400 w-full">Tarefa</th>
-            <th className="px-4 py-3 text-left text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">Prioridade</th>
-            <th className="px-4 py-3 text-left text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">Prazo</th>
-            <th className="px-4 py-3 text-left text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">Responsável</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map(t => (
-            <tr key={t.id} onClick={() => onSelect(t)}
-              className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-orange-50/40 dark:hover:bg-orange-900/10 cursor-pointer transition-all duration-150 active:bg-orange-100/50 dark:active:bg-orange-900/20">
-              <td className="px-4 py-3">
-                <button className="font-semibold text-slate-800 dark:text-slate-100 text-left max-w-xs hover:underline" onClick={event => { event.stopPropagation(); onSelect(t); }}>{t.title}</button>
-                {t.description && <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{t.description}</p>}
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', STATUS_COLORS[t.status])}>
-                  {STATUS_LABELS[t.status] || t.status || 'Não informado'}
-                </span>
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                <span className={cn('flex items-center gap-1 text-xs font-semibold', PRIORITY_COLORS[t.priority])}>
-                  <Flag size={11} /> {PRIORITY_LABELS[t.priority]}
-                </span>
-              </td>
-              <td className={cn('px-4 py-3 text-xs whitespace-nowrap', isOverdue(t) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-slate-500 dark:text-slate-400')}>
-                {t.deadline ? fmtDate(t.deadline) : '—'}
-              </td>
-              <td className="px-4 py-3">
-                {t.owner ? (
-                  <div className="flex items-center gap-2">
-                    <Avatar user={t.owner} size={6} />
-                    <span className="text-xs text-slate-700 dark:text-slate-300 truncate max-w-[100px]">{t.owner.name.split(' ')[0]}</span>
-                  </div>
-                ) : <span className="text-xs text-slate-400">—</span>}
-              </td>
-            </tr>
-          ))}
-          {!tasks.length && (
-            <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-400">Nenhuma tarefa encontrada.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-    </>
-  );
+  return tasks.length ? <ul className="tasks-vertical-list" aria-label="Lista de tarefas">
+    {tasks.map(task => <li key={task.id}><TaskCard task={task} onClick={() => onSelect(task)} /></li>)}
+  </ul> : <p className="nex-empty-state">Nenhuma tarefa encontrada. Ajuste os filtros ou crie uma tarefa.</p>;
 }
 
 /* ── PlannerView ─────────────────────────────────────────────────────────── */
@@ -1408,9 +1366,7 @@ function PlannerView({ tasks, users, onSelect }: { tasks: Task[]; users: UserTyp
             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{group.user?.name || 'Sem responsável'}</p>
             <span className="text-xs text-slate-400 ml-1">{group.tasks.length} tarefa(s)</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-            {group.tasks.map(t => <TaskCard key={t.id} task={t} onClick={() => onSelect(t)} />)}
-          </div>
+          <ListView tasks={group.tasks} onSelect={onSelect} />
         </div>
       ))}
       {!byUser.length && <div className="py-16 text-center text-sm text-slate-400">Nenhuma tarefa ainda.</div>}
@@ -1742,6 +1698,8 @@ export function Tasks() {
   const { user } = useAuth();
   const [scope, setScope] = useState<'mine' | 'all' | 'observing' | 'overdue' | 'today' | 'done'>('mine');
   const [sortBy, setSortBy] = useState('deadline');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersId = useId();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [view, setView] = useState<View>('lista');
@@ -1759,6 +1717,7 @@ export function Tasks() {
   const [renameText, setRenameText] = useState('');
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [templateForCreate, setTemplateForCreate] = useState<TaskTemplate | null>(null);
+  const [cloneForCreate,setCloneForCreate]=useState<TaskCloneDraft|null>(null);
   const [assistantDraft,setAssistantDraft]=useState<{title:string;deadline:string}|null>(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1890,11 +1849,15 @@ export function Tasks() {
         </button>
 
         <div className="tasks-search flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-          <select aria-label="Envolvimento nas tarefas" value={scope} onChange={e => setScope(e.target.value as typeof scope)}><option value="mine">Minhas tarefas</option><option value="all">Todas em que estou envolvido</option><option value="observing">Estou observando</option><option value="overdue">Minhas vencidas</option><option value="today">Minhas para hoje</option><option value="done">Minhas concluídas</option></select>
-          <select aria-label="Ordenar tarefas" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="deadline">Por prazo</option><option value="priority">Por prioridade</option><option value="title">Por título</option></select>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Título, ID ou protocolo…" aria-label="Buscar tarefas por título, ID ou protocolo"
             className="h-9 flex-1 sm:w-40 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors" />
-          <select aria-label="Filtrar tarefas por status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          <button type="button" className="tasks-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filtersId} onClick={() => setMobileFiltersOpen(open => !open)}>
+            <Filter size={16} />Filtros{(scope !== 'mine' || sortBy !== 'deadline' || filterStatus) && <span aria-label="Filtros ativos">{Number(scope !== 'mine') + Number(sortBy !== 'deadline') + Number(Boolean(filterStatus))}</span>}
+          </button>
+          <div id={filtersId} className="tasks-search-options" data-open={mobileFiltersOpen}>
+            <select aria-label="Envolvimento nas tarefas" value={scope} onChange={e => setScope(e.target.value as typeof scope)}><option value="mine">Minhas tarefas</option><option value="all">Todas em que estou envolvido</option><option value="observing">Estou observando</option><option value="overdue">Minhas vencidas</option><option value="today">Minhas para hoje</option><option value="done">Minhas concluídas</option></select>
+            <select aria-label="Ordenar tarefas" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="deadline">Por prazo</option><option value="priority">Por prioridade</option><option value="title">Por título</option></select>
+            <select aria-label="Filtrar tarefas por status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             className="h-9 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors cursor-pointer">
             <option value="">Todos</option>
             <option value="todo">A Fazer</option>
@@ -1902,6 +1865,7 @@ export function Tasks() {
             <option value="done">Concluída</option>
             <option value="cancelled">Cancelada</option>
           </select>
+          </div>
         </div>
       </div>
 
@@ -1910,7 +1874,7 @@ export function Tasks() {
           <input autoFocus value={newListName} onChange={e => setNewListName(e.target.value)} aria-label="Nome da nova lista" placeholder="Nome da lista" required />
           <button type="submit">Salvar</button><button type="button" aria-label="Cancelar nova lista" onClick={() => setAddingList(false)}><X size={16} /></button>
         </form> : <>
-          <select aria-label="Selecionar lista de tarefas" value={selectedListId || ''} onChange={e => setSelectedListId(e.target.value || null)}><option value="">Todas as listas ({tasks.length})</option>{customLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}</select>
+          <select aria-label="Selecionar lista de tarefas" value={selectedListId || ''} onChange={e => { setSelectedListId(e.target.value || null); setView('lista'); }}><option value="">Todas as listas ({tasks.length})</option>{customLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}</select>
           <button onClick={() => setAddingList(true)} aria-label="Criar nova lista"><FolderPlus size={18} /></button>
         </>}
       </div>
@@ -1921,7 +1885,7 @@ export function Tasks() {
           <div className="p-3 flex-shrink-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 px-1">Listas</p>
             <button
-              onClick={() => setSelectedListId(null)}
+              onClick={() => { setSelectedListId(null); setView('lista'); }}
               className={cn('w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold transition-colors',
                 selectedListId === null ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800')}
             >
@@ -1939,7 +1903,7 @@ export function Tasks() {
                   </form>
                 ) : (
                   <button
-                    onClick={() => setSelectedListId(list.id)}
+                    onClick={() => { setSelectedListId(list.id); setView('lista'); }}
                     className={cn('w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold transition-colors',
                       selectedListId === list.id ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800')}
                   >
@@ -2017,10 +1981,10 @@ export function Tasks() {
       </div>
 
       {selectedTask && (
-        <TaskDetail key={selectedTask.id} task={selectedTask} users={users} onTemplatesChanged={() => { void templateApi.list().then(setTemplates).catch(()=>{}); }} onClose={() => { setSelectedTask(null); setSearchParams(params => { const next = new URLSearchParams(params); next.delete('tarefa'); next.delete('protocolo'); return next; }, { replace: true }); }} onUpdate={handleUpdate} onDelete={handleDelete} customLists={customLists} />
+        <TaskDetail onClone={draft=>{setCloneForCreate(draft);setTemplateForCreate(null);setAssistantDraft(null);setCreating(true);}} key={selectedTask.id} task={selectedTask} users={users} onTemplatesChanged={() => { void templateApi.list().then(setTemplates).catch(()=>{}); }} onClose={() => { setSelectedTask(null); setSearchParams(params => { const next = new URLSearchParams(params); next.delete('tarefa'); next.delete('protocolo'); return next; }, { replace: true }); }} onUpdate={handleUpdate} onDelete={handleDelete} customLists={customLists} />
       )}
       {creating && (
-        <CreateTaskModal users={users} template={templateForCreate} onCreate={(task) => { handleCreate(task); setTemplateForCreate(null);setAssistantDraft(null); }} onClose={() => { setCreating(false); setTemplateForCreate(null);setAssistantDraft(null); }} customLists={customLists} defaultListId={selectedListId} initialTitle={assistantDraft?.title || ''} initialDeadline={assistantDraft?.deadline || ''} />
+        <CreateTaskModal users={users} cloneDraft={cloneForCreate} template={templateForCreate} onCreate={(task) => { handleCreate(task); setTemplateForCreate(null);setCloneForCreate(null);setAssistantDraft(null); }} onClose={() => { setCreating(false); setTemplateForCreate(null);setCloneForCreate(null);setAssistantDraft(null); }} customLists={customLists} defaultListId={selectedListId} initialTitle={assistantDraft?.title || ''} initialDeadline={assistantDraft?.deadline || ''} />
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { NativeAppShell } from './components/NativeAppShell';
 import './styles/interactions.css';
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
@@ -17,6 +18,8 @@ const Dashboard   = lazy(() => import('./pages/Dashboard').then(m => ({ default:
 const Feed        = lazy(() => import('./pages/Feed').then(m => ({ default: m.Feed })));
 const Training    = lazy(() => import('./pages/Training').then(m => ({ default: m.Training })));
 const PasswordVault = lazy(() => import('./pages/PasswordVault').then(m => ({ default: m.PasswordVault })));
+const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then(m => ({ default: m.ArchitecturePage })));
+const BehavioralProfilePage = lazy(() => import('./pages/BehavioralProfilePage').then(m => ({ default: m.BehavioralProfilePage })));
 const Wiki        = lazy(() => import('./pages/Wiki').then(m => ({ default: m.Wiki })));
 const Users       = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const Permissions = lazy(() => import('./pages/Permissions').then(m => ({ default: m.Permissions })));
@@ -47,8 +50,6 @@ const ResetPassword    = lazy(() => import('./pages/ResetPassword').then(m => ({
 const PainelTIPage = lazy(() => import('./pages/PainelTIPage').then(m => ({ default: m.PainelTIPage })));
 const NocPage = lazy(() => import('./pages/NocPage').then(m => ({ default: m.NocPage })));
 const ImplementacaoPage = lazy(() => import('./pages/ImplementacaoPage').then(m => ({ default: m.ImplementacaoPage })));
-const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then(m => ({ default: m.ArchitecturePage })));
-const BehavioralProfilePage = lazy(() => import('./pages/BehavioralProfilePage').then(m => ({ default: m.BehavioralProfilePage })));
 
 
 class RouteErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -116,6 +117,7 @@ function App() {
       <HrAccessProvider>
       <GamificationToast />
       <BrowserRouter>
+        <NativeAppShell />
         <WsManager />
         <GlobalNotificationsMount />
         <GlobalCallOverlay />
@@ -133,6 +135,8 @@ function App() {
               <Route path="/rh" element={<Suspense fallback={<PageFallback />}><HrPage /></Suspense>} />
               <Route path="/treinamentos" element={<Suspense fallback={<PageFallback />}><Training /></Suspense>} />
               <Route path="/senhas" element={<Suspense fallback={<PageFallback />}><PasswordVault /></Suspense>} />
+              <Route path="/arquitetura" element={<Suspense fallback={<PageFallback />}><ArchitecturePage /></Suspense>} />
+              <Route path="/perfil-comportamental" element={<Suspense fallback={<PageFallback />}><BehavioralProfilePage /></Suspense>} />
               <Route path="/wiki" element={<Suspense fallback={<PageFallback />}><Wiki /></Suspense>} />
               <Route path="/colaboradores" element={<Suspense fallback={<PageFallback />}><Users /></Suspense>} />
               <Route path="/bate-papo" element={<Suspense fallback={<PageFallback />}><Chat /></Suspense>} />
@@ -158,8 +162,6 @@ function App() {
               <Route path="/gestao-ti" element={<Suspense fallback={<PageFallback />}><PainelTIPage /></Suspense>} />
               <Route path="/noc" element={<Suspense fallback={<PageFallback />}><NocPage /></Suspense>} />
               <Route path="/implementacao" element={<Suspense fallback={<PageFallback />}><ImplementacaoPage /></Suspense>} />
-              <Route path="/arquitetura" element={<Suspense fallback={<PageFallback />}><ArchitecturePage /></Suspense>} />
-              <Route path="/perfil-comportamental" element={<Suspense fallback={<PageFallback />}><BehavioralProfilePage /></Suspense>} />
             </Route>
           </Routes>
         </Suspense>

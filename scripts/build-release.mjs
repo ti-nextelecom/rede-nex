@@ -17,6 +17,7 @@ async function main() {
   // No developer VITE_* value may leak into the deploy build.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('VITE_')));
   Object.assign(env, { NODE_ENV: 'production', VITE_API_URL: '/api', VITE_REMOTE_READ_ONLY: 'false', VITE_REMOTE_API_TARGET: '' });
+  await run(process.execPath, ['scripts/check-server.mjs']);
   await run(process.execPath, ['node_modules/typescript/bin/tsc', '-b']);
   const tests = (await readdir(join(root, 'tests'))).filter(name => name.endsWith('.test.mjs')).map(name => 'tests/' + name);
   await run(process.execPath, ['--test', ...tests]);
@@ -29,13 +30,13 @@ async function main() {
     }
   }
   await checkPublic(join(root, 'public'));
-  await run(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--mode', 'production'], { env });
+  await run(process.execPath, ['--input-type=module', '-e', "globalThis.__dirname=process.cwd(); const {build}=await import('vite'); await build({configLoader:'runner', mode:'production'});"], { env });
   const release = new Date().toISOString().replace(/[:.]/g, '-');
   const output = join(root, '.cache', 'releases'); const stage = join(output, 'rede-nex-' + release);
   await mkdir(stage, { recursive: true });
   const include = ['dist', 'server/src', 'server/agents', 'server/migrations', 'shared', 'deploy',
     'package.json', 'package-lock.json', 'ecosystem.config.cjs', '.env.example', 'README_DEPLOY_VM.md',
-    'docs/modulo-rh.md', 'docs/personal-workspace.md', 'docs/hosting-verification.md'];
+    ...(await readdir(join(root, 'docs'))).filter(name => name.endsWith('.md')).map(name => 'docs/' + name)];
   for (const path of include) {
     await cp(join(root, path), join(stage, path), { recursive: true, filter: source => !/\.(bak.*|log|map)$/.test(source) && !source.split(/[\\/]/).some(part => part.startsWith('.env') && part !== '.env.example') });
   }

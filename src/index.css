@@ -1,3 +1,7 @@
+@import './styles/typography.css';
+@import './styles/form-fields.css';
+@import './styles/native-app.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -48,7 +52,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--nex-font-sans);
     font-size: 17px;
     line-height: 1.6;
     margin: 0;
@@ -126,11 +130,12 @@
   .dark .text-slate-400:not(.chat-dark *) { color: hsl(var(--muted-foreground) / 0.8) !important; }
 
   /* Inputs, textareas, selects */
-  .dark input:not(.chat-dark *):not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  .dark input:not(.chat-dark *):not([data-field-part]):not(.bg-transparent):not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
     background-color: hsl(var(--input)) !important;
     border-color: hsl(var(--border)) !important;
     color: hsl(var(--foreground)) !important;
   }
+  .dark input.bg-transparent { color: hsl(var(--foreground)) !important; }
   .dark textarea:not(.chat-dark *) {
     background-color: hsl(var(--input)) !important;
     border-color: hsl(var(--border)) !important;

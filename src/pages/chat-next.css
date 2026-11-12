@@ -1,7 +1,5 @@
-@font-face { font-family: 'Nex Chat Open Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/open-sans-regular.ttf') format('truetype'); }
-@font-face { font-family: 'Nex Chat Open Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/open-sans-semibold.ttf') format('truetype'); }
 /* Native dark communication workspace. User wallpapers and sent-bubble colors stay intact. */
-.chat-shell { font-family: 'Nex Chat Open Sans', 'Segoe UI', sans-serif; font-size: 14px; }
+.chat-shell { font-family: var(--nex-font-sans); font-size: 14px; }
 .chat-shell .chat-message-history { overflow-anchor: none; }
 .chat-thread-status { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 100px; padding: 16px; color: hsl(var(--muted-foreground)); background: transparent; font-size: 14px; }
 .chat-conversation-filters { flex-wrap: wrap; }
@@ -184,7 +182,7 @@
 .chat-shell .chat-conversation-row button.chat-conversation-more:has(> svg:only-child) { grid-column: 3; grid-row: 1; display: inline-flex; align-items: center; justify-content: center; align-self: center; width: 32px; min-width: 32px; height: 36px; min-height: 36px; margin: 0; border-radius: 8px; color: hsl(var(--muted-foreground)); opacity: 1; }
 .chat-shell .chat-conversation-row button.chat-conversation-more > svg:only-child { width: 18px; height: 18px; }
 .chat-shell .chat-conversation-row button.chat-conversation-more:is(:hover,:focus-visible,[data-state='open']) { color: #ffd3a8; background: #d98c3b1a; outline: 1px solid #dfa06260; }
-.chat-conversation-options { width: min(225px,calc(100vw - 24px)); padding: 5px; border: 1px solid hsl(var(--foreground) / 0.125); border-radius: 12px; background: hsl(var(--muted)); color: hsl(var(--foreground)); box-shadow: 0 12px 36px #0006; font-family: 'Nex Chat Open Sans','Segoe UI',sans-serif; }
+.chat-conversation-options { width: min(225px,calc(100vw - 24px)); padding: 5px; border: 1px solid hsl(var(--foreground) / 0.125); border-radius: 12px; background: hsl(var(--muted)); color: hsl(var(--foreground)); box-shadow: 0 12px 36px #0006; font-family: var(--nex-font-sans); }
 .chat-conversation-options > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 8px 10px; border-radius: 7px; text-align: left; font-size: 13px; }
 .chat-conversation-options > button:is(:hover,:focus-visible) { background: hsl(var(--foreground) / 0.043); color: #ffd3a8; }
 .chat-conversation-options > button > svg { flex: none; }
@@ -193,7 +191,7 @@
 .chat-shell .chat-thread-actions > button:has(> svg:only-child) { width: 34px; min-width: 34px; height: 34px; min-height: 34px; }
 .chat-shell .chat-thread-actions > button > svg:only-child { width: 18px; height: 18px; }
 .chat-shell .chat-message-row > .group > div > .chat-message-text { font-size: var(--chat-message-font-size,15.4px); font-weight: 400; line-height: 1.42; letter-spacing: normal; }
-.chat-font-options { width: min(260px,calc(100vw - 24px)); padding: 16px; border: 1px solid hsl(var(--foreground) / 0.125); border-radius: 14px; background: hsl(var(--muted)); color: hsl(var(--foreground)); font-family: 'Nex Chat Open Sans','Segoe UI',sans-serif; box-shadow: 0 12px 36px #0006; }
+.chat-font-options { width: min(260px,calc(100vw - 24px)); padding: 16px; border: 1px solid hsl(var(--foreground) / 0.125); border-radius: 14px; background: hsl(var(--muted)); color: hsl(var(--foreground)); font-family: var(--nex-font-sans); box-shadow: 0 12px 36px #0006; }
 .chat-font-options > p { margin-bottom: 12px; font-size: 14px; font-weight: 600; }
 .chat-font-controls { display: flex; align-items: center; gap: 10px; }
 .chat-font-controls button { flex: none; width: 46px; min-height: 44px; border: 1px solid hsl(var(--foreground) / 0.239); border-radius: 9px; background: hsl(var(--foreground) / 0.024); font-size: 18px; font-weight: 600; }

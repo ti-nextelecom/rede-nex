@@ -7,11 +7,15 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://rede.nextelecom.net.br',
     cleartext: false,
-    allowNavigation: ['rede.nextelecom.net.br']
+    allowNavigation: ['rede.nextelecom.net.br'],
+    errorPath: 'native-offline.html'
+  },
+  plugins: {
+    SystemBars: { insetsHandling: 'css', initialViewportFitValueHint: 'cover', style: 'DARK' }
   },
   android: {
     allowMixedContent: false,
-    captureInput: true,
+    captureInput: false,
     webContentsDebuggingEnabled: false,
     backgroundColor: '#0f172a'
   }

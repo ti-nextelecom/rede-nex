@@ -13,7 +13,7 @@ export function ChatCaptionInput({ value, onChange, participants, group, onNeedP
   function choose(name: string) { onChange(value.slice(0, at) + '@' + name + ' '); setClosed(true); input.current?.focus(); }
   return <div className="chat-caption-input">
     {!!candidates.length && <div className="chat-caption-mentions" role="listbox" aria-label="Mencionar na legenda">{candidates.map((person, position) => <button key={person.id} type="button" role="option" aria-selected={position === index} onMouseDown={event => { event.preventDefault(); choose(person.name); }}>@{person.name}</button>)}</div>}
-    <input disabled={disabled} ref={input} autoFocus value={value} maxLength={8000} placeholder="Legenda… use @ para mencionar" aria-label="Legenda da mídia"
+    <input disabled={disabled} ref={input} value={value} maxLength={8000} placeholder="Legenda… use @ para mencionar" aria-label="Legenda da mídia"
       onChange={event => { onChange(event.target.value); setClosed(false); setIndex(0); if (event.target.value.includes('@')) onNeedParticipants(); }}
       onKeyDown={event => {
         if (event.nativeEvent.isComposing) return;

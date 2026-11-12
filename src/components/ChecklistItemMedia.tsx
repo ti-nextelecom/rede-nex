@@ -4,8 +4,8 @@ import { TASK_UPLOAD_ACCEPT, type TaskMediaFile } from '../../shared/taskMedia.m
 import { reviewImageUploads } from '../lib/mediaTools';
 import { TaskFileCard } from './TaskFileCard';
 
-export function ChecklistItemMedia({ title, files, editable, disabled, onUpload, onRemove }: {
-  title: string; files: TaskMediaFile[]; editable: boolean; disabled: boolean;
+export function ChecklistItemMedia({ title, files, editable, disabled, onUpload, onRemove, reviewImages = true, emptyLabel = 'Adicionar mídia' }: {
+  title: string; files: TaskMediaFile[]; editable: boolean; disabled: boolean; reviewImages?: boolean; emptyLabel?: string;
   onUpload: (files: File[]) => Promise<void>; onRemove: (file: TaskMediaFile) => void;
 }) {
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -13,7 +13,7 @@ export function ChecklistItemMedia({ title, files, editable, disabled, onUpload,
   async function upload(items: File[]) {
     if (!items.length || !editable || disabled || uploading.current) return;
     uploading.current = true; setOpen(true); setBusy(true); setError('');
-    try { const reviewed = await reviewImageUploads(items); if (reviewed.length) await onUpload(reviewed); }
+    try { const reviewed = reviewImages ? await reviewImageUploads(items) : items; if (reviewed.length) await onUpload(reviewed); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível anexar a mídia. Tente novamente.'); }
     finally { uploading.current = false; setBusy(false); if (input.current) input.current.value = ''; }
   }
@@ -21,7 +21,7 @@ export function ChecklistItemMedia({ title, files, editable, disabled, onUpload,
   return <div className="checklist-media" onDragOver={event => { if (editable) event.preventDefault(); }}
     onDrop={event => { if (!editable) return; event.preventDefault(); void upload(Array.from(event.dataTransfer.files)); }}>
     <button type="button" className="checklist-media-toggle" aria-expanded={open} aria-label={`Mídias da etapa ${title}`} onClick={() => setOpen(value => !value)}>
-      <Paperclip size={14} />{files.length ? `${files.length} anexo${files.length === 1 ? '' : 's'}` : 'Adicionar mídia'}
+      <Paperclip size={14} />{files.length ? `${files.length} anexo${files.length === 1 ? '' : 's'}` : emptyLabel}
     </button>
     {(open || files.length > 0) && <div className="checklist-media-content">
       {files.map(file => <TaskFileCard key={file.id} file={file} onRemove={editable && !disabled && !busy ? () => onRemove(file) : undefined} />)}

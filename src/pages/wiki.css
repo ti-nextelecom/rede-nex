@@ -8,7 +8,7 @@
   background: hsl(var(--card));
   border-color: var(--wiki-line);
   border-radius: 18px;
-  font-family: "Segoe UI", Inter, sans-serif;
+  font-family: var(--nex-font-sans);
   letter-spacing: normal;
 }
 .wiki-shell :is(h1, h2, h3, h4, p, button, span, small) { word-break: normal; overflow-wrap: normal; letter-spacing: normal; }

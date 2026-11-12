@@ -1,7 +1,7 @@
 /* Shared visual language for the project workspace. */
 .projetos-wrap {
   height: var(--nex-workspace-height);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-family: var(--nex-font-sans);
   --project-surface: hsl(var(--card));
   --project-muted: hsl(var(--muted-foreground));
   --project-border: hsl(var(--border));
@@ -10,7 +10,7 @@
 .projetos-wrap .projetos-sidebar { width: 240px; padding: 8px; }
 .projetos-wrap .sidebar-brand { padding: 22px 12px; gap: 12px; }
 .projetos-wrap .sidebar-brand-icon { width: 40px; height: 40px; border-radius: 13px; background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary))); }
-.projetos-wrap .sidebar-brand strong { font: 700 19px 'Plus Jakarta Sans', sans-serif; }
+.projetos-wrap .sidebar-brand strong { font: 700 19px var(--nex-font-sans); }
 .projetos-wrap .sidebar-section { padding: 18px 4px 10px; }
 .projetos-wrap .sidebar-section-label { font-size: 11px; letter-spacing: .1em; margin-bottom: 10px; }
 .projetos-wrap .sidebar-nav-item { min-height: 46px; padding: 10px 12px; border-radius: 12px; gap: 11px; font-size: 14px; margin-bottom: 4px; }
@@ -20,7 +20,7 @@
 .projetos-wrap .sidebar-user-info strong { font-size: 13px; }
 .projetos-wrap .sidebar-user-info small { font-size: 12px; }
 html.dark .projetos-wrap .sidebar-user-info strong { color: hsl(var(--foreground)); }
-.project-dialog { --project-border-legacy: hsl(var(--border)); --project-muted-legacy: hsl(var(--muted-foreground)); --surface: hsl(var(--card)); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+.project-dialog { --project-border-legacy: hsl(var(--border)); --project-muted-legacy: hsl(var(--muted-foreground)); --surface: hsl(var(--card)); font-family: var(--nex-font-sans); }
 .project-dialog .modal { border: 1px solid hsl(var(--border)); border-radius: 20px; }
 .project-dialog .round-button { min-width: 40px; min-height: 40px; border-radius: 12px; background: hsl(var(--muted)); }
 .project-dialog .modal-header h3 { color: #eef3fc; }
@@ -44,7 +44,7 @@ html.dark .projetos-wrap .sidebar-user-info strong { color: hsl(var(--foreground
 .projetos-wrap .content-grid { margin-top: 22px; gap: 20px; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
 .projetos-wrap .panel { border-radius: 20px; padding: 22px; }
 .projetos-wrap .panel-heading { gap: 12px; flex-wrap: wrap; }
-.projetos-wrap .panel-heading h2, .projetos-wrap .view-heading h2 { font: 700 21px 'Plus Jakarta Sans', sans-serif; letter-spacing: -.03em; }
+.projetos-wrap .panel-heading h2, .projetos-wrap .view-heading h2 { font: 700 21px var(--nex-font-sans); letter-spacing: -.03em; }
 .projetos-wrap .text-button, .projetos-wrap .banner-action { min-height: 40px; font-size: 13px; }
 .projetos-wrap .project-row { width: 100%; padding: 16px 12px; margin-top: 8px; text-align: left; border: 1px solid var(--project-border); border-radius: 14px; gap: 13px; }
 .projetos-wrap .project-row-title { gap: 7px; flex-wrap: wrap; }
@@ -79,7 +79,7 @@ html.dark .projetos-wrap .search-field input { background: transparent !importan
 .projetos-wrap .project-badge { width: 44px; height: 44px; flex-shrink: 0; border-radius: 13px; font-size: 12px; }
 .projetos-wrap .card-title-row { flex-wrap: wrap; margin-top: 18px; }
 .projetos-wrap .card-title-row > div { width: 100%; }
-.projetos-wrap .card-title-row h3 { max-width: none; font: 700 20px/1.4 'Plus Jakarta Sans', sans-serif; letter-spacing: -.025em; margin-top: 8px; }
+.projetos-wrap .card-title-row h3 { max-width: none; font: 700 20px/1.4 var(--nex-font-sans); letter-spacing: -.025em; margin-top: 8px; }
 .projetos-wrap .card-category { font-size: 11px; }
 .projetos-wrap .project-open-button { text-align: left; }
 .projetos-wrap .project-open-button::after { content: ''; position: absolute; inset: 0; border-radius: 20px; }

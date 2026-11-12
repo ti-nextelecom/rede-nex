@@ -1,8 +1,7 @@
 /* projetos.css — Painel Estratégico ported to Rede Nex */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
 
 .projetos-wrap {
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--nex-font-sans);
   --navy: hsl(var(--card));
   --project-muted-legacy: hsl(var(--muted-foreground));
   --line: hsl(var(--border));
@@ -29,7 +28,7 @@
 /* Sidebar UI */
 :where(.projetos-wrap, .project-dialog) .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 18px 14px 16px; border-bottom: 1px solid hsl(var(--border)); }
 :where(.projetos-wrap, .project-dialog) .sidebar-brand-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: hsl(var(--primary)); color: var(--nex-on-accent); flex-shrink: 0; }
-:where(.projetos-wrap, .project-dialog) .sidebar-brand strong { font-family: Manrope, sans-serif; font-size: 13px; font-weight: 700; color: hsl(var(--foreground)); }
+:where(.projetos-wrap, .project-dialog) .sidebar-brand strong { font-family: var(--nex-font-sans); font-size: 13px; font-weight: 700; color: hsl(var(--foreground)); }
 :where(.projetos-wrap, .project-dialog) .sidebar-section { padding: 14px 10px 8px; }
 :where(.projetos-wrap, .project-dialog) .sidebar-section-label { display: block; font-size: 9px; font-weight: 700; letter-spacing: .06em; color: hsl(var(--muted-foreground)); padding: 0 7px; margin-bottom: 5px; }
 :where(.projetos-wrap, .project-dialog) .sidebar-nav-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border-radius: 8px; font-size: 12px; font-weight: 500; color: hsl(var(--muted-foreground)); text-align: left; transition: background .15s, color .15s; margin-bottom: 1px; overflow: hidden; }
@@ -78,7 +77,7 @@
 :where(.projetos-wrap, .project-dialog) .metric-pink { color: #d03b97; background: #ffebf7; }
 :where(.projetos-wrap, .project-dialog) .metric-label, :where(.projetos-wrap, .project-dialog) .metric-caption { display: block; }
 :where(.projetos-wrap, .project-dialog) .metric-label { color: hsl(var(--muted-foreground)); font-size: 11px; }
-:where(.projetos-wrap, .project-dialog) .metric-value { display: block; color: hsl(var(--foreground)); font: 800 28px Manrope, sans-serif; letter-spacing: -1px; margin: 11px 0 1px; }
+:where(.projetos-wrap, .project-dialog) .metric-value { display: block; color: hsl(var(--foreground)); font: 800 28px var(--nex-font-sans); letter-spacing: -1px; margin: 11px 0 1px; }
 :where(.projetos-wrap, .project-dialog) .metric-caption { color: hsl(var(--muted-foreground)); font-size: 10px; }
 :where(.projetos-wrap, .project-dialog) .metric-trend { display: flex; align-items: center; gap: 4px; position: absolute; left: 20px; bottom: 15px; font-size: 10px; font-weight: 600; }
 :where(.projetos-wrap, .project-dialog) .trend-blue { color: var(--nex-accent-ink); }
@@ -88,7 +87,7 @@
 :where(.projetos-wrap, .project-dialog) .content-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, .8fr); gap: 15px; margin-top: 15px; }
 :where(.projetos-wrap, .project-dialog) .panel { min-width: 0; padding: 22px 23px; border: 1px solid hsl(var(--border)); border-radius: 13px; background: hsl(var(--card)); box-shadow: 0 4px 16px hsl(var(--foreground) / 0.02); }
 :where(.projetos-wrap, .project-dialog) .panel-heading, :where(.projetos-wrap, .project-dialog) .view-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-:where(.projetos-wrap, .project-dialog) .panel-heading h2, :where(.projetos-wrap, .project-dialog) .view-heading h2 { color: hsl(var(--foreground)); font: 700 17px Manrope, sans-serif; letter-spacing: -.4px; margin-top: 6px; }
+:where(.projetos-wrap, .project-dialog) .panel-heading h2, :where(.projetos-wrap, .project-dialog) .view-heading h2 { color: hsl(var(--foreground)); font: 700 17px var(--nex-font-sans); letter-spacing: -.4px; margin-top: 6px; }
 :where(.projetos-wrap, .project-dialog) .text-button { display: inline-flex; align-items: center; gap: 6px; color: var(--nex-accent-ink); background: transparent; font-size: 11px; font-weight: 700; padding-top: 8px; }
 :where(.projetos-wrap, .project-dialog) .round-button { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 8px; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); transition: .2s; }
 :where(.projetos-wrap, .project-dialog) .round-button:hover { color: var(--nex-accent-ink); background: #eaf2ff; }
@@ -129,7 +128,7 @@
 :where(.projetos-wrap, .project-dialog) .timeline-item { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid hsl(var(--border)); }
 :where(.projetos-wrap, .project-dialog) .timeline-item:first-child { border-top: 0; }
 :where(.projetos-wrap, .project-dialog) .timeline-date { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 37px; height: 42px; border-radius: 8px; }
-:where(.projetos-wrap, .project-dialog) .timeline-date strong { font: 700 15px Manrope, sans-serif; line-height: 16px; }
+:where(.projetos-wrap, .project-dialog) .timeline-date strong { font: 700 15px var(--nex-font-sans); line-height: 16px; }
 :where(.projetos-wrap, .project-dialog) .timeline-date span { font-size: 8px; font-weight: 700; margin-top: 3px; }
 :where(.projetos-wrap, .project-dialog) .date-teal { color: #0b998b; background: #e4f9f4; }
 :where(.projetos-wrap, .project-dialog) .date-pink { color: #d03b98; background: #ffebf7; }
@@ -143,11 +142,11 @@
 :where(.projetos-wrap, .project-dialog) .highlight-banner { display: flex; align-items: center; gap: 14px; margin-top: 15px; padding: 17px 20px; border: 1px solid #dcecff; background: linear-gradient(100deg, #f3f8ff, #fcfeff); border-radius: 13px; }
 :where(.projetos-wrap, .project-dialog) .highlight-icon { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; color: var(--nex-accent-ink); background: #e2efff; border-radius: 10px; }
 :where(.projetos-wrap, .project-dialog) .highlight-banner > div:nth-child(2) { flex: 1; }
-:where(.projetos-wrap, .project-dialog) .highlight-banner h2 { color: hsl(var(--muted-foreground)); font: 500 13px Manrope, sans-serif; margin-top: 4px; }
+:where(.projetos-wrap, .project-dialog) .highlight-banner h2 { color: hsl(var(--muted-foreground)); font: 500 13px var(--nex-font-sans); margin-top: 4px; }
 :where(.projetos-wrap, .project-dialog) .highlight-banner h2 strong { color: var(--nex-accent-ink); }
 :where(.projetos-wrap, .project-dialog) .banner-action { display: inline-flex; align-items: center; gap: 7px; color: var(--nex-accent-ink); background: transparent; font-size: 11px; font-weight: 700; }
 :where(.projetos-wrap, .project-dialog) .view-heading { margin-top: 27px; align-items: center; }
-:where(.projetos-wrap, .project-dialog) .heading-count { display: inline-block; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); border-radius: 5px; font: 600 10px 'DM Sans'; padding: 4px 7px; margin-left: 4px; vertical-align: middle; }
+:where(.projetos-wrap, .project-dialog) .heading-count { display: inline-block; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); border-radius: 5px; font: 600 10px var(--nex-font-sans); padding: 4px 7px; margin-left: 4px; vertical-align: middle; }
 :where(.projetos-wrap, .project-dialog) .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 15px; color: var(--nex-on-accent); border-radius: 8px; background: hsl(var(--primary)); box-shadow: 0 5px 13px hsl(var(--primary) / 0.145); font-size: 11px; font-weight: 700; transition: all .2s; }
 :where(.projetos-wrap, .project-dialog) .primary-button:hover { transform: translateY(-1px); background: #1f6bdd; box-shadow: 0 7px 18px hsl(var(--primary) / 0.204); }
 :where(.projetos-wrap, .project-dialog) .filters { display: flex; gap: 9px; margin-top: 23px; }
@@ -170,7 +169,7 @@
 :where(.projetos-wrap, .project-dialog) .card-top, :where(.projetos-wrap, .project-dialog) .card-title-row, :where(.projetos-wrap, .project-dialog) .progress-heading, :where(.projetos-wrap, .project-dialog) .card-footer { display: flex; align-items: center; justify-content: space-between; }
 :where(.projetos-wrap, .project-dialog) .card-category { color: hsl(var(--muted-foreground)); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 :where(.projetos-wrap, .project-dialog) .card-title-row { align-items: flex-start; margin-top: 13px; gap: 10px; }
-:where(.projetos-wrap, .project-dialog) .card-title-row h3 { max-width: 235px; color: hsl(var(--foreground)); font: 700 15px Manrope, sans-serif; line-height: 1.35; margin-top: 5px; }
+:where(.projetos-wrap, .project-dialog) .card-title-row h3 { max-width: 235px; color: hsl(var(--foreground)); font: 700 15px var(--nex-font-sans); line-height: 1.35; margin-top: 5px; }
 :where(.projetos-wrap, .project-dialog) .card-progress { margin-top: 23px; }
 :where(.projetos-wrap, .project-dialog) .progress-heading { color: hsl(var(--muted-foreground)); font-size: 10px; margin-bottom: 8px; }
 :where(.projetos-wrap, .project-dialog) .progress-heading strong { color: hsl(var(--muted-foreground)); font-size: 11px; }
@@ -194,7 +193,7 @@
 :where(.projetos-wrap) .modal-overlay, .project-dialog.modal-overlay { position: fixed; inset: 0; z-index: 200; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 24px; background: hsl(var(--card) / 0.549); backdrop-filter: blur(3px); animation: pop .2s ease-out; }
 :where(.projetos-wrap, .project-dialog) .modal { width: 100%; max-width: 540px; flex-shrink: 0; margin: auto; padding: 26px 28px; background: hsl(var(--card)); border-radius: 16px; box-shadow: 0 20px 60px hsl(var(--foreground) / 0.2); }
 :where(.projetos-wrap, .project-dialog) .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
-:where(.projetos-wrap, .project-dialog) .modal-header h3 { color: hsl(var(--foreground)); font: 700 18px Manrope; margin-top: 5px; }
+:where(.projetos-wrap, .project-dialog) .modal-header h3 { color: hsl(var(--foreground)); font: 700 18px var(--nex-font-sans); margin-top: 5px; }
 :where(.projetos-wrap, .project-dialog) .accent-picker { display: flex; gap: 10px; flex-wrap: wrap; }
 :where(.projetos-wrap, .project-dialog) .accent-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid hsl(var(--border)); box-shadow: 0 0 0 1px hsl(var(--border)); cursor: pointer; transition: box-shadow .2s, transform .2s; }
 :where(.projetos-wrap, .project-dialog) .accent-dot.active { box-shadow: 0 0 0 2px hsl(var(--primary)); transform: scale(1.1); }
@@ -211,11 +210,11 @@
 :where(.projetos-wrap, .project-dialog) .presentation-card { width: 100%; max-width: 95vw; background: hsl(var(--card)); color: hsl(var(--foreground)); border-radius: 20px; overflow: hidden; border-top: 6px solid; box-shadow: 0 30px 70px rgba(0,0,0,0.4); animation: slideIn .5s ease; display: flex; flex-direction: column; }
 :where(.projetos-wrap, .project-dialog) .presentation-card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 32px; border-bottom: 1px solid hsl(var(--border)); flex: 0 0 auto; }
 :where(.projetos-wrap, .project-dialog) .presentation-index { color: hsl(var(--muted-foreground)); font-size: 14px; font-weight: 700; }
-:where(.projetos-wrap, .project-dialog) .presentation-index span { color: var(--nex-accent-ink); font-size: 22px; font-family: Manrope, sans-serif; }
+:where(.projetos-wrap, .project-dialog) .presentation-index span { color: var(--nex-accent-ink); font-size: 22px; font-family: var(--nex-font-sans); }
 :where(.projetos-wrap, .project-dialog) .presentation-card-body { display: grid; grid-template-columns: 0.55fr 1.45fr; gap: 0; flex: 1; min-height: 0; }
 :where(.projetos-wrap, .project-dialog) .presentation-card-left { padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; }
 :where(.projetos-wrap, .project-dialog) .presentation-card-left .presentation-next { margin-top: auto; }
-:where(.projetos-wrap, .project-dialog) .presentation-title { color: hsl(var(--foreground)); font: 800 26px/1.2 Manrope, sans-serif; letter-spacing: -1px; margin-top: 8px; }
+:where(.projetos-wrap, .project-dialog) .presentation-title { color: hsl(var(--foreground)); font: 800 26px/1.2 var(--nex-font-sans); letter-spacing: -1px; margin-top: 8px; }
 :where(.projetos-wrap, .project-dialog) .presentation-summary { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; margin-top: 8px; }
 :where(.projetos-wrap, .project-dialog) .presentation-owner { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 :where(.projetos-wrap, .project-dialog) .presentation-owner .avatar { width: 36px; height: 36px; flex: 0 0 36px; font-size: 12px; }
@@ -232,7 +231,7 @@
 :where(.projetos-wrap, .project-dialog) .presentation-next strong { flex: 1; color: hsl(var(--foreground)); }
 :where(.projetos-wrap, .project-dialog) .presentation-next > svg { color: var(--nex-accent-ink); }
 :where(.projetos-wrap, .project-dialog) .presentation-card-right { padding: 24px 32px; background: hsl(var(--card)); border-left: 1px solid hsl(var(--border)); overflow: hidden; display: flex; flex-direction: column; }
-:where(.projetos-wrap, .project-dialog) .presentation-card-right h3 { color: hsl(var(--foreground)); font: 700 16px Manrope; margin-bottom: 18px; }
+:where(.projetos-wrap, .project-dialog) .presentation-card-right h3 { color: hsl(var(--foreground)); font: 700 16px var(--nex-font-sans); margin-bottom: 18px; }
 :where(.projetos-wrap, .project-dialog) .presentation-steps { display: flex; flex-direction: column; gap: 12px; }
 :where(.projetos-wrap, .project-dialog) .presentation-step { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 12px 14px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 10px; }
 :where(.projetos-wrap, .project-dialog) .presentation-step strong { display: block; color: hsl(var(--foreground)); font-size: 13px; }
@@ -257,16 +256,16 @@
 :where(.projetos-wrap, .project-dialog) .presentation-exit { display: inline-flex; align-items: center; gap: 7px; color: hsl(var(--foreground)); background: hsl(var(--foreground) / 0.06); border: 1px solid hsl(var(--foreground) / 0.1); border-radius: 8px; font-size: 12px; font-weight: 600; padding: 8px 14px; transition: all .2s; }
 :where(.projetos-wrap, .project-dialog) .presentation-exit:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / 0.12); }
 :where(.projetos-wrap, .project-dialog) .presentation-empty { display: grid; place-items: center; gap: 16px; text-align: center; margin: auto; }
-:where(.projetos-wrap, .project-dialog) .presentation-empty h2 { color: hsl(var(--foreground)); font: 700 22px Manrope; }
+:where(.projetos-wrap, .project-dialog) .presentation-empty h2 { color: hsl(var(--foreground)); font: 700 22px var(--nex-font-sans); }
 :where(.projetos-wrap, .project-dialog) .presentation-empty p { color: hsl(var(--muted-foreground)); font-size: 14px; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 :where(.projetos-wrap, .project-dialog) .empty-state { display: grid; justify-items: center; gap: 8px; padding: 70px 0; color: hsl(var(--muted-foreground)); }
-:where(.projetos-wrap, .project-dialog) .empty-state h3 { color: hsl(var(--muted-foreground)); font: 700 15px Manrope; }
+:where(.projetos-wrap, .project-dialog) .empty-state h3 { color: hsl(var(--muted-foreground)); font: 700 15px var(--nex-font-sans); }
 :where(.projetos-wrap, .project-dialog) .empty-state p { font-size: 11px; }
 :where(.projetos-wrap, .project-dialog) .new-project-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: 58px; max-width: 960px; margin: 45px auto 0; padding: 38px 42px; border: 1px solid hsl(var(--border)); border-radius: 16px; background: hsl(var(--card)); box-shadow: 0 10px 30px hsl(var(--foreground) / 0.031); }
 :where(.projetos-wrap, .project-dialog) .new-icon { display: grid; place-items: center; width: 47px; height: 47px; margin-bottom: 25px; color: var(--nex-accent-ink); background: #eaf2ff; border-radius: 13px; }
-:where(.projetos-wrap, .project-dialog) .form-intro h2 { color: hsl(var(--foreground)); font: 800 24px/1.25 Manrope; letter-spacing: -.8px; margin-top: 9px; }
+:where(.projetos-wrap, .project-dialog) .form-intro h2 { color: hsl(var(--foreground)); font: 800 24px/1.25 var(--nex-font-sans); letter-spacing: -.8px; margin-top: 9px; }
 :where(.projetos-wrap, .project-dialog) .form-intro > p { max-width: 320px; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.65; margin-top: 12px; }
 :where(.projetos-wrap, .project-dialog) .form-tip { display: flex; gap: 8px; align-items: flex-start; max-width: 300px; color: hsl(var(--muted-foreground)); background: hsl(var(--card)); border-radius: 9px; font-size: 10px; line-height: 1.5; padding: 11px; margin-top: 28px; }
 :where(.projetos-wrap, .project-dialog) .form-tip svg { flex: 0 0 auto; color: var(--nex-accent-ink); }
@@ -307,7 +306,7 @@
 :where(.projetos-wrap, .project-dialog) .back-button:hover { color: var(--nex-accent-ink); }
 :where(.projetos-wrap, .project-dialog) .detail-header { display: flex; align-items: flex-start; gap: 18px; padding-bottom: 22px; border-bottom: 1px solid hsl(var(--border)); margin-bottom: 26px; }
 :where(.projetos-wrap, .project-dialog) .large-badge { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 12px; font-size: 12px; font-weight: 800; }
-:where(.projetos-wrap, .project-dialog) .detail-title { color: hsl(var(--foreground)); font: 800 22px/1.25 Manrope, sans-serif; letter-spacing: -.6px; margin: 6px 0 0; }
+:where(.projetos-wrap, .project-dialog) .detail-title { color: hsl(var(--foreground)); font: 800 22px/1.25 var(--nex-font-sans); letter-spacing: -.6px; margin: 6px 0 0; }
 :where(.projetos-wrap, .project-dialog) .detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 10px; color: hsl(var(--muted-foreground)); font-size: 11px; }
 :where(.projetos-wrap, .project-dialog) .detail-meta > span { display: flex; align-items: center; gap: 5px; }
 :where(.projetos-wrap, .project-dialog) .detail-section { padding: 24px; border: 1px solid hsl(var(--border)); border-radius: 13px; background: hsl(var(--card)); box-shadow: 0 4px 16px hsl(var(--foreground) / 0.02); margin-bottom: 20px; }
@@ -479,7 +478,7 @@
 :where(.projetos-wrap, .project-dialog) .presentation-step.step-row-done { background: #22c55e; color: var(--nex-success-ink); }
 :where(.projetos-wrap, .project-dialog) .presentation-step.step-row-early { background: #0ea5e9; color: #02172a; }
 /* ── Presentation step grid layout ──────────────────────────── */
-:where(.projetos-wrap, .project-dialog) .pres-step-num { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; font: 700 13px Manrope; flex: 0 0 28px; }
+:where(.projetos-wrap, .project-dialog) .pres-step-num { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; font: 700 13px var(--nex-font-sans); flex: 0 0 28px; }
 :where(.projetos-wrap, .project-dialog) .pres-step-info { min-width: 0; overflow: hidden; }
 :where(.projetos-wrap, .project-dialog) .presentation-step .pres-step-name { color: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 :where(.projetos-wrap, .project-dialog) .presentation-step .pres-step-status { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: inherit; background: rgba(0,0,0,.12); border-radius: 20px; padding: 1px 8px; margin-top: 3px; }

@@ -17,6 +17,7 @@ export async function createHrTestDb() {
   await pool.query('UPDATE users SET photo_url=$1,position=\'Cargo fictício\',admission_date=\'2020-01-01\' WHERE id=$2',[photo,ids.employee]);
   const migration = await readFile(new URL('../server/migrations/20261016_hr_module.sql',import.meta.url),'utf8');
   await pool.query(migration); await pool.query(migration); // idempotency under FORCE RLS
+  await pool.query(await readFile(new URL('../server/migrations/20261027_hr_employee_termination.sql',import.meta.url),'utf8'));
   await hrTransaction(pool,ids.admin,async client => {
     const employee = await saveHrRecord(client,'employees',{user_id:ids.employee,employee_code:'TESTE-001',team:'Equipe de Teste',position:'Cargo de Teste'});
     await saveHrRecord(client,'asos',{employee_id:employee.id,last_exam_on:'2024-01-01',periodicity_months:12,notes:'Registro inteiramente fictício.'});

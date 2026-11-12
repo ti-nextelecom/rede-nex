@@ -33,4 +33,5 @@ coverage/
 *.bak
 *.bak_*
 server/_debug_ical.js
+!public/behavioral-profiles/*.png
 server/firebase-service-account.json

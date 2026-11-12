@@ -1,0 +1,29 @@
+﻿/* SystemBars injects zero insets when the native WebView is already padded. */
+html[data-native-app='android'] {
+  --nex-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --nex-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --nex-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --nex-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --nex-header-height: calc(64px + var(--nex-safe-top));
+  --nex-workspace-height: calc(var(--nex-visible-height, 100dvh) - var(--nex-header-height) - var(--nex-bottom-height));
+}
+html[data-native-app='android'] .nex-app { min-height: var(--nex-visible-height, 100dvh); }
+html[data-native-app='android'] .navbar-modern { padding-top: var(--nex-safe-top); padding-inline: var(--nex-safe-left) var(--nex-safe-right); }
+html[data-native-app='android'] .nex-main { padding-left: max(12px, var(--nex-safe-left)); padding-right: max(12px, var(--nex-safe-right)); }
+html[data-native-app='android'] .nex-main-workspace { padding-left: var(--nex-safe-left); padding-right: var(--nex-safe-right); }
+html[data-native-app='android'] .nex-bottom-nav { padding-bottom: var(--nex-safe-bottom); padding-left: max(4px, var(--nex-safe-left)); padding-right: max(4px, var(--nex-safe-right)); }
+html[data-native-app='android'][data-native-keyboard='true'] { --nex-bottom-height: 0px; }
+html[data-native-app='android'][data-native-keyboard='true'] .nex-bottom-nav { display: none; }
+html[data-native-app='android'] :is(input, textarea, [contenteditable='true']) { scroll-margin-block: 16px; }
+html[data-native-app='android'] .nex-media-dialog { inset: calc(6px + var(--nex-safe-top)) calc(6px + var(--nex-safe-right)) calc(6px + var(--nex-safe-bottom)) calc(6px + var(--nex-safe-left)); }
+html[data-native-app='android'] .chat-attachment-viewport[role='dialog'] { padding: max(8px, var(--nex-safe-top)) max(8px, var(--nex-safe-right)) max(8px, var(--nex-safe-bottom)) max(8px, var(--nex-safe-left)); }
+@media (max-width: 1023px) {
+  html[data-native-app='android'] { --nex-header-height: calc(56px + var(--nex-safe-top)); --nex-bottom-height: calc(68px + var(--nex-safe-bottom)); }
+  html[data-native-app='android'][data-native-keyboard='true'] { --nex-bottom-height: 0px; }
+  html[data-native-app='android'] :is(.nex-task-detail.task-detail-dialog, .nex-task-create.task-composer-dialog) {
+    top: calc(6px + var(--nex-safe-top)); left: calc(6px + var(--nex-safe-left)); transform: none;
+    width: calc(100vw - 12px - var(--nex-safe-left) - var(--nex-safe-right));
+    height: calc(var(--nex-visible-height, 100dvh) - 12px - var(--nex-safe-top) - var(--nex-safe-bottom));
+    max-height: calc(var(--nex-visible-height, 100dvh) - 12px - var(--nex-safe-top) - var(--nex-safe-bottom));
+  }
+}

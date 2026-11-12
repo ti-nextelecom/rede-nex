@@ -1,3 +1,4 @@
+import { chatUploadType } from '../../shared/chatMediaUpload.mjs';
 import {
   ChangeEvent, CSSProperties, FormEvent, Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react';
@@ -16,6 +17,7 @@ import { openMedia, editImage } from '../lib/mediaTools';
 import { ImageLightbox } from '../components/ui/ImageLightbox';
 import { mergeChatOutbox } from '../../shared/chatOutbox.mjs';
 import { ChatCaptionInput } from '../components/ChatCaptionInput';
+import { ChatAttachmentDialog } from '../components/ChatAttachmentDialog';
 import './chat-interactions.css';
 import { buildMentionMatcher, type MentionMatcher } from '../../shared/chatMentions.mjs';
 import { wsEventBus } from '../lib/wsEventBus';
@@ -52,6 +54,7 @@ import { enableDesktopNotifications,syncDesktopNotifications } from '../lib/brow
 import { getChatMessageContext } from '../lib/chatApi';
 import './chat.css';
 import './chat-next.css';
+import './chat-mobile.css';
 import { useDarkMode } from '../lib/useDarkMode';
 
 interface IncomingToast { id: string; title: string; body: string; conversationId: string; }
@@ -1104,11 +1107,6 @@ export function Chat() {
   const [pendingFile, setPendingFile] = useState<{ src: string; type: 'image' | 'video' | 'audio' | 'document'; raw: File } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   useEffect(() => () => { if (pendingFile?.src.startsWith('blob:')) URL.revokeObjectURL(pendingFile.src); }, [pendingFile]);
-  useEffect(() => {
-    if (!pendingFile) return;
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && !(event.target as HTMLElement)?.closest('.nex-media-dialog')) { setPendingFile(null); setPendingCaption(''); } };
-    window.addEventListener('keydown',close); return () => window.removeEventListener('keydown',close);
-  },[pendingFile]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Editing
@@ -1495,8 +1493,12 @@ export function Chat() {
   }
 
   function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    e.target.value = '';
+    let file: File;
+    try { const type = chatUploadType(selected); file = selected.type === type ? selected : new File([selected], selected.name, {type, lastModified: selected.lastModified}); }
+    catch (error) { setSendFailure({conversationId: selectedId || '', message: error instanceof Error ? error.message : 'Arquivo inv\u00e1lido.'}); return; }
     const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document';
     const src = type !== 'document' ? URL.createObjectURL(file) : '';
     setPendingFile({ src, type, raw: file });
@@ -2178,54 +2180,19 @@ export function Chat() {
               </div>
             )}
 
-            {/* Media send modal */}
+            {/* Portaled attachment dialog stays inside the visible mobile viewport. */}
             {pendingFile && (
-              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 px-4 pt-4" style={{paddingBottom:'calc(max(1rem, env(safe-area-inset-bottom, 0px)) + 72px)'}}
-                onClick={e => { if (e.target === e.currentTarget) { setPendingFile(null); setPendingCaption(''); } }}>
-                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style={{maxHeight:'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 10rem)'}}>
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-800 flex-shrink-0">
-                    <p className="text-sm font-semibold text-white">Enviar arquivo</p>
-                    <button onClick={() => { setPendingFile(null); setPendingCaption(''); }}
-                      className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-600 text-slate-300">
-                      <X size={15} />
-                    </button>
-                  </div>
-                  {/* Preview */}
-                  <div className="bg-slate-900 flex items-center justify-center p-3 flex-1 min-h-0 overflow-auto">
-                    {pendingFile.type === 'image'
-                      ? <img src={pendingFile.src} alt="" className="max-h-full max-w-full object-contain rounded-lg" />
-                      : pendingFile.type === 'video'
-                        ? <video src={pendingFile.src} controls className="max-h-full max-w-full rounded-lg" />
-                        : pendingFile.type === 'audio'
-                          ? <div className="flex flex-col items-center gap-3 py-8">
-                              <Mic size={52} className="text-orange-400" />
-                              <p className="text-sm text-slate-300 text-center px-4 break-all">{pendingFile.raw.name}</p>
-                            </div>
-                        : <div className="flex flex-col items-center gap-3 py-8">
-                            <FileText size={52} className="text-orange-400" />
-                            <p className="text-sm text-slate-300 text-center px-4 break-all">{pendingFile.raw.name}</p>
-                          </div>}
-                  </div>
-                  {/* Footer */}
-                  <div className="p-3 bg-slate-800 flex-shrink-0">
-                    <button type="button" className="chat-edit-attachment" onClick={() => openMedia({url:pendingFile.src || URL.createObjectURL(pendingFile.raw),name:pendingFile.raw.name,type:pendingFile.raw.type,temporary:!pendingFile.src})}>Ampliar anexo</button>
-                    {pendingFile.type === 'image' && <button type="button" disabled={attachmentSending} className="chat-edit-attachment" onClick={() => { const original=pendingFile; void editImage(original.raw).then(file => { if (file && file !== original.raw) setPendingFile(current => current === original ? {src:URL.createObjectURL(file),type:'image',raw:file} : current); }); }}><Pencil size={16} />Cortar e marcar imagem</button>}
-                    {sendFailure?.conversationId === selectedId && <p className="chat-send-error" role="alert">{sendFailure.message}</p>}
-                    <p className="text-[10px] text-slate-400 mb-1.5 px-1">{pendingFile.raw.name} · {(pendingFile.raw.size / 1024 / 1024).toFixed(1)} MB</p>
-                    <div className="flex gap-2">
-                      <ChatCaptionInput disabled={attachmentSending} value={pendingCaption} onChange={setPendingCaption} group={selectedConversation.type === 'group'}
-                        participants={selectedConversation.type === 'group' ? mentionParticipants : selectedConversation.other_participant ? [selectedConversation.other_participant] : []}
-                        onNeedParticipants={() => { if (selectedConversation.type === 'group') loadMentionDirectory(selectedConversation.id); }}
-                        onSend={() => void handleSend()} onCancel={() => { setPendingFile(null); setPendingCaption(''); }} />
-                      <button disabled={attachmentSending} aria-label="Enviar anexo" onClick={() => handleSend()}
-                        className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full bg-orange-500 hover:bg-orange-600 text-white">
-                        {attachmentSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ChatAttachmentDialog file={pendingFile} busy={attachmentSending}
+                error={sendFailure?.conversationId === selectedId ? sendFailure.message : undefined}
+                onClose={() => { setPendingFile(null); setPendingCaption(''); }}
+                onPreview={() => openMedia({url:pendingFile.src || URL.createObjectURL(pendingFile.raw),name:pendingFile.raw.name,type:pendingFile.raw.type,temporary:!pendingFile.src})}
+                onEdit={() => { const original=pendingFile; void editImage(original.raw).then(file => { if (file && file !== original.raw) setPendingFile(current => current === original ? {src:URL.createObjectURL(file),type:'image',raw:file} : current); }); }}
+                onSend={() => void handleSend()}>
+                <ChatCaptionInput disabled={attachmentSending} value={pendingCaption} onChange={setPendingCaption} group={selectedConversation.type === 'group'}
+                  participants={selectedConversation.type === 'group' ? mentionParticipants : selectedConversation.other_participant ? [selectedConversation.other_participant] : []}
+                  onNeedParticipants={() => { if (selectedConversation.type === 'group') loadMentionDirectory(selectedConversation.id); }}
+                  onSend={() => void handleSend()} onCancel={() => { if (!attachmentLock.current) { setPendingFile(null); setPendingCaption(''); } }} />
+              </ChatAttachmentDialog>
             )}
 
             {/* Broadcast notice */}
@@ -2251,6 +2218,14 @@ export function Chat() {
                 {(()=>{const ct=selectedId?typingByConv.get(selectedId):null;if(!ct||ct.size===0)return null;const us=Array.from(ct.values());return(<div className="px-1 pb-1 flex items-center gap-1.5 text-xs text-slate-400 italic"><span className="flex gap-[3px] items-end"><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'0ms'}}/><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'150ms'}}/><span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{animationDelay:'300ms'}}/></span>{us.map(u=>u.name).join(', ')} {us.length===1?'está':'estão'} digitando...</div>);})()}
                 {sendFailure?.conversationId === selectedId && <p role="alert" className="chat-send-error">{sendFailure.message}</p>}
                 <form onSubmit={handleSend} className="chat-composer-form relative flex items-center gap-2">
+                  {/* File attachment */}
+                  <label role="button" tabIndex={0} onClick={() => { setShowInputTools(false); setShowEmoji(false); setShowStickers(false); }}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fileInputRef.current?.click(); } }}
+                    className="chat-attach-button cursor-pointer h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Anexar arquivo ou comprovante" aria-label="Anexar arquivo ou comprovante">
+                    <Paperclip size={19} />
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                  </label>
+
                   {/* Mobile toggle — shows/hides tool buttons */}
                   <button type="button"
                     className="chat-tools-toggle flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500"
@@ -2299,12 +2274,6 @@ export function Chat() {
                     )}
                   </div>
 
-                  {/* File attachment */}
-                  <label className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500 cursor-pointer" title="Enviar arquivo">
-                    <Paperclip size={19} />
-                    <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
-                  </label>
-
                   {/* Reminder */}
                   <button type="button" onClick={() => setShowReminderModal(true)}
                     className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Criar lembrete">
@@ -2316,7 +2285,7 @@ export function Chat() {
                     const mShowTodos = 'todos'.startsWith((mentionQuery || '').toLowerCase());
                     const mFiltered = mentionParticipants.filter(p => p.name.toLowerCase().includes((mentionQuery || '').toLowerCase())).slice(0, 6);
                     return (
-                      <div className="absolute bottom-14 left-12 z-30 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                      <div className="chat-composer-mentions absolute bottom-14 left-12 z-30 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
                         <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mencionar</p>
                         {mShowTodos && (
                           <button type="button"
@@ -2399,7 +2368,7 @@ export function Chat() {
 
                   {/* Audio */}
                   <button type="button" onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Enviar gravação' : 'Gravar áudio'} aria-label={isRecording ? 'Enviar gravação' : 'Gravar áudio'}
-                    className={cn('h-10 w-10 flex items-center justify-center rounded-lg transition-colors',
+                    className={cn('chat-record-button h-10 w-10 flex items-center justify-center rounded-lg transition-colors',
                       isRecording ? 'bg-red-500 text-white hover:bg-red-600' : 'text-slate-500 hover:bg-slate-100 hover:text-orange-500')}>
                     {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
                   </button>

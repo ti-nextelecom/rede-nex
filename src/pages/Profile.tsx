@@ -50,6 +50,7 @@ export function Profile() {
       bio: user?.bio || '',
       google_ical_url: user?.google_ical_url || '',
       photo_url: user?.photo_url || '',
+      anydesk_id: user?.anydesk_id || '',
     });
   }, [user]);
 

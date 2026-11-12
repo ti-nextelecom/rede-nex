@@ -1,5 +1,7 @@
 # REDE NEX — atualizar a VM existente
 
+Consulte o roteiro consolidado desta entrega em [atualizacao de 10/11/2026](docs/atualizacao-vm-2026-11-10.md).
+
 Este é um pacote de **atualização**, com frontend compilado e API Node conectada ao **PostgreSQL nativo existente**. Não usa Supabase nem exige trocar de banco. Não recria usuários nem restaura dumps. Não é um instalador de banco vazio.
 
 ## O que fica na VM
@@ -34,6 +36,10 @@ pm2 save
 Não crie outro processo com nome diferente se já houver um atendendo a mesma porta. Configure a inicialização automática do PM2 para o usuário do serviço conforme a política da VM.
 
 ## Atualização normal (depois da preparação única)
+
+O módulo Perfil Comportamental requer API, frontend e a migração aditiva `20261106_behavioral_profiles.sql` juntos. Ele vincula avaliações aos usuários existentes e restringe respostas ao próprio usuário e à gestão pelo organograma. Veja [escopo, privacidade, banco e validações](docs/perfil-comportamental-2026-11-03.md). A implementação local não atualizou o banco da VM.
+
+O módulo Arquitetura requer API, frontend e a migração aditiva `20261105_architecture.sql` juntos. Novos projetos ficam visíveis à equipe; o responsável escolhe editores. Veja [funcionalidades, limites e validações](docs/arquitetura-2026-11-03.md). A criação local do módulo não aplica essa migração na VM.
 
 As melhorias de mídias/envio de 30/10 exigem API, frontend e a migração aditiva `20261104_chat_message_delivery.sql` juntos. Ela permite confirmar e repetir um envio sem duplicar a mensagem. A migração `20261103_password_vault.sql` também é necessária para o cofre de senhas. Veja [detalhes e validações locais](docs/midias-editor-envio-2026-10-30.md). Nenhuma dessas instruções indica que o banco da VM já foi atualizado.
 

@@ -17,7 +17,7 @@ import { preserveBrandAssets, brandAssets } from '../deploy/prepare-static-asset
 
 test('hosting: migration inventory is ordered, hashed and strips only the legacy outer transaction', async () => {
   const files = await migrationFiles();
-  assert.deepEqual(files.map(file => file.name), ["20261016_hr_module.sql","20261017_runtime_tables.sql","20261026_task_collaboration.sql","20261027_hr_employee_termination.sql","20261028_chat_conversation_archives.sql","20261029_task_blueprints.sql","20261030_attention_browser_push.sql","20261031_chat_message_reactions.sql","20261101_achievement_avatar_frames.sql","20261102_user_appearance.sql","20261103_password_vault.sql","20261104_chat_message_delivery.sql"]);
+  assert.deepEqual(files.map(file => file.name), ["20261016_hr_module.sql","20261017_runtime_tables.sql","20261026_task_collaboration.sql","20261027_hr_employee_termination.sql","20261028_chat_conversation_archives.sql","20261029_task_blueprints.sql","20261030_attention_browser_push.sql","20261031_chat_message_reactions.sql","20261101_achievement_avatar_frames.sql","20261102_user_appearance.sql","20261103_password_vault.sql","20261104_chat_message_delivery.sql","20261105_architecture.sql","20261106_behavioral_profiles.sql"]);
   assert.match(files[0].checksum, /^[0-9a-f]{64}$/);
   assert.ok(!files[0].sql.trim().startsWith('BEGIN;'));
   assert.ok(!files[0].sql.trim().endsWith('COMMIT;'));
@@ -80,15 +80,16 @@ test('hosting isolated PostgreSQL: apply, idempotency, checksums and transaction
   const { pool, database } = await createHrTestDb(); const client = await pool.connect();
   try {
     const files = await migrationFiles();
-    assert.equal((await migrationStatus(client, files)).filter(row => row.status === 'pending').length, 2);
-    assert.equal((await applyMigrations(client, files, { expectedDatabase: database, runtimeRole: 'rh_app' })).length, 2);
+    await client.query(await readFile(new URL('./hosting-legacy-fixture.sql', import.meta.url), 'utf8'));
+    assert.equal((await migrationStatus(client, files)).filter(row => row.status === 'pending').length, files.length);
+    assert.equal((await applyMigrations(client, files, { expectedDatabase: database, runtimeRole: 'rh_app' })).length, files.length);
     assert.deepEqual(await applyMigrations(client, files, { expectedDatabase: database, runtimeRole: 'rh_app' }), []);
     assert.equal((await client.query('SELECT count(*)::int n FROM ti_projects')).rows[0].n, 0, 'No example projects');
     const bad = { name: '20991231_failed.sql', checksum: 'fictional', sql: 'CREATE TABLE public.rollback_probe(id int); SELECT nonexistent_column FROM public.roles;' };
     await assert.rejects(() => applyMigrations(client, [...files, bad], { expectedDatabase: database, runtimeRole: 'rh_app' }));
     assert.equal((await client.query("SELECT to_regclass('public.rollback_probe') present")).rows[0].present, null);
-    assert.equal((await client.query('SELECT count(*)::int n FROM nex_deploy.migrations')).rows[0].n, 2);
-    await assert.rejects(() => migrationStatus(client, [{ ...files[0], checksum: 'changed' }, files[1]]), /alterada/);
+    assert.equal((await client.query('SELECT count(*)::int n FROM nex_deploy.migrations')).rows[0].n, files.length);
+    await assert.rejects(() => migrationStatus(client, [{ ...files[0], checksum: 'changed' }, ...files.slice(1)]), /alterada/);
   } finally { client.release(); await pool.end(); }
 });
 
@@ -131,7 +132,9 @@ test('hosting isolated PostgreSQL: packaged API boots without optional secrets o
   const envFile = join(directory, 'runtime.env');
   await writeFile(envFile, `DATABASE_URL=postgresql://rh_app@127.0.0.1:55482/${database}\nPORT=${port}\nHOST=127.0.0.1\nJRH_UPLOADS_DIR=${directory.replaceAll('\\', '/')}\n`);
   const runtimeRoot = process.env.NEX_TEST_RELEASE_DIR ? resolve(process.env.NEX_TEST_RELEASE_DIR) : fileURLToPath(new URL('..', import.meta.url));
-  const expectedRelease = process.env.NEX_TEST_RELEASE_DIR ? JSON.parse(await readFile(join(runtimeRoot, 'release-manifest.json'), 'utf8')).release : 'development';
+  let expectedRelease = 'development';
+  try { expectedRelease = JSON.parse(await readFile(join(runtimeRoot, 'release-manifest.json'), 'utf8')).release; }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
   const child = spawn(process.execPath, ['server/src/server.js'], { cwd: runtimeRoot, env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, NODE_ENV: 'production', REDE_NEX_ENV_FILE: envFile }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   let output = ''; child.stdout.on('data', data => { output += data; }); child.stderr.on('data', data => { output += data; });
   const exited = once(child, 'exit');

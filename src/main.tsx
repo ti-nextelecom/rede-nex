@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
@@ -7,7 +8,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
-if ('Notification' in window && Notification.permission === 'default') {
+if (!Capacitor.isNativePlatform() && 'Notification' in window && Notification.permission === 'default') {
   Notification.requestPermission().catch(() => {});
 }
 

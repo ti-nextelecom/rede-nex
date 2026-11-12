@@ -1,3 +1,4 @@
+import { chatUploadType } from '../../shared/chatMediaUpload.mjs';
 import { apiDelete, apiDeleteJson, apiGet, apiPatch, apiPost, apiPut } from './apiClient';
 import { dispatchXPEvent } from './xpEvents';
 
@@ -179,6 +180,7 @@ export async function getMessageReaders(conversationId: string, messageId: strin
 }
 
 export async function uploadChatMedia(file: File): Promise<string> {
+  const fileType = chatUploadType(file);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async () => {
@@ -186,9 +188,10 @@ export async function uploadChatMedia(file: File): Promise<string> {
         const response = await apiPost<{ data?: { public_url: string } }>('/chat/media', {
           data: reader.result,
           file_name: file.name,
-          file_type: file.type,
+          file_type: fileType,
         });
-        resolve(response.data?.public_url ?? '');
+        if (!response.data?.public_url) throw new Error('O servidor n\u00e3o confirmou o envio do arquivo.');
+        resolve(response.data.public_url);
       } catch (e) { reject(e); }
     };
     reader.onerror = reject;
