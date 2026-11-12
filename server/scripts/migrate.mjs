@@ -49,12 +49,12 @@ export async function applyMigrations(client, files, { expectedDatabase, runtime
         GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA nex_hr TO ${target};
         GRANT SELECT,INSERT,UPDATE,DELETE ON public.ti_projects,public.ti_tasks,public.ti_task_history,public.training_progress,public.nav_settings,public.task_observers,
           public.chat_conversation_archives,public.task_template_recipients,public.task_checklist_item_people,
-          public.chat_attention_requests,public.browser_push_subscriptions,public.browser_push_deliveries,public.chat_message_reactions,public.password_vaults,public.user_avatar_frames,public.user_appearance_preferences TO ${target};
+          public.chat_attention_requests,public.browser_push_subscriptions,public.browser_push_deliveries,public.chat_message_reactions,public.password_vaults,public.device_fcm_tokens,public.android_push_deliveries,public.user_avatar_frames,public.user_appearance_preferences TO ${target};
         GRANT SELECT,INSERT,UPDATE ON public.architecture_projects TO ${target};
         GRANT SELECT,INSERT ON public.behavioral_assessments TO ${target};
         GRANT SELECT,INSERT,UPDATE,DELETE ON public.behavioral_drafts TO ${target};
         GRANT SELECT,INSERT,UPDATE ON public.behavioral_badges TO ${target};
-        GRANT USAGE,SELECT ON SEQUENCE public.browser_push_deliveries_id_seq TO ${target}`);
+        GRANT USAGE,SELECT ON SEQUENCE public.browser_push_deliveries_id_seq,public.android_push_deliveries_id_seq TO ${target}`);
       }
     }
     await client.query('COMMIT');

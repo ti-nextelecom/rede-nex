@@ -1,3 +1,4 @@
+import { validatePasswordComplexity } from '../../shared/passwordPolicy.mjs';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -41,7 +42,7 @@ function formatPresence(user: User) {
 }
 
 const emptyForm: CreateUserInput & { status?: string } = {
-  name: '', email: '', password: '', position: '',
+  name: '', email: '', password: '', position: '', must_change_password: true,
   department_id: '', role_id: '', phone: '', admission_date: '', birth_date: '', status: 'active',
 };
 
@@ -127,6 +128,7 @@ export function Users() {
       name: user.name,
       email: user.email,
       password: '',
+      must_change_password: true,
       position: user.position ?? '',
       department_id: user.department_id ?? '',
       role_id: user.role_id ?? '',
@@ -142,6 +144,8 @@ export function Users() {
 
   function closeModal() {
     setModal({ open: false, mode: 'create' });
+    setForm({ ...emptyForm });
+    setShowPassword(false);
   }
 
   async function handleSave() {
@@ -155,8 +159,8 @@ export function Users() {
       setFormError('Senha é obrigatória para novos colaboradores.');
       return;
     }
-    if (form.password && form.password.length < 8) {
-      setFormError('A senha deve ter pelo menos 8 caracteres.');
+    if (form.password && validatePasswordComplexity(form.password)) {
+      setFormError(validatePasswordComplexity(form.password)!);
       return;
     }
 
@@ -172,7 +176,7 @@ export function Users() {
           role_id: form.role_id, phone: form.phone,
           admission_date: form.admission_date, birth_date: form.birth_date, status: form.status,
         };
-        if (form.password) payload.password = form.password;
+        if (form.password) { payload.password = form.password; payload.must_change_password = form.must_change_password; }
         const updated = await updateUser(modal.user.id, payload);
         setUsers(prev => prev.map(u => u.id === modal.user!.id ? updated : u));
       }
@@ -523,7 +527,7 @@ export function Users() {
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      id="person-password" autoComplete="new-password"
+                      id="person-password" autoComplete="new-password" maxLength={128} aria-describedby="person-password-rules"
                       className={`${inputCls} pr-9`}
                       placeholder={modal.mode === 'create' ? 'Mínimo 8 caracteres' : 'Nova senha (opcional)'}
                       value={form.password}
@@ -538,6 +542,16 @@ export function Users() {
                       {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <p id="person-password-rules" className="text-xs leading-5 text-muted-foreground">Use de 8 a 128 caracteres, com maiúscula, número e caractere especial.</p>
+                  <label className="flex items-start gap-2 text-sm text-foreground">
+                    <input type="checkbox" checked={Boolean(form.must_change_password)} disabled={!form.password || saving}
+                      onChange={event => setForm(value => ({ ...value, must_change_password: event.target.checked }))}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-orange-500" />
+                    <span>Exigir alteração da senha no próximo acesso</span>
+                  </label>
+                  <p className="text-xs leading-5 text-muted-foreground">{form.password ? 'O colaborador precisará definir uma senha pessoal antes de continuar, se esta opção estiver marcada.' : 'Preencha a nova senha para habilitar esta opção.'}</p>
                 </div>
                 <div>
                   <label htmlFor="person-position" className={labelCls}>Cargo</label>

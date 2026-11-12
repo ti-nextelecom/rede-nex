@@ -1,9 +1,9 @@
 .wiki-shell {
   --wiki-line: hsl(var(--foreground) / 0.141);
-  --wiki-ink: #edf4fc;
+  --wiki-ink: hsl(var(--foreground));
   --wiki-muted: hsl(var(--muted-foreground));
   --wiki-panel: hsl(var(--card));
-  --wiki-accent: #69b9ff;
+  --wiki-accent: var(--nex-accent-ink, hsl(var(--primary)));
   color: var(--wiki-ink);
   background: hsl(var(--card));
   border-color: var(--wiki-line);
@@ -114,12 +114,12 @@
 .wiki-shell .wiki-breadcrumb { border-color: var(--wiki-line); color: hsl(var(--muted-foreground)); }
 .wiki-shell .wiki-breadcrumb button { color: #8ccaff; }
 .wiki-shell .wiki-document-header { padding: clamp(22px, 3vw, 42px); border-color: var(--wiki-line); }
-.wiki-shell .wiki-document-header h2 { color: #f1f6fd; font-size: clamp(26px, 3vw, 38px); overflow-wrap: break-word; }
+.wiki-shell .wiki-document-header h2 { color: var(--wiki-ink); font-size: clamp(26px, 3vw, 38px); overflow-wrap: break-word; }
 .wiki-shell .wiki-document-meta { color: hsl(var(--muted-foreground)); line-height: 1.6; }
 .wiki-shell .wiki-content:not(.wiki-content--html) { max-width: 900px; padding: clamp(22px, 3vw, 42px); color: hsl(var(--foreground)); font-size: 15px; line-height: 1.75; }
 .wiki-shell .wiki-content p { font-size: 15px; line-height: 1.75; overflow-wrap: break-word; }
-.wiki-shell .wiki-content :is(h1,h2,h3,h4) { color: #f5f9fe; line-height: 1.3; }
-.wiki-shell .wiki-content a { color: #8bcaff; }
+.wiki-shell .wiki-content :is(h1,h2,h3,h4,h5,h6) { color: var(--wiki-ink); line-height: 1.3; }
+.wiki-shell .wiki-content a { color: var(--wiki-accent); }
 .wiki-shell .wiki-right-rail .wiki-panel { background: hsl(var(--muted)); }
 .wiki-shell .wiki-toc-link { color: hsl(var(--muted-foreground)); }
 .wiki-shell .wiki-toc-link:hover { color: hsl(var(--foreground)); background: hsl(var(--accent)); }
@@ -228,7 +228,7 @@
   border-radius: 3px; text-decoration-line: underline; text-decoration-color: rgba(139, 202, 255, .35);
   text-underline-offset: 4px; transition: color .18s ease, text-decoration-color .18s ease, background-color .18s ease;
 }
-.wiki-shell .wiki-content:not(.wiki-content--html) a:focus-visible { outline: 2px solid #9ad4ff; outline-offset: 3px; }
+.wiki-shell .wiki-content:not(.wiki-content--html) a:focus-visible { outline: 2px solid var(--wiki-accent); outline-offset: 3px; }
 @media (hover: hover) and (pointer: fine) {
   .wiki-shell .wiki-category-card:hover {
     transform: translateY(-4px); border-color: var(--wiki-hover-line) !important;
@@ -254,7 +254,7 @@
   .wiki-shell .wiki-primary-button:not(:disabled):hover { transform: translateY(-1px); background: #fb7935; box-shadow: 0 5px 17px rgba(236, 102, 31, .23); }
   .wiki-shell .wiki-editor-choice-card:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0, 0, 0, .2), 0 0 0 1px rgba(123, 198, 255, .16); }
   .wiki-shell .wiki-breadcrumb button:hover { color: #c6e8ff; text-decoration: underline; text-underline-offset: 4px; }
-  .wiki-shell .wiki-content:not(.wiki-content--html) a:hover { color: #c6e8ff; text-decoration-color: currentColor; background: rgba(105, 185, 255, .1); }
+  .wiki-shell .wiki-content:not(.wiki-content--html) a:hover { color: var(--wiki-accent); text-decoration-color: currentColor; background: rgba(105, 185, 255, .1); }
   .wiki-shell .wiki-global-search:hover { border-color: rgba(123, 198, 255, .45); }
 }
 @media (hover: none), (pointer: coarse) {
@@ -273,4 +273,56 @@
   .wiki-shell :is(.wiki-category-card, .wiki-article-row, .wiki-editor-choice-card, .wiki-primary-button):hover,
   .wiki-shell .wiki-category-card:hover :is(.wiki-category-card-icon, .wiki-category-card-image, .wiki-category-card-count span:last-child),
   .wiki-shell .wiki-article-row:hover .wiki-article-icon { transform: none !important; }
+}
+
+/* Article surfaces follow the same palette in reading and editor preview. */
+.wiki-shell :is(.wiki-document, .wiki-preview-pane) {
+  background: hsl(var(--card));
+  color: var(--wiki-ink);
+}
+.wiki-shell .wiki-content {
+  color: var(--wiki-ink);
+  color-scheme: inherit;
+}
+.wiki-shell .wiki-content :is(pre, .wiki-code) {
+  background: hsl(var(--input));
+  border-color: var(--wiki-line);
+  color: var(--wiki-ink);
+}
+.wiki-shell .wiki-content :is(pre code, .wiki-code code) { color: inherit; }
+.wiki-shell .wiki-content :is(.wiki-inline-code, :not(pre) > code) {
+  background: hsl(var(--muted));
+  border-color: var(--wiki-line);
+  color: var(--wiki-accent);
+}
+.wiki-shell .wiki-content :is(th, thead) { background: hsl(var(--muted)); }
+.wiki-shell .wiki-content :is(td, th, blockquote, details, hr) { border-color: var(--wiki-line); }
+.wiki-shell .wiki-content :is(blockquote, details) { background: hsl(var(--muted)); }
+.wiki-shell .wiki-content :is(summary, a) { color: var(--wiki-accent); }
+.wiki-shell :is(.wiki-source-pane, .wiki-code-shell) { background: hsl(var(--input)); }
+.wiki-shell :is(.wiki-line-number, .wiki-code-rail) { background: hsl(var(--muted)); }
+.wiki-shell .wiki-mode-pagebar :is(input, select) { color: var(--wiki-ink); }
+
+/* Legacy imported HTML has inline light surfaces and dark text. Override only
+   presentation in dark mode; saved article content and media remain intact. */
+.dark .wiki-shell .wiki-content :is(div, p, span, strong, em, li, ul, ol, figure,
+  figcaption, h1, h2, h3, h4, h5, h6, table, thead, tbody, tr, td, th, details,
+  summary, blockquote, pre, code) {
+  color: var(--wiki-ink) !important;
+  border-color: var(--wiki-line) !important;
+}
+.dark .wiki-shell .wiki-content :is(div, p, span, strong, em, li, ul, ol, figure,
+  figcaption, h1, h2, h3, h4, h5, h6, tbody, tr, td) {
+  background-color: transparent !important;
+}
+.dark .wiki-shell .wiki-content :is(table, pre, .wiki-code) {
+  background-color: hsl(var(--input)) !important;
+}
+.dark .wiki-shell .wiki-content :is(details, blockquote, th, thead) {
+  background-color: hsl(var(--muted)) !important;
+}
+.dark .wiki-shell .wiki-content :is(a, a *, summary, summary *, .wiki-inline-code,
+  :not(pre) > code) { color: var(--wiki-accent) !important; }
+.dark .wiki-shell .wiki-content :is(.wiki-code-label, figcaption, caption) {
+  color: hsl(var(--muted-foreground)) !important;
 }

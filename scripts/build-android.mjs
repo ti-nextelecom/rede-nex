@@ -28,6 +28,8 @@ if (mode === 'debug') {
 }
 process.chdir(root);
 run(process.execPath, ['node_modules/typescript/bin/tsc', '-b']);
+// APKs always use the authenticated API of the platform, never a local dev proxy.
+process.env.VITE_API_URL='/api';process.env.VITE_REMOTE_READ_ONLY='false';process.env.VITE_REMOTE_API_TARGET='';
 globalThis.__dirname = root;
 const { build } = await import('vite');
 await build({ configLoader: 'runner' });

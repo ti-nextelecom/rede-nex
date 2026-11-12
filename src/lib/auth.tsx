@@ -92,11 +92,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function changePassword(currentPassword: string, newPassword: string) {
+    const owner = user?.id;
     await apiPost('/auth/change-password', {
       current_password: currentPassword,
       new_password: newPassword,
     });
-    await refreshUser();
+    // The change already succeeded. A refresh failure must not suggest it failed
+    // or reset unrelated unsaved profile fields.
+    setUser(current => current && current.id === owner && current.must_change_password
+      ? { ...current, must_change_password: false } : current);
   }
 
   async function uploadAvatar(file: File) {

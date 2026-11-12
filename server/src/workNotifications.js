@@ -1,3 +1,5 @@
+import {buildMentionMatcher,chatTextParts} from '../../shared/chatMentions.mjs';
+import {parseTaskMessage} from '../../shared/taskMedia.mjs';
 // Pure recipient selection: no broadcast fallback. Callers pass trusted records
 // from authenticated mutation handlers, never arbitrary recipient IDs from UI.
 export function taskRecipients(task, actorId) {
@@ -30,4 +32,21 @@ export async function notifyProjectActivity(project, actor, title, repositories)
   if (!userIds.length) return;
   await repositories.notifyUsers({ actorId: actor.id, actorName: actor.name, actorPhotoUrl: actor.photo_url,
     title, message: `${project.name} • ${project.status}`, type: 'project', link: `/projetos?projeto=${encodeURIComponent(project.id)}`, userIds });
+}
+
+// Mention recipients come only from the task's trusted audience. Each person
+// receives either a mention notice or an activity notice, never both.
+export function taskCommentNotices(task, actor, content, users) {
+  const allowed = new Set(taskRecipients(task, actor.id));
+  const directory = users.filter(user => allowed.has(user.id) || user.id === actor.id);
+  const text = parseTaskMessage(content, task.files || []).text.replace(/^\[Anexo: [^\]\r\n]+\]\([^)\r\n]+\)$/gm, '');
+  const parts = chatTextParts(text, buildMentionMatcher(directory));
+  const mentioned = new Set(parts.filter(part => part.kind === 'mention').map(part => part.userId));
+  const everyone = mentioned.has('__todos__');
+  return [false, true].flatMap(isMention => {
+    const userIds = [...new Set(directory.filter(user => allowed.has(user.id) && (everyone || mentioned.has(user.id)) === isMention).map(user => user.id))];
+    return userIds.length ? [{ actorId: actor.id, actorName: actor.name, actorPhotoUrl: actor.photo_url,
+      title: isMention ? 'Você foi mencionado em uma tarefa' : 'Novo comentário em uma tarefa sua',
+      message: task.title, type: 'task', link: '/tarefas?tarefa=' + encodeURIComponent(task.id), userIds }] : [];
+  });
 }

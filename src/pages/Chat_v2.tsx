@@ -1,3 +1,4 @@
+import { CHAT_UPLOAD_ACCEPT } from '../../shared/chatMediaUpload.mjs';
 import {
   ChangeEvent, FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
@@ -1787,7 +1788,7 @@ export function Chat() {
                     className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Enviar arquivo">
                     <Paperclip size={19} />
                   </button>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                  <input ref={fileInputRef} type="file" accept={CHAT_UPLOAD_ACCEPT} className="hidden" onChange={handleFileSelect} />
 
                   {mentionQuery !== null && mentionParticipants.length > 0 && (
                     <div className="absolute bottom-14 left-12 z-30 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">

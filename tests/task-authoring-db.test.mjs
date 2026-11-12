@@ -60,6 +60,11 @@ test('task authoring HTTP/database persists attachments, clones, atomic checklis
     for(const[name,content]of [['montagem.pdf','Montar'],['conexao.png','Conectar'],['validacao.mp3','Validar']])assert.equal(stepFiles.find(file=>file.name===name).checklist_item_id,steps.find(item=>item.content===content).id);
     const stepDraft=(await request('/'+stepTask.id+'/clone')).body.data;const stepCopy=await request('',{...stepDraft.blueprint,clone_source_id:stepTask.id});assert.equal(stepCopy.status,201);const copiedStepFiles=await repo.listTaskFiles(stepCopy.body.data.id),copiedSteps=stepCopy.body.data.checklists.flatMap(group=>group.items);
     for(const[name,content]of [['montagem.pdf','Montar'],['conexao.png','Conectar'],['validacao.mp3','Validar']]){const id=copiedSteps.find(item=>item.content===content).id;assert.equal(copiedStepFiles.find(file=>file.name===name).checklist_item_id,id);assert.notEqual(id,steps.find(item=>item.content===content).id);}assert.equal(notifications,5);
+    const delegated=await request('',{title:'Concluida criada para outro responsavel',owner_id:ids.bob});assert.equal(delegated.status,201);await pool.query("UPDATE tasks SET status='done' WHERE id=$1",[delegated.body.data.id]);
+    assert.ok((await repo.listTasks(ids.alice)).some(task=>task.id===delegated.body.data.id&&task.status==='done'));
+    assert.ok((await repo.listTasks(ids.bob)).some(visible=>visible.id===task.id&&visible.status==='done'));
+    assert.ok((await repo.listTasks(ids.carol)).some(visible=>visible.id===task.id&&visible.status==='done'));
+    assert.equal((await repo.listTasks(ids.outsider)).length,0);
 
   }finally{if(server){server.closeAllConnections();await new Promise(done=>server.close(done));}await pool?.end();await admin.query('DROP DATABASE IF EXISTS '+database);await admin.end();await rm(envFile,{force:true});}
 });

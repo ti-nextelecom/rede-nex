@@ -1,3 +1,4 @@
+import { isHtmlAttachment } from '../../../shared/chatAttachmentSafety.mjs';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Download, ExternalLink, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react';
@@ -11,7 +12,8 @@ export function MediaViewer({ asset, onClose }: { asset: MediaAsset; onClose(): 
   const stage = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef({ x: 0, y: 0, left: 0, top: 0, distance: 0, zoom: 1 });
-  const url = safeMediaSource(asset.url), kind = asset.kind || mediaKind(asset);
+  const html = isHtmlAttachment(asset);
+  const url = safeMediaSource(asset.url), kind = html ? 'file' : asset.kind || mediaKind(asset);
   useEffect(() => { const element = stage.current; if (!element) return; const resize = () => setViewport({ width: element.clientWidth, height: element.clientHeight }); const observer = new ResizeObserver(resize); observer.observe(element); resize(); return () => observer.disconnect(); }, []);
   useEffect(() => {
     const element=stage.current; if (!element || kind !== 'image') return;
@@ -28,7 +30,7 @@ export function MediaViewer({ asset, onClose }: { asset: MediaAsset; onClose(): 
   }}>
     <header className="nex-media-toolbar"><Dialog.Title>{asset.name || 'Visualizar anexo'}</Dialog.Title><div>
       {(kind === 'image' || kind === 'pdf') && <><button type="button" aria-label="Diminuir zoom" disabled={zoom <= .25} onClick={() => changeZoom(zoom - .25)}><ZoomOut size={20} /></button><output aria-label="Zoom">{Math.round(zoom * 100)}%</output><button type="button" aria-label="Aumentar zoom" disabled={zoom >= 4} onClick={() => changeZoom(zoom + .25)}><ZoomIn size={20} /></button><button type="button" aria-label="Ajustar à tela" title="Ajustar à tela" onClick={() => changeZoom(1)}><Maximize2 size={20} /></button></>}
-      {url && <><a href={url} download={asset.name || undefined} target="_blank" rel="noopener noreferrer" aria-label="Baixar arquivo"><Download size={20} /></a><a href={url} target="_blank" rel="noopener noreferrer" aria-label="Abrir original" title="Abrir original"><ExternalLink size={19} /></a></>}
+      {url && <><a href={url} download={asset.name || undefined} target="_blank" rel="noopener noreferrer" aria-label="Baixar arquivo"><Download size={20} /></a>{!html && <a href={url} target="_blank" rel="noopener noreferrer" aria-label="Abrir original" title="Abrir original"><ExternalLink size={19} /></a>}</>}
       <Dialog.Close aria-label="Fechar visualização (Esc)"><X size={22} /></Dialog.Close>
     </div></header><Dialog.Description className="nex-media-help">Esc para fechar · + e − para zoom · 0 para ajustar à tela{kind === 'image' ? ' · arraste para navegar · Ctrl + rolagem para zoom' : ''}</Dialog.Description>
     <div ref={stage} className={`nex-media-stage is-${kind}`} tabIndex={0}
@@ -46,7 +48,7 @@ export function MediaViewer({ asset, onClose }: { asset: MediaAsset; onClose(): 
       }} onPointerUp={event => { pointers.current.delete(event.pointerId); }} onPointerCancel={event => { pointers.current.delete(event.pointerId); }} onDoubleClick={() => { if (kind === 'image') changeZoom(zoom === 1 ? 2 : 1); }}>
       {!url || error ? <p role="alert">Não foi possível abrir o anexo. O arquivo original foi preservado.</p> : kind === 'image' ? <div className="nex-image-space" style={{ width: Math.max(viewport.width, dimensions.width + 32), height: Math.max(viewport.height, dimensions.height + 32) }}>{!loaded && <p className="nex-media-loading" role="status">Carregando imagem…</p>}<img src={url} alt={asset.name || 'Imagem'} draggable={false} style={dimensions} onLoad={event => { setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setLoaded(true); }} onError={() => setError(true)} /></div>
         : kind === 'pdf' ? <Suspense fallback={<p role="status">Preparando visualizador…</p>}><PdfPreview url={url} width={viewport.width} zoom={zoom} /></Suspense>
-          : kind === 'video' ? <video src={url} controls autoPlay={false} /> : kind === 'audio' ? <audio src={url} controls /> : <div className="nex-media-fallback"><p>Este formato pode ser aberto no aplicativo do seu dispositivo.</p><a href={url} target="_blank" rel="noopener noreferrer">Abrir arquivo original</a></div>}
+          : kind === 'video' ? <video src={url} controls autoPlay={false} /> : kind === 'audio' ? <audio src={url} controls /> : <div className="nex-media-fallback"><p>Este formato pode ser aberto no aplicativo do seu dispositivo.</p>{html ? <a href={url} download={asset.name || 'arquivo.html'}>Baixar HTML</a> : <a href={url} target="_blank" rel="noopener noreferrer">Abrir arquivo original</a>}</div>}
     </div>
   </Dialog.Content></Dialog.Portal></Dialog.Root>;
 }

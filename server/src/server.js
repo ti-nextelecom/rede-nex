@@ -1,3 +1,6 @@
+import { validatePasswordComplexity } from '../../shared/passwordPolicy.mjs';
+import { saveAndroidToken, startAndroidPushWorker } from './fcm.mjs';
+import { attachmentResponseHeaders } from '../../shared/chatAttachmentSafety.mjs';
 import { createServer } from 'node:http';
 import { mkdirSync, writeFileSync, createReadStream, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
@@ -9,7 +12,7 @@ import { sendPasswordResetEmail } from './email.js';
 import { getOrgChart } from './orgchart.repository.js';
 import { searchKnowledge } from './copiloto.js';
 import { buildCopilotoSystem, loadCopilotoContext, operationalBriefing, safeCopilotoHistory } from './copilotoContext.js';
-import { notifyTaskActivity, notifyProjectActivity } from './workNotifications.js';
+import { notifyTaskActivity, notifyProjectActivity, taskRecipients, taskCommentNotices } from './workNotifications.js';
 import { pool } from './db.js';
 import { conversationArchives } from './chat-conversation-archives.mjs';
 import { requestChatAttention } from './chat-attention.mjs';
@@ -155,14 +158,11 @@ const MAX_JSON_BYTES = Number(process.env.MAX_JSON_BYTES || 32 * 1024 * 1024);
 const allowedOrigins = new Set((process.env.CORS_ORIGINS || 'http://127.0.0.1:5173,http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean));
 
 async function notifyMentionsInTask(content, task, actor, sendFn) {
-  const rawParts = content.split('@').slice(1);
-  if (!rawParts.length) return;
-  const candidates = rawParts.map(p => p.split('\n')[0].trim().toLowerCase()).filter(Boolean);
-  if (!candidates.length) return;
-  const { rows } = await pool.query("SELECT id, lower(trim(name)) AS lname FROM users WHERE status='active' AND id != $1", [actor.id]);
-  const matched = rows.filter(u => candidates.some(c => c === u.lname || c.startsWith(u.lname + ' ') || c.startsWith(u.lname + ','))).map(u => u.id);
-  if (!matched.length) return;
-  await sendFn({ actorId: actor.id, actorName: actor.name, actorPhotoUrl: actor.photo_url, title: 'Você foi mencionado em uma tarefa', message: task.title, type: 'task', link: '/tarefas?tarefa=' + encodeURIComponent(task.id), userIds: matched });
+  if (!content.includes('@')) return notifyTaskActivity(task, actor, 'Novo comentário em uma tarefa sua', sendFn);
+  const recipients = taskRecipients(task, actor.id);
+  if (!recipients.length) return;
+  const { rows } = await pool.query("SELECT id,name FROM users WHERE status='active' AND id=ANY($1::uuid[])", [[...recipients, actor.id]]);
+  for (const notice of taskCommentNotices(task, actor, content, rows)) await sendFn(notice);
 }
 
 function getRealIP(req) {
@@ -229,8 +229,8 @@ function sendEmpty(req, res, status = 204, extraHeaders = {}) {
   res.end();
 }
 
-function sendBinary(req, res, status, buffer, contentType) {
-  res.writeHead(status, responseHeaders(req, contentType || 'application/octet-stream'));
+function sendBinary(req, res, status, buffer, contentType, fileName) {
+  res.writeHead(status, { ...responseHeaders(req, contentType || 'application/octet-stream'), ...attachmentResponseHeaders(contentType || '',fileName) });
   res.end(buffer);
 }
 
@@ -261,15 +261,6 @@ function getBearerToken(req) {
   if (cookie) return cookie;
   const auth = req.headers.authorization || '';
   return auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
-}
-
-function validatePasswordComplexity(password) {
-  if (String(password).length < 8) return 'A senha precisa ter pelo menos 8 caracteres';
-  if (String(password).length > 128) return 'A senha deve ter no máximo 128 caracteres';
-  if (!/[A-Z]/.test(password)) return 'A senha precisa ter pelo menos uma letra maiúscula';
-  if (!/[0-9]/.test(password)) return 'A senha precisa ter pelo menos um número';
-  if (!/[^A-Za-z0-9]/.test(password)) return 'A senha precisa ter pelo menos um caractere especial (!@#$%...)';
-  return null;
 }
 
 async function optionalUser(req) {
@@ -518,6 +509,8 @@ async function route(req, res) {
       if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
       const pwError = validatePasswordComplexity(payload.new_password);
       if (pwError) return sendError(req, res, 400, 'VALIDATION_ERROR', pwError);
+      if (typeof payload.current_password !== 'string' || payload.current_password.length > 128) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Senha atual invalida');
+      if (payload.current_password === payload.new_password) return sendError(req, res, 400, 'VALIDATION_ERROR', 'Escolha uma senha diferente da atual');
       const changed = await changePassword(user.id, payload.current_password, payload.new_password);
       return changed
         ? sendJson(req, res, 200, { data: { changed: true } })
@@ -550,7 +543,7 @@ async function route(req, res) {
       if (!user) return;
       const media = await getMediaContent(segments[2]);
       return media?.file_data
-        ? sendBinary(req, res, 200, media.file_data, media.file_type)
+        ? sendBinary(req, res, 200, media.file_data, media.file_type, media.file_name)
         : sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
     }
 
@@ -619,12 +612,12 @@ async function route(req, res) {
         const actor = await requireAdmin(req, res);
         if (!actor) return;
         const payload = await readJson(req);
-        const { name, email, role_id, department_id, position, phone, admission_date, birth_date, status, password } = payload;
+        const { name, email, role_id, department_id, position, phone, admission_date, birth_date, status, password, must_change_password } = payload;
         if (password) {
           const pwErr = validatePasswordComplexity(password);
           if (pwErr) return sendError(req, res, 400, 'VALIDATION_ERROR', pwErr);
         }
-        const updated = await updateUser(userId, { name, email, role_id, department_id, position, phone, admission_date, birth_date, status, password });
+        const updated = await updateUser(userId, { name, email, role_id, department_id, position, phone, admission_date, birth_date, status, password, must_change_password });
         return updated ? sendJson(req, res, 200, { data: updated }) : sendError(req, res, 404, 'NOT_FOUND', 'Usuário não encontrado');
       }
       if (req.method === 'DELETE') {
@@ -679,14 +672,8 @@ async function route(req, res) {
     if (path === '/api/devices/fcm-token' && req.method === 'POST') {
       const user = await requireUser(req, res);
       if (!user) return;
-      const { token } = await readJson(req);
-      if (!token) return sendError(req, res, 400, 'VALIDATION_ERROR', 'token required');
-      await pool.query(
-        `INSERT INTO device_fcm_tokens (user_id, token)
-         VALUES ($1, $2)
-         ON CONFLICT (token) DO UPDATE SET user_id = $1, updated_at = now()`,
-        [user.id, token]
-      );
+      if (req.headers['x-nex-user-id'] && req.headers['x-nex-user-id'] !== user.id) return sendError(req,res,409,'ACCOUNT_CHANGED','A conta mudou. Entre novamente.');
+      await saveAndroidToken(pool,user,await readJson(req));
       return sendJson(req, res, 200, { data: { ok: true } });
     }
 
@@ -1025,7 +1012,7 @@ async function route(req, res) {
         if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
         const task = await addTaskComment(taskId, user.id, payload.content);
         await notifyMentionsInTask(payload.content, existing, user, notifyUsers).catch(e => console.error('[Mention notification]', e.message));
-        await notifyTaskActivity(existing, user, 'Novo comentário em uma tarefa sua', notifyUsers).catch(error => console.error('[Task notification]', error.message));
+
         return sendJson(req, res, 201, { data: task });
       }
 
@@ -2376,7 +2363,7 @@ async function route(req, res) {
       const user = await requireUser(req, res);
       if (!user) return;
       const media = await getMediaByPath(segments.slice(1).join('/'));
-      return media?.file_data ? sendBinary(req, res, 200, media.file_data, media.file_type)
+      return media?.file_data ? sendBinary(req, res, 200, media.file_data, media.file_type, media.file_name)
         : sendError(req, res, 404, 'NOT_FOUND', 'Arquivo não encontrado');
     }
 
@@ -3324,6 +3311,7 @@ httpServer.listen(port, process.env.HOST || '127.0.0.1', () => {
   console.log(`Rede Nex API listening on port ${port}`);
 });
 const stopPushWorker=startPushWorker(pool);
+const stopAndroidPushWorker=startAndroidPushWorker(pool);
 
 // Daily cleanup of expired sessions
 const cleanupInterval = setInterval(() => {
@@ -3335,6 +3323,7 @@ function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   stopPushWorker();
+  stopAndroidPushWorker();
   clearInterval(wsPingInterval);
   clearInterval(cleanupInterval);
   for (const client of wss.clients) client.close(1001, 'Atualização do servidor');

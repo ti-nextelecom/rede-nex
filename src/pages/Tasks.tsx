@@ -1,3 +1,4 @@
+import { filterTaskScope, type TaskScope } from '../../shared/taskFilters.mjs';
 import {
   FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState,
 } from 'react';
@@ -1696,7 +1697,7 @@ function TemplatesView({ templates, users, onUseTemplate, onDelete, onRefresh }:
 
 export function Tasks() {
   const { user } = useAuth();
-  const [scope, setScope] = useState<'mine' | 'all' | 'observing' | 'overdue' | 'today' | 'done'>('mine');
+  const [scope, setScope] = useState<TaskScope>('all');
   const [sortBy, setSortBy] = useState('deadline');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersId = useId();
@@ -1763,13 +1764,7 @@ export function Tasks() {
   const todayCount = mine.filter(task => !isFinished(task.status) && dayKey(task.deadline) === today).length;
 
   const filtered = useMemo(() => {
-    let t = tasks;
-    if (scope !== 'all' && scope !== 'observing') t = t.filter(task => isTaskMine(task, user?.id));
-    if (scope === 'observing') t = t.filter(task => task.observers?.some(person => person.id === user?.id));
-    if (scope === 'mine' && !filterStatus) t = t.filter(task => !isFinished(task.status));
-    if (scope === 'overdue') t = t.filter(task => !isFinished(task.status) && dayKey(task.deadline) && dayKey(task.deadline)! < today!);
-    if (scope === 'today') t = t.filter(task => !isFinished(task.status) && dayKey(task.deadline) === today);
-    if (scope === 'done') t = t.filter(task => task.status === 'done');
+    let t = filterTaskScope(tasks,{scope,userId:user?.id,status:filterStatus,today});
     if (selectedListId) t = t.filter(x => x.custom_list_id === selectedListId);
     if (search) t = t.filter(x => x.title.toLowerCase().includes(search.toLowerCase()) || x.id.toLowerCase().includes(search.toLowerCase()) || (x.protocol && x.protocol.toUpperCase().includes(search.toUpperCase())));
     if (filterStatus) t = t.filter(x => x.status === filterStatus);
@@ -1829,7 +1824,7 @@ export function Tasks() {
         <button type="button" onClick={() => setCreating(true)}><Plus size={20} /> Nova tarefa</button>
       </header>
       <section className="tasks-summary" aria-label="Resumo das minhas tarefas">
-        <button aria-pressed={scope === 'mine'} onClick={() => { setScope('mine'); setFilterStatus(''); }}><ListTodo size={21} /><span><strong>{mine.filter(t => !isFinished(t.status)).length}</strong><small>Minhas pendências</small></span></button>
+        <button aria-pressed={scope === 'pending'} onClick={() => { setScope('pending'); setFilterStatus(''); }}><ListTodo size={21} /><span><strong>{mine.filter(t => !isFinished(t.status)).length}</strong><small>Minhas pendências</small></span></button>
         <button className="is-overdue" aria-pressed={scope === 'overdue'} onClick={() => { setScope('overdue'); setFilterStatus(''); }}><Clock size={21} /><span><strong>{overdueCount}</strong><small>Prazo vencido</small></span></button>
         <button aria-pressed={scope === 'today'} onClick={() => { setScope('today'); setFilterStatus(''); }}><CalendarDays size={21} /><span><strong>{todayCount}</strong><small>Para hoje</small></span></button>
         <button aria-pressed={scope === 'done'} onClick={() => { setScope('done'); setFilterStatus(''); }}><CheckSquare size={21} /><span><strong>{mine.filter(t => t.status === 'done').length}</strong><small>Concluídas</small></span></button>
@@ -1852,14 +1847,15 @@ export function Tasks() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Título, ID ou protocolo…" aria-label="Buscar tarefas por título, ID ou protocolo"
             className="h-9 flex-1 sm:w-40 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors" />
           <button type="button" className="tasks-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filtersId} onClick={() => setMobileFiltersOpen(open => !open)}>
-            <Filter size={16} />Filtros{(scope !== 'mine' || sortBy !== 'deadline' || filterStatus) && <span aria-label="Filtros ativos">{Number(scope !== 'mine') + Number(sortBy !== 'deadline') + Number(Boolean(filterStatus))}</span>}
+            <Filter size={16} />Filtros{(scope !== 'all' || sortBy !== 'deadline' || filterStatus) && <span aria-label="Filtros ativos">{Number(scope !== 'all') + Number(sortBy !== 'deadline') + Number(Boolean(filterStatus))}</span>}
           </button>
           <div id={filtersId} className="tasks-search-options" data-open={mobileFiltersOpen}>
-            <select aria-label="Envolvimento nas tarefas" value={scope} onChange={e => setScope(e.target.value as typeof scope)}><option value="mine">Minhas tarefas</option><option value="all">Todas em que estou envolvido</option><option value="observing">Estou observando</option><option value="overdue">Minhas vencidas</option><option value="today">Minhas para hoje</option><option value="done">Minhas concluídas</option></select>
+            <select aria-label="Envolvimento nas tarefas" value={scope} onChange={e => { setScope(e.target.value as TaskScope); setFilterStatus(''); }}><option value="all">Todas as tarefas</option><option value="mine">Sou responsável ou participante</option><option value="pending">Minhas pendências</option><option value="observing">Estou observando</option><option value="overdue">Minhas vencidas</option><option value="today">Minhas para hoje</option><option value="done">Minhas concluídas</option></select>
             <select aria-label="Ordenar tarefas" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="deadline">Por prazo</option><option value="priority">Por prioridade</option><option value="title">Por título</option></select>
-            <select aria-label="Filtrar tarefas por status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            <select aria-label="Filtrar tarefas por status" value={scope === 'pending' || scope === 'overdue' || scope === 'today' ? 'open' : scope === 'done' ? 'done' : filterStatus} onChange={e => { const value=e.target.value; setFilterStatus(value === 'open' ? '' : value); if (value === 'open') setScope('pending'); else if (!value || ['pending','overdue','today','done'].includes(scope)) setScope('all'); }}
             className="h-9 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none focus:border-orange-400 hover:border-slate-300 transition-colors cursor-pointer">
             <option value="">Todos</option>
+            <option value="open">Pendentes</option>
             <option value="todo">A Fazer</option>
             <option value="in_progress">Andamento</option>
             <option value="done">Concluída</option>
@@ -1874,7 +1870,7 @@ export function Tasks() {
           <input autoFocus value={newListName} onChange={e => setNewListName(e.target.value)} aria-label="Nome da nova lista" placeholder="Nome da lista" required />
           <button type="submit">Salvar</button><button type="button" aria-label="Cancelar nova lista" onClick={() => setAddingList(false)}><X size={16} /></button>
         </form> : <>
-          <select aria-label="Selecionar lista de tarefas" value={selectedListId || ''} onChange={e => { setSelectedListId(e.target.value || null); setView('lista'); }}><option value="">Todas as listas ({tasks.length})</option>{customLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}</select>
+          <select aria-label="Selecionar lista de tarefas" value={selectedListId || ''} onChange={e => { setSelectedListId(e.target.value || null); if (!e.target.value) { setScope('all'); setFilterStatus(''); } setView('lista'); }}><option value="">Todas as listas ({tasks.length})</option>{customLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}</select>
           <button onClick={() => setAddingList(true)} aria-label="Criar nova lista"><FolderPlus size={18} /></button>
         </>}
       </div>
@@ -1885,7 +1881,7 @@ export function Tasks() {
           <div className="p-3 flex-shrink-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 px-1">Listas</p>
             <button
-              onClick={() => { setSelectedListId(null); setView('lista'); }}
+              onClick={() => { setSelectedListId(null); setScope('all'); setFilterStatus(''); setView('lista'); }}
               className={cn('w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold transition-colors',
                 selectedListId === null ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800')}
             >

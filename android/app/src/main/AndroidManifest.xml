@@ -37,6 +37,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="rede-nex" android:host="chat" />
+                <data android:scheme="rede-nex" android:host="open" />
             </intent-filter>
 
         </activity>
@@ -53,6 +54,8 @@
                 <data android:mimeType="text/plain" />
                 <data android:mimeType="image/*" />
                 <data android:mimeType="video/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="text/html" />
                 <data android:mimeType="application/*" />
             </intent-filter>
             <meta-data
@@ -60,6 +63,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <service android:name="com.capacitorjs.plugins.pushnotifications.MessagingService" tools:node="remove" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="rede-nex-chat" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_nex" />
         <service
             android:name=".MessagingService"
             android:exported="false">

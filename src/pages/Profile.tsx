@@ -1,3 +1,5 @@
+import { ChangePasswordForm } from '../components/ChangePasswordForm';
+import { Capacitor } from '@capacitor/core';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Camera, Heart, ImagePlus, Mail, MessageCircle, Newspaper, Phone, Save, Settings, ShieldCheck, UserRound, Star, Target } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
@@ -314,6 +316,7 @@ export function Profile() {
                 </div>
               </div>
 
+              <ChangePasswordForm key={user?.id} />
               <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-semibold text-slate-700">Nome</span>
@@ -412,7 +415,8 @@ export function Profile() {
                   <p className="text-xs text-slate-400">Informe seu ID AnyDesk para que o suporte TI possa conectar remotamente ao seu computador.</p>
                 </div>
 
-                                <div className="md:col-span-2 flex items-center justify-end">
+                {Capacitor.getPlatform() === 'android' && <div className="md:col-span-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold" onClick={() => window.dispatchEvent(new Event('nex:android-push-enable'))}>Ativar notificações do Android</button></div>}
+                <div className="md:col-span-2 flex items-center justify-end">
                   <button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-orange-500 px-4 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60">
                     <Save size={16} />
                     {saving ? 'Salvando...' : 'Salvar perfil'}

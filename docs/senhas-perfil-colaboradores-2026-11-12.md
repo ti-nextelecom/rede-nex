@@ -1,0 +1,13 @@
+# Troca de senha no perfil e em colaboradores — 12/11/2026
+
+No menu da conta, acesse **Meu perfil > Config. > Alterar senha**. Informe a senha atual, a nova senha e a confirmação. O formulário exige de 8 a 128 caracteres, uma letra maiúscula, um número e um caractere especial. A nova senha deve ser diferente da atual. Há controle para mostrar/ocultar os campos e confirmação após salvar. Os campos são limpos depois da troca e não são persistidos no navegador.
+
+Em **Mais > Colaboradores > Editar perfil**, preencha **Nova senha** e marque **Exigir alteração da senha no próximo acesso**. A opção fica disponível quando há uma nova senha preenchida; vem marcada por padrão na interface e pode ser desmarcada. Salve as alterações para aplicar. Ao entrar com a senha temporária, o colaborador precisa definir uma senha pessoal para continuar. A mesma escolha também aparece na criação de colaboradores.
+
+A exigência é validada pela API, não apenas pela tela. Alterar outros dados do cadastro sem redefinir a senha preserva a exigência anterior. O endpoint de alteração pessoal usa a conta autenticada e valida a senha atual. Apenas os perfis que já possuem autorização administrativa conseguem definir a senha de outro colaborador. Senhas continuam armazenadas como hash scrypt e não são incluídas na auditoria.
+
+O campo `users.must_change_password` e a tela de troca obrigatória já existiam. **Não há migração de banco nesta entrega.** Para disponibilizar a funcionalidade na VM, atualize **frontend e API**, incluindo `shared/passwordPolicy.mjs`. O banco de produção e as senhas reais dos colaboradores não foram alterados durante a implementação. O modo local de visualização permanece preservado.
+
+Validação funcional: teste de API real com PostgreSQL local descartável e contas fictícias. Foram conferidos autenticação, permissão administrativa, senha incorreta/fraca, troca obrigatória, liberação após troca, marcação/desmarcação, preservação da opção em edição comum e isolamento de contas. Os dois formulários foram conferidos visualmente na interface local sem salvar alterações em colaboradores reais.
+
+Para repetir o teste funcional, em ambiente de teste com os papéis locais `rh_test`/`rh_app` na porta 55482: `RUN_ACCOUNT_PASSWORD_DB_TESTS=1 node --test tests/account-password-db.test.mjs`. Esse teste cria e remove somente um banco com prefixo `account_password_test_` em localhost. Ele não deve ser apontado para produção.

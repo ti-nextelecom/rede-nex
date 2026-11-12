@@ -1,14 +1,7 @@
+import { validatePasswordComplexity } from '../../../shared/passwordPolicy.mjs';
 import { FormEvent, useState } from 'react';
 import { LockKeyhole, CheckCircle2, Circle } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
-
-function validateComplexity(password: string) {
-  if (password.length < 8) return 'A nova senha precisa ter pelo menos 8 caracteres.';
-  if (!/[A-Z]/.test(password)) return 'A nova senha precisa ter pelo menos uma letra maiúscula.';
-  if (!/[0-9]/.test(password)) return 'A nova senha precisa ter pelo menos um número.';
-  if (!/[^A-Za-z0-9]/.test(password)) return 'A nova senha precisa ter pelo menos um caractere especial (!@#$%...).';
-  return null;
-}
 
 function Rule({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -33,7 +26,7 @@ export function PasswordChangeGate() {
     event.preventDefault();
     setError('');
 
-    const complexityError = validateComplexity(newPassword);
+    const complexityError = validatePasswordComplexity(newPassword);
     if (complexityError) { setError(complexityError); return; }
     if (newPassword !== confirmPassword) { setError('As senhas novas não conferem.'); return; }
 
@@ -63,13 +56,14 @@ export function PasswordChangeGate() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900">Troque sua senha</h2>
-            <p className="text-sm text-slate-500">Obrigatório no primeiro acesso.</p>
+            <p className="text-sm text-slate-500">Defina sua senha pessoal para continuar.</p>
           </div>
         </div>
 
         <label className="text-sm font-semibold text-slate-700">Senha atual</label>
         <input
           type="password"
+          autoComplete="current-password" maxLength={128}
           value={currentPassword}
           onChange={event => setCurrentPassword(event.target.value)}
           className="mt-1 mb-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-orange-400"
@@ -79,6 +73,7 @@ export function PasswordChangeGate() {
         <label className="text-sm font-semibold text-slate-700">Nova senha</label>
         <input
           type="password"
+          autoComplete="new-password" maxLength={128}
           value={newPassword}
           onChange={event => setNewPassword(event.target.value)}
           className="mt-1 mb-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-orange-400"
@@ -97,6 +92,7 @@ export function PasswordChangeGate() {
         <label className="text-sm font-semibold text-slate-700">Confirmar nova senha</label>
         <input
           type="password"
+          autoComplete="new-password" maxLength={128}
           value={confirmPassword}
           onChange={event => setConfirmPassword(event.target.value)}
           className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-orange-400"

@@ -152,6 +152,7 @@ export interface CreateUserInput {
   name: string;
   email: string;
   password: string;
+  must_change_password?: boolean;
   position?: string;
   department_id?: string;
   role_id?: string;

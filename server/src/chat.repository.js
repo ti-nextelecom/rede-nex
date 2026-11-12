@@ -1,5 +1,4 @@
 import { query } from './db.js';
-import { sendFcmToUsers } from './fcm.mjs';
 import { notifyUsers } from './notifications.repository.js';
 import { attachChatReactions } from './chat-reactions.mjs';
 import { insertChatMessage } from './chat-message-insert.mjs';
@@ -238,7 +237,7 @@ export async function listMessages(userId, conversationId, { beforeId = null } =
 export async function sendMessage(userId, conversationId, content, attachmentUrl = null, replyToId = null, clientMessageId = null) {
   const isMedia = typeof content === 'string' && /^\[(?:IMAGE|VIDEO|AUDIO_MSG|AUDIO|DOC(?:\|[^\]]*)?|FILE)\]/.test(content);
   const cleanContent = isMedia
-    ? String(content ?? '').replace(/ /g, '').trim()
+    ? String(content ?? '').replace(/\u0000/g, '').trim()
     : cleanText(content, 8000);
   if (!cleanContent && !attachmentUrl) return null;
 
@@ -277,10 +276,6 @@ export async function sendMessage(userId, conversationId, content, attachmentUrl
     (async () => {
       for (const notice of notices) {
         await notifyUsers(notice);
-        sendFcmToUsers(notice.userIds, {
-          title: notice.title, body: notice.message,
-          data: { conversationId: String(conversationId), messageId: String(rows[0].id), link: notice.link, senderAvatar: mine.photo_url ? (mine.photo_url.startsWith('http') ? mine.photo_url : 'https://rede.nextelecom.net.br' + mine.photo_url) : '' },
-        }).catch(() => {});
       }
     })().catch(() => {});
   }

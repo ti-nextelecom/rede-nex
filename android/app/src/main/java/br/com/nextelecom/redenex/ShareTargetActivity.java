@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
+import android.database.Cursor;
+import android.provider.OpenableColumns;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.CookieManager;
@@ -93,15 +95,15 @@ public class ShareTargetActivity extends Activity {
                 } else if (Intent.ACTION_SEND.equals(action)) {
                     Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
                     if (uri != null) {
-                        String mediaUrl = uploadFile(cookie, uri, type);
-                        if (mediaUrl != null) sendMessage(cookie, convId, null, mediaUrl);
+                        String mediaContent = uploadFile(cookie, uri, type);
+                        if (mediaContent != null) sendMessage(cookie, convId, mediaContent, null);
                     }
                 } else if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
                     ArrayList<Uri> uris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
                     if (uris != null) {
                         for (Uri uri : uris) {
-                            String mediaUrl = uploadFile(cookie, uri, type);
-                            if (mediaUrl != null) sendMessage(cookie, convId, null, mediaUrl);
+                            String mediaContent = uploadFile(cookie, uri, type);
+                            if (mediaContent != null) sendMessage(cookie, convId, mediaContent, null);
                         }
                     }
                 }
@@ -151,20 +153,26 @@ public class ShareTargetActivity extends Activity {
         if (fileUrl != null) body.put("attachment_url", fileUrl);
         byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
         try (OutputStream os = conn.getOutputStream()) { os.write(bytes); }
-        conn.getResponseCode();
+        int status = conn.getResponseCode();
         conn.disconnect();
+        if (status < 200 || status >= 300) throw new java.io.IOException("Falha ao enviar mensagem");
     }
 
     private String uploadFile(String cookie, Uri uri, String mimeType) throws Exception {
         InputStream is = getContentResolver().openInputStream(uri);
-        if (is == null) return null;
+        if (is == null) throw new java.io.IOException("Nao foi possivel abrir o arquivo");
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
         int n;
-        while ((n = is.read(buf)) != -1) baos.write(buf, 0, n);
+        while ((n = is.read(buf)) != -1) { if (baos.size() + n > 20 * 1024 * 1024) { is.close(); throw new java.io.IOException("Arquivo maior que 20 MB"); } baos.write(buf, 0, n); }
         is.close();
         String b64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
         String fileName = uri.getLastPathSegment();
+        try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) fileName = cursor.getString(0);
+        } catch (Exception ignored) { }
+        String resolvedType = getContentResolver().getType(uri);
+        if (resolvedType != null && !resolvedType.isEmpty()) mimeType = resolvedType;
         if (fileName == null) fileName = "file_" + System.currentTimeMillis();
 
         URL url = new URL(BASE_URL + "/api/chat/media");
@@ -178,14 +186,21 @@ public class ShareTargetActivity extends Activity {
         try (OutputStream os = conn.getOutputStream()) { os.write(bytes); }
 
         int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) { conn.disconnect(); return null; }
+        if (code < 200 || code >= 300) { conn.disconnect(); throw new java.io.IOException("Falha ao enviar arquivo"); }
         String resp = readStream(conn.getInputStream());
         conn.disconnect();
 
         JSONObject respObj = new JSONObject(resp);
         JSONObject dataObj = respObj.optJSONObject("data");
         String mediaUrl = dataObj != null ? dataObj.optString("public_url", null) : null;
-        return mediaUrl;
+        if (mediaUrl == null || mediaUrl.isEmpty()) throw new java.io.IOException("Arquivo nao confirmado pelo servidor");
+        String cleanName = fileName.replace("]", "").replace("\n", " ").replace("\r", " ");
+        boolean audio = (mimeType != null && (mimeType.startsWith("audio/") || mimeType.equals("application/ogg")))
+            || mediaUrl.matches("(?i).*\\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|amr)$");
+        String prefix = mimeType != null && mimeType.startsWith("image/") ? "[IMAGE]"
+            : mimeType != null && mimeType.startsWith("video/") ? "[VIDEO]"
+            : audio ? "[AUDIO_MSG]" : "[DOC|" + cleanName + "]";
+        return prefix + mediaUrl;
     }
 
     private HttpURLConnection openConn(URL url, String method, String cookie) throws Exception {

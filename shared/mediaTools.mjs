@@ -8,7 +8,7 @@ export function mediaKind({ url = '', name = '', type = '' }) {
   if (type === 'application/pdf' || /\.pdf(?:[?#]|$)/i.test(name || url) || url.startsWith('data:application/pdf')) return 'pdf';
   if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|avif|svg)(?:[?#]|$)/i.test(name || url) || url.startsWith('data:image/')) return 'image';
   if (type.startsWith('video/') || /\.(mp4|webm|mov)(?:[?#]|$)/i.test(name || url)) return 'video';
-  if (type.startsWith('audio/')) return 'audio';
+  if (type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|amr)(?:[?#]|$)/i.test(name || url)) return 'audio';
   return 'file';
 }
 export const clampZoom = value => Math.max(.25, Math.min(4, Number.isFinite(value) ? value : 1));

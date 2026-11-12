@@ -1,3 +1,4 @@
+import { PushManager } from './components/PushManager';
 import { NativeAppShell } from './components/NativeAppShell';
 import './styles/interactions.css';
 import React, { lazy, Suspense } from 'react';
@@ -118,6 +119,7 @@ function App() {
       <GamificationToast />
       <BrowserRouter>
         <NativeAppShell />
+        <PushManager />
         <WsManager />
         <GlobalNotificationsMount />
         <GlobalCallOverlay />

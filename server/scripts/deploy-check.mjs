@@ -24,7 +24,7 @@ const coreColumns = {
   chat_conversations: ['id', 'type', 'name', 'pinned_message_id', 'broadcast_mode'],
   chat_participants: ['conversation_id', 'user_id', 'role', 'is_muted', 'is_pinned', 'last_read_at'],
 };
-const runtimeTables = ['ti_projects', 'ti_tasks', 'ti_task_history', 'training_progress', 'nav_settings', 'task_observers','chat_conversation_archives','task_template_recipients','task_checklist_item_people','chat_attention_requests','browser_push_subscriptions','browser_push_deliveries','chat_message_reactions','password_vaults','user_avatar_frames','user_appearance_preferences','architecture_projects','behavioral_assessments','behavioral_drafts','behavioral_badges'];
+const runtimeTables = ['ti_projects', 'ti_tasks', 'ti_task_history', 'training_progress', 'nav_settings', 'task_observers','chat_conversation_archives','task_template_recipients','task_checklist_item_people','chat_attention_requests','browser_push_subscriptions','browser_push_deliveries','chat_message_reactions','password_vaults','device_fcm_tokens','android_push_deliveries','user_avatar_frames','user_appearance_preferences','architecture_projects','behavioral_assessments','behavioral_drafts','behavioral_badges'];
 export async function checkDatabase(client, { beforeMigrations = false } = {}) {
   const app = await identity(client); requireSafeRole(app);
   const tables = [...coreTables, ...(beforeMigrations ? [] : runtimeTables)];

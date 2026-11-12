@@ -1,3 +1,4 @@
+import { chatUploadType } from '../../shared/chatMediaUpload.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join } from 'node:path';
@@ -22,7 +23,10 @@ const MAGIC = {
   'audio/ogg':  { offset: 0, bytes: [[0x4F, 0x67, 0x67, 0x53]] },
   'audio/mp4':  { offset: 4, bytes: [[0x66, 0x74, 0x79, 0x70]] },
   'audio/mpeg': { offset: 0, bytes: [[0xFF, 0xFB], [0xFF, 0xF3], [0xFF, 0xF2], [0x49, 0x44, 0x33]] },
-  'audio/wav':  { offset: 0, bytes: [[0x52, 0x49, 0x46, 0x46]] },
+  'audio/wav':  { offset: 0, bytes: [[0x52, 0x49, 0x46, 0x46]], extra: {offset:8,bytes:[0x57,0x41,0x56,0x45]} },
+  'audio/aac': {offset:0,bytes:[[0xff,0xf1],[0xff,0xf9],[0x49,0x44,0x33]]},
+  'audio/flac': {offset:0,bytes:[[0x66,0x4c,0x61,0x43]]},
+  'audio/amr': {offset:0,bytes:[[0x23,0x21,0x41,0x4d,0x52]]},
 };
 
 function validateMagicBytes(buffer, fileType) {
@@ -51,7 +55,7 @@ const allowedWikiTypes = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]);
 
-const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.ogg', '.m4a', '.mp3', '.wav', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar', '.7z', '.ppt', '.pptx', '.txt', '.csv']);
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.ogg', '.m4a', '.mp3', '.wav', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar', '.7z', '.ppt', '.pptx', '.txt', '.csv', '.html', '.htm', '.aac', '.flac', '.amr', '.opus', '.oga']);
 
 function extensionFor(fileName, fileType) {
   const current = extname(fileName || '').toLowerCase();
@@ -60,7 +64,7 @@ function extensionFor(fileName, fileType) {
     'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif',
     'video/mp4': '.mp4', 'video/webm': '.webm',
     'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a',
-    'audio/mpeg': '.mp3', 'audio/wav': '.wav',
+    'audio/mpeg': '.mp3', 'audio/wav': '.wav', 'audio/aac': '.aac', 'audio/flac': '.flac', 'audio/amr': '.amr', 'text/html': '.html',
     'application/pdf': '.pdf', 'application/msword': '.doc',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
     'application/vnd.ms-excel': '.xls',
@@ -193,13 +197,13 @@ export async function saveWikiMedia(user, input) {
 }
 
 export async function getMediaContent(id) {
-  const { rows } = await query('select path, file_type from media_assets where id = $1 limit 1', [id]);
+  const { rows } = await query('select path, file_type, file_name from media_assets where id = $1 limit 1', [id]);
   if (!rows[0]) return null;
-  const { path, file_type } = rows[0];
+  const { path, file_type, file_name } = rows[0];
   const filePath = join(uploadRoot, path);
   const file_data = await readFile(filePath).catch(() => null);
   if (!file_data) return null;
-  return { file_data, file_type };
+  return { file_data, file_type, file_name };
 }
 
 // Same authenticated delivery as /api/media/:id/content, for stored /uploads URLs.
@@ -236,27 +240,12 @@ export async function saveUserCover(user, input) {
 
 export async function saveChatMedia(userId, input) {
   if (!input?.data || !input?.file_name || !input?.file_type) throw new Error('Arquivo inválido');
-  const allowedChatTypes = new Set([
-    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-    'video/mp4', 'video/webm',
-    'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav',
-    'application/pdf', 'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/zip', 'application/x-zip-compressed', 'application/x-zip',
-    'application/x-rar-compressed', 'application/vnd.rar',
-    'application/x-7z-compressed',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain', 'text/csv',
-  ]);
-  if (!allowedChatTypes.has(input.file_type)) throw new Error('Formato não permitido no chat');
   const base64 = String(input.data).includes(',') ? String(input.data).split(',').pop() : String(input.data);
   const buffer = Buffer.from(base64, 'base64');
   if (!buffer.length) throw new Error('Arquivo vazio');
   if (buffer.length > 20 * 1024 * 1024) throw new Error('Arquivo maior que 20MB');
-  validateMagicBytes(buffer, input.file_type);
+  try { input = { ...input, file_type: chatUploadType({name:input.file_name,type:input.file_type,size:buffer.length}) }; validateMagicBytes(buffer, input.file_type); }
+  catch(error) { error.statusCode=400; throw error; }
   const bucket = 'chat';
   const fileName = `${randomUUID()}${extensionFor(input.file_name, input.file_type)}`;
   const relativePath = `${bucket}/${fileName}`;

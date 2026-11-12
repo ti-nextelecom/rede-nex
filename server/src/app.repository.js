@@ -1,3 +1,4 @@
+import { validatePasswordComplexity } from '../../shared/passwordPolicy.mjs';
 import { query, pool } from './db.js';
 import { notifyAdmins, notifyUsers } from './notifications.repository.js';
 import { hashPassword } from './auth.repository.js';
@@ -552,12 +553,14 @@ export async function createUser(input) {
   const email = cleanText(input.email, 200).toLowerCase();
   const password = String(input.password || '');
   if (!name || !email || !password) throw Object.assign(new Error('name, email e password sao obrigatorios'), { statusCode: 400, code: 'VALIDATION_ERROR' });
-  if (password.length < 8) throw Object.assign(new Error('Senha deve ter pelo menos 8 caracteres'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  const passwordError = validatePasswordComplexity(password);
+  if (passwordError) throw Object.assign(new Error(passwordError), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  if (input.must_change_password !== undefined && typeof input.must_change_password !== 'boolean') throw Object.assign(new Error('Opcao de troca de senha invalida'), { statusCode: 400, code: 'VALIDATION_ERROR' });
 
   const passwordHash = await hashPassword(password);
   const { rows } = await query(
     `insert into users (name, email, password_hash, position, department_id, role_id, phone, admission_date, birth_date, status, must_change_password)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', true)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10)
      returning id`,
     [
       name,
@@ -569,6 +572,7 @@ export async function createUser(input) {
       input.phone ? cleanText(input.phone, 30) : null,
       input.admission_date || null,
       input.birth_date || null,
+      input.must_change_password ?? true,
     ]
   );
   const created = await query(`${userSelect} where u.id = $1 limit 1`, [rows[0].id]);
@@ -589,10 +593,15 @@ export async function updateUser(id, input) {
   if (input.admission_date !== undefined) { fields.push(`admission_date = $${i++}`); values.push(input.admission_date || null); }
   if (input.birth_date !== undefined) { fields.push(`birth_date = $${i++}`); values.push(input.birth_date || null); }
   if (input.status !== undefined && ['active', 'inactive'].includes(input.status)) { fields.push(`status = $${i++}`); values.push(input.status); }
-  if (input.password !== undefined && String(input.password).length >= 8) {
+  if (input.must_change_password !== undefined && (typeof input.must_change_password !== 'boolean' || !input.password)) throw Object.assign(new Error('Defina uma nova senha e uma opcao de troca valida'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  if (input.password !== undefined) {
+    const passwordError = validatePasswordComplexity(input.password);
+    if (passwordError) throw Object.assign(new Error(passwordError), { statusCode: 400, code: 'VALIDATION_ERROR' });
     fields.push(`password_hash = $${i++}`);
     values.push(await hashPassword(String(input.password)));
-    fields.push(`must_change_password = false`);
+    fields.push(`must_change_password = $${i++}`);
+    values.push(input.must_change_password ?? false);
+    fields.push(`password_changed_at = now()`);
   }
 
   if (!fields.length) throw Object.assign(new Error('Nenhum campo para atualizar'), { statusCode: 400, code: 'VALIDATION_ERROR' });

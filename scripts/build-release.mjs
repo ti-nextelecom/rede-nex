@@ -20,7 +20,8 @@ async function main() {
   await run(process.execPath, ['scripts/check-server.mjs']);
   await run(process.execPath, ['node_modules/typescript/bin/tsc', '-b']);
   const tests = (await readdir(join(root, 'tests'))).filter(name => name.endsWith('.test.mjs')).map(name => 'tests/' + name);
-  await run(process.execPath, ['--test', ...tests]);
+  // Bound database-test parallelism so busy workstations do not exhaust the test deadline.
+  await run(process.execPath, ['--test', '--test-concurrency=2', ...tests]);
   // Exclude private uploads/dumps even when someone has placed them inside public/.
   async function checkPublic(directory) {
     for (const name of await readdir(directory)) {

@@ -1,4 +1,4 @@
-import { chatUploadType } from '../../shared/chatMediaUpload.mjs';
+import { CHAT_UPLOAD_ACCEPT, chatUploadType } from '../../shared/chatMediaUpload.mjs';
 import {
   ChangeEvent, CSSProperties, FormEvent, Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react';
@@ -2223,7 +2223,7 @@ export function Chat() {
                     onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fileInputRef.current?.click(); } }}
                     className="chat-attach-button cursor-pointer h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Anexar arquivo ou comprovante" aria-label="Anexar arquivo ou comprovante">
                     <Paperclip size={19} />
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                  <input ref={fileInputRef} type="file" accept={CHAT_UPLOAD_ACCEPT} className="hidden" onChange={handleFileSelect} />
                   </label>
 
                   {/* Mobile toggle — shows/hides tool buttons */}
