@@ -2,6 +2,9 @@
 export function canManageTask(task, actor, adminRoles = ['Administrador', 'Gestor']) {
   return Boolean(task && actor && (adminRoles.includes(actor.role_name) || task.created_by === actor.id || task.owner_id === actor.id));
 }
+export function canToggleTaskChecklist(task, actor, adminRoles = ['Administrador', 'Gestor']) {
+  return Boolean(task && actor?.id && (canManageTask(task, actor, adminRoles) || task.assignees?.some(person => person.id === actor.id)));
+}
 export function canRemoveTaskFile(task, actor, file, adminRoles = ['Administrador', 'Gestor']) {
   return canManageTask(task, actor, adminRoles) || Boolean(actor && !file.checklist_item_id && file.uploaded_by === actor.id);
 }

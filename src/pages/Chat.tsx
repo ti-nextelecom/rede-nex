@@ -2180,11 +2180,11 @@ export function Chat() {
 
             {/* Media send modal */}
             {pendingFile && (
-              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-4"
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 px-4 pt-4" style={{paddingBottom:'calc(max(1rem, env(safe-area-inset-bottom, 0px)) + 72px)'}}
                 onClick={e => { if (e.target === e.currentTarget) { setPendingFile(null); setPendingCaption(''); } }}>
-                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style={{maxHeight:'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 10rem)'}}>
                   {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-800">
+                  <div className="flex items-center justify-between px-4 py-3 bg-slate-800 flex-shrink-0">
                     <p className="text-sm font-semibold text-white">Enviar arquivo</p>
                     <button onClick={() => { setPendingFile(null); setPendingCaption(''); }}
                       className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-600 text-slate-300">
@@ -2192,11 +2192,11 @@ export function Chat() {
                     </button>
                   </div>
                   {/* Preview */}
-                  <div className="bg-slate-900 flex items-center justify-center p-3 min-h-[280px] max-h-[65vh] overflow-hidden">
+                  <div className="bg-slate-900 flex items-center justify-center p-3 flex-1 min-h-0 overflow-auto">
                     {pendingFile.type === 'image'
-                      ? <img src={pendingFile.src} alt="" className="max-h-[50vh] max-w-full object-contain rounded-lg" />
+                      ? <img src={pendingFile.src} alt="" className="max-h-full max-w-full object-contain rounded-lg" />
                       : pendingFile.type === 'video'
-                        ? <video src={pendingFile.src} controls className="max-h-[50vh] max-w-full rounded-lg" />
+                        ? <video src={pendingFile.src} controls className="max-h-full max-w-full rounded-lg" />
                         : pendingFile.type === 'audio'
                           ? <div className="flex flex-col items-center gap-3 py-8">
                               <Mic size={52} className="text-orange-400" />
@@ -2208,7 +2208,7 @@ export function Chat() {
                           </div>}
                   </div>
                   {/* Footer */}
-                  <div className="p-3 bg-slate-800">
+                  <div className="p-3 bg-slate-800 flex-shrink-0">
                     <button type="button" className="chat-edit-attachment" onClick={() => openMedia({url:pendingFile.src || URL.createObjectURL(pendingFile.raw),name:pendingFile.raw.name,type:pendingFile.raw.type,temporary:!pendingFile.src})}>Ampliar anexo</button>
                     {pendingFile.type === 'image' && <button type="button" disabled={attachmentSending} className="chat-edit-attachment" onClick={() => { const original=pendingFile; void editImage(original.raw).then(file => { if (file && file !== original.raw) setPendingFile(current => current === original ? {src:URL.createObjectURL(file),type:'image',raw:file} : current); }); }}><Pencil size={16} />Cortar e marcar imagem</button>}
                     {sendFailure?.conversationId === selectedId && <p className="chat-send-error" role="alert">{sendFailure.message}</p>}
@@ -2300,11 +2300,10 @@ export function Chat() {
                   </div>
 
                   {/* File attachment */}
-                  <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500" title="Enviar arquivo">
+                  <label className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-orange-500 cursor-pointer" title="Enviar arquivo">
                     <Paperclip size={19} />
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                    <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" className="hidden" onChange={handleFileSelect} />
+                  </label>
 
                   {/* Reminder */}
                   <button type="button" onClick={() => setShowReminderModal(true)}

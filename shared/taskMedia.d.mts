@@ -8,3 +8,5 @@ export function parseTaskMessage(content: string, files?: TaskMediaFile[]): { te
 export function canAccessTaskFiles(task: { created_by?: string; owner_id?: string; assignees?: { id: string }[]; observers?: { id: string }[] } | null, actor: { id: string; role_name?: string } | null, adminRoles?: string[]): boolean;
 export function descriptionImageMarkdown(file: TaskMediaFile): string;
 export function taskDescriptionParts(content: string): Array<{ kind: 'text'; text: string } | { kind: 'image'; url: string; name: string }>;
+
+export function taskDescriptionWithoutMedia(content: string, files?: {file_url?: string}[]): string;

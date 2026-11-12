@@ -1,16 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-        <item name="android:background">@null</item>
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="android:statusBarColor">#FF0f172a</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">#FF0f172a</item>
-        <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
-    </style>
 </resources>

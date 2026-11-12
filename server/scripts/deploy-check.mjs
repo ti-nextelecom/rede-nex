@@ -24,7 +24,7 @@ const coreColumns = {
   chat_conversations: ['id', 'type', 'name', 'pinned_message_id', 'broadcast_mode'],
   chat_participants: ['conversation_id', 'user_id', 'role', 'is_muted', 'is_pinned', 'last_read_at'],
 };
-const runtimeTables = ['ti_projects', 'ti_tasks', 'ti_task_history', 'training_progress', 'nav_settings', 'task_observers','chat_conversation_archives','task_template_recipients','task_checklist_item_people','chat_attention_requests','browser_push_subscriptions','browser_push_deliveries','chat_message_reactions','password_vaults'];
+const runtimeTables = ['ti_projects', 'ti_tasks', 'ti_task_history', 'training_progress', 'nav_settings', 'task_observers','chat_conversation_archives','task_template_recipients','task_checklist_item_people','chat_attention_requests','browser_push_subscriptions','browser_push_deliveries','chat_message_reactions','password_vaults','user_avatar_frames','user_appearance_preferences','architecture_projects','behavioral_assessments','behavioral_drafts','behavioral_badges'];
 export async function checkDatabase(client, { beforeMigrations = false } = {}) {
   const app = await identity(client); requireSafeRole(app);
   const tables = [...coreTables, ...(beforeMigrations ? [] : runtimeTables)];
@@ -59,6 +59,10 @@ export async function checkDatabase(client, { beforeMigrations = false } = {}) {
     }
     const vault = (await client.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.password_vaults'::regclass")).rows[0];
     if (!vault?.relrowsecurity || !vault?.relforcerowsecurity) throw new Error('Password vault RLS is required');
+    const architecture = (await client.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.architecture_projects'::regclass")).rows[0];
+    if (!architecture?.relrowsecurity || !architecture?.relforcerowsecurity) throw new Error('Arquitetura exige RLS habilitada e forçada');
+    const behavioral=(await client.query("SELECT relname,relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=ANY(ARRAY['public.behavioral_assessments'::regclass,'public.behavioral_drafts'::regclass,'public.behavioral_badges'::regclass])")).rows;
+    if(behavioral.length!==3||behavioral.some(table=>!table.relrowsecurity||!table.relforcerowsecurity))throw new Error('Perfil Comportamental exige RLS habilitada e forçada');
     await client.query("SELECT nex_hr.actor_id(), nex_hr.allowed('rh.view')");
   }
   return { database: app.name, role: app.role, tablesChecked: tables.length, hr: beforeMigrations ? 'pending check after migrations' : 'RLS enabled and forced' };

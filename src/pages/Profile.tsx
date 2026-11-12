@@ -38,6 +38,7 @@ export function Profile() {
     bio: user?.bio || '',
     google_ical_url: user?.google_ical_url || '',
     photo_url: user?.photo_url || '',
+    anydesk_id: user?.anydesk_id || '',
   });
 
   useEffect(() => {
@@ -396,6 +397,18 @@ export function Profile() {
                     placeholder="https://nextelecom.bitrix24.com.br/b26742727/resize_cache/..."
                   />
                   <p className="text-xs text-slate-400">Cole o endereço da imagem para definir sua foto de perfil.</p>
+                </div>
+
+                <div className="md:col-span-2 space-y-1.5">
+                  <span className="text-sm font-semibold text-slate-700">AnyDesk ID</span>
+                  <input
+                    type="text"
+                    value={form.anydesk_id}
+                    onChange={event => setForm(prev => ({ ...prev, anydesk_id: event.target.value }))}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-orange-400"
+                    placeholder="Ex: 123 456 789"
+                  />
+                  <p className="text-xs text-slate-400">Informe seu ID AnyDesk para que o suporte TI possa conectar remotamente ao seu computador.</p>
                 </div>
 
                                 <div className="md:col-span-2 flex items-center justify-end">

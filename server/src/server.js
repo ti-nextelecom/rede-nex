@@ -16,15 +16,17 @@ import { requestChatAttention } from './chat-attention.mjs';
 import { chatReactions } from './chat-reactions.mjs';
 import { avatarFrames } from './avatar-frames.mjs';
 import { userAppearance } from './appearance.mjs';
+import { createTaskAuthoringRouter } from './task-authoring.mjs';
+import { createTaskChecklistProgressRouter } from './task-checklist-progress.mjs';
 import { createVaultRouter } from './password-vault.mjs';
+import { createArchitectureRouter } from './architecture.mjs';
+import { createBehavioralRouter } from './behavioral-profiles.mjs';
 import { markChatRead } from './chat-read.mjs';
 import { pushConfiguration, savePushSubscription, startPushWorker } from './browser-push.mjs';
 import { createHrRouter } from './hr.js';
 import { jrhUploadsDir, downloadsDir } from './runtimePaths.js';
 import { releaseId } from './release.js';
 import { getMaintenance, setMaintenance, clearMaintenance } from './maintenance.mjs';
-import { createArchitectureRouter } from './architecture.mjs';
-import { createBehavioralRouter } from './behavioral-profiles.mjs';
 import { runAuthorizedTaskAction } from './task-actions.mjs';
 import { parseRequestCookies, requestOriginAllowed, passwordResetOrigin, createRateLimiter } from './http-security.mjs';
 import { changePassword, createPasswordResetToken, getUserByToken, heartbeat, listOnlineUsers, login, logout, resetPasswordByToken, updateMyProfile } from './auth.repository.js';
@@ -33,7 +35,6 @@ import { importBitrixUsers, listBitrixImports, listBitrixUsers } from './bitrix.
 import { getMediaContent, getMediaByPath, saveChatAvatar, saveChatMedia, saveUserAvatar, saveUserCover, saveWikiMedia, saveProjectCover } from './media.repository.js';
 import { canAccessTaskFiles, safeTaskFileUrl } from '../../shared/taskMedia.mjs';
 import { canManageTask, canRemoveTaskFile, checklistItemBelongsToTask, taskPeopleInputError } from '../../shared/taskCollaboration.mjs';
-import { blueprintFromTask, blueprintFromTemplate } from '../../shared/taskBlueprint.mjs';
 import {
   addParticipants, createConversation, deleteMessage, editMessage, getMessageEditHistory,
   getNotes, getOrCreateSelfConversation, listConversations, listGroupParticipants,
@@ -41,10 +42,10 @@ import {
   toggleMuteConversation, updateConversation, updateParticipantRole,
 } from './chat.repository.js';
 import {
-  addChecklist, addChecklistItem, addTaskComment, deleteTaskComment, createTask, deleteChecklist,
+  addChecklistItem, addTaskComment, deleteTaskComment, createTask, deleteChecklist,
   deleteChecklistItem, deleteTask, getTask, getTaskByProtocol, listTasks, updateChecklist, updateChecklistItem, updateTask,
   listCustomLists, createCustomList, renameCustomList, deleteCustomList,
-  listTaskTemplates, getTaskTemplate, createTaskTemplate, shareTaskTemplate, deleteTaskTemplate,
+  listTaskTemplates, getTaskTemplate, shareTaskTemplate, deleteTaskTemplate,
   listTaskFiles, addTaskFile, deleteTaskFile,
 } from './tasks.repository.js';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, notifyUsers } from './notifications.repository.js';
@@ -312,10 +313,12 @@ function validateRequired(payload, fields) {
   return missing.length ? `Campos obrigatorios: ${missing.join(', ')}` : null;
 }
 
+const handleTaskChecklistProgressRoutes=createTaskChecklistProgressRouter({requireUser,readJson,sendJson,sendError,getTask,updateChecklistItem,adminRoles:ADMIN_ROLES});
+const handleTaskAuthoringRoutes=createTaskAuthoringRouter({requireUser,readJson,sendJson,sendError,onCreated:(task,actor)=>notifyTaskActivity(task,actor,'Você foi envolvido em uma tarefa',notifyUsers)});
 const handleVaultRoutes = createVaultRouter({ pool, requireUser, sendJson, sendError, readJson });
-const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleArchitectureRoutes = createArchitectureRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleBehavioralRoutes = createBehavioralRouter({ pool, requireUser, sendJson, sendError, readJson });
+const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
 
 async function route(req, res) {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !requestOriginAllowed(req.headers.origin, allowedOrigins)) {
@@ -335,6 +338,8 @@ async function route(req, res) {
   }
 
   try {
+    if (await handleTaskChecklistProgressRoutes(req,res,path)) return;
+    if (await handleTaskAuthoringRoutes(req,res,path)) return;
     if (await handleHrRoutes(req, res, path)) return;
     if (await handleVaultRoutes(req, res, path)) return;
     if (await handleArchitectureRoutes(req, res, path)) return;
@@ -350,7 +355,7 @@ async function route(req, res) {
       return sendJson(req, res, 200, { ok: true });
     }
 
-    
+
     // Public file downloads (desktop app distribution & auto-update)
     if (path.startsWith('/api/downloads/') && req.method === 'GET') {
       const { createReadStream } = await import('node:fs');
@@ -911,20 +916,7 @@ async function route(req, res) {
       if (!user) return;
       if (!segments[3]) {
         if (req.method === 'GET') return sendJson(req, res, 200, { data: await listTaskTemplates(user.id) });
-        if (req.method === 'POST') {
-          const payload = await readJson(req);
-          if (typeof payload.title !== 'string' || !payload.title.trim()) return sendError(req, res, 400, 'VALIDATION_ERROR', 'title obrigatorio');
-          if (payload.source_task_id) {
-            const source = await getTask(payload.source_task_id);
-            if (!canAccessTaskFiles(source, user, ADMIN_ROLES)) return sendError(req,res,403,'FORBIDDEN','Sem acesso à tarefa original');
-            payload.task_snapshot = blueprintFromTask(source, await listTaskFiles(source.id));
-          } else if (payload.source_template_id) {
-            const source = await getTaskTemplate(payload.source_template_id, user.id);
-            if (!source) return sendError(req,res,403,'FORBIDDEN','Sem acesso ao modelo original');
-            payload.task_snapshot = { ...(payload.task_snapshot || blueprintFromTemplate(source)), files: blueprintFromTemplate(source).files };
-          }
-          return sendJson(req, res, 201, { data: await createTaskTemplate(user.id, payload) });
-        }
+
       }
       if (segments[3] && !segments[4] && req.method === 'GET') {
         const template = await getTaskTemplate(segments[3],user.id);
@@ -973,21 +965,7 @@ async function route(req, res) {
 
       if (!segments[2]) {
         if (req.method === 'GET') return sendJson(req, res, 200, { data: await listTasks(user.id) });
-        if (req.method === 'POST') {
-          const payload = await readJson(req);
-          const error = validateRequired(payload, ['title']);
-          if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
-          const peopleError = taskPeopleInputError(payload);
-          if (peopleError) return sendError(req, res, 400, 'VALIDATION_ERROR', peopleError);
-          if (payload.template_id) {
-            const template = await getTaskTemplate(payload.template_id,user.id);
-            if (!template) return sendError(req,res,403,'FORBIDDEN','Modelo indisponível ou compartilhamento removido');
-            payload.files = blueprintFromTemplate(template).files;
-          }
-          const task = await createTask(user.id, payload);
-          await notifyTaskActivity(task, user, 'Você foi envolvido em uma tarefa', notifyUsers).catch(error => console.error('[Task notification]', error.message));
-          return sendJson(req, res, 201, { data: task });
-        }
+
       }
 
       const taskId = segments[2];
@@ -1057,14 +1035,7 @@ async function route(req, res) {
         if (!taskForCl) return sendError(req, res, 404, 'NOT_FOUND', 'Tarefa não encontrada');
         const isOwnerCl = taskForCl.created_by === user.id || taskForCl.owner_id === user.id;
         if (!isOwnerCl && !ADMIN_ROLES.includes(user.role_name)) return sendError(req, res, 403, 'FORBIDDEN', 'Sem permissão');
-        if (!segments[4] && req.method === 'POST') {
-          const payload = await readJson(req);
-          const error = validateRequired(payload, ['title']);
-          if (error) return sendError(req, res, 400, 'VALIDATION_ERROR', error);
-          const checklistId = await addChecklist(taskId, payload.title);
-          const task = await getTask(taskId);
-          return sendJson(req, res, 201, { data: task, checklistId });
-        }
+
 
         const checklistId = segments[4];
         if (checklistId && !taskForCl.checklists.some(list => list.id === checklistId)) return sendError(req, res, 404, 'NOT_FOUND', 'Checklist não pertence a esta tarefa');
@@ -1088,10 +1059,6 @@ async function route(req, res) {
             return sendJson(req, res, 201, { data: await getTask(taskId) });
           }
           const itemId = segments[6];
-          if (itemId && req.method === 'PATCH') {
-            await updateChecklistItem(itemId, await readJson(req));
-            return sendJson(req, res, 200, { data: await getTask(taskId) });
-          }
           if (itemId && req.method === 'DELETE') {
             await deleteChecklistItem(itemId);
             return sendJson(req, res, 200, { data: await getTask(taskId) });
@@ -2646,7 +2613,7 @@ async function route(req, res) {
       return sendJson(req, res, 200, { reply });
     }
 
-        
+
 
     // POST /api/tts — ElevenLabs TTS
     if (path === '/api/tts' && req.method === 'POST') {
@@ -2715,7 +2682,7 @@ Instruções:
 - Quando cumprimentado ou questionado sobre trabalho pendente, use as ferramentas para buscar dados reais antes de responder
 - Se houver tarefas atrasadas, mencione-as proativamente de forma cordial
 - Use markdown apenas quando necessário — prefira frases curtas
-- Responda sempre em português do Brasil
+- Always respond in the same language the user writes in. If the user writes in Portuguese, respond in Portuguese. If the user writes in English, respond in English.
 - Máximo de 4 iterações de ferramentas por resposta
 - Para criar tarefas, projetos ou eventos, SEMPRE confirme os detalhes antes de criar
 - Ao listar projetos, verifique também as etapas para dar informação completa${voice_mode ? '\nMODO VOZ ATIVO: máximo 2 frases, zero markdown, resposta imediata.' : ''}`;
@@ -2961,6 +2928,20 @@ Instruções:
             }
           }
         },
+        {
+          type: 'function',
+          function: {
+            name: 'conectar_remote_desktop',
+            description: 'Obtém o ID AnyDesk de um usuário para suporte remoto. Retorna ID e link anydesk:<id>. Sem nome = usuário atual.',
+            parameters: {
+              type: 'object',
+              properties: {
+                nome_usuario: { type: 'string', description: 'Nome do usuário alvo (opcional)' }
+              },
+              required: []
+            }
+          }
+        },
         ...(isAdmin ? [
           {
             type: 'function',
@@ -3123,6 +3104,18 @@ Instruções:
           return { conversation_id: conv?.id, usuario: { id: target.id, name: target.name, email: target.email } };
         }
         if (name === 'navegar_para') { navigateTo = args.rota; return { sucesso: true, mensagem: args.mensagem }; }
+        if (name === 'conectar_remote_desktop') {
+          let targetId = user.id;
+          if (args.nome_usuario) {
+            const encontrados = unwrap(await listUsers({ search: args.nome_usuario, limit: 1 }));
+            if (!encontrados.length) return { erro: `Usuário "${args.nome_usuario}" não encontrado.` };
+            targetId = encontrados[0].id;
+          }
+          const { rows: adRows } = await pool.query('SELECT name, anydesk_id FROM users WHERE id = $1', [targetId]);
+          const adUser = adRows[0];
+          if (!adUser?.anydesk_id) return { erro: `Nenhum ID AnyDesk configurado${args.nome_usuario ? ` para ${adUser?.name || args.nome_usuario}` : ''}. Configure em Perfil > AnyDesk ID.` };
+          return { sucesso: true, nome: adUser.name, anydesk_id: adUser.anydesk_id, link: `anydesk:${adUser.anydesk_id}` };
+        }
         return { erro: 'Ferramenta não disponível para este usuário' };
       };
 

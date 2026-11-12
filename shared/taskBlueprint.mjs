@@ -1,4 +1,4 @@
-import { safeTaskFileUrl } from './taskMedia.mjs';
+import { safeTaskFileUrl, taskDescriptionWithoutMedia } from './taskMedia.mjs';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function invalid(message) { throw Object.assign(new Error(message), { statusCode: 400, code: 'VALIDATION_ERROR' }); }
 const text = (value, max) => String(value ?? '').replace(/\u0000/g, '').trim().slice(0, max);
@@ -51,7 +51,7 @@ export function blueprintFromTask(task, files = []) {
   return normalizeTaskBlueprint({ ...task, assignee_ids: (task.assignees || []).map(p => p.id), observer_ids: (task.observers || []).map(p => p.id), files });
 }
 export function blueprintFromTemplate(template) {
-  return normalizeTaskBlueprint(template.task_snapshot?.version ? template.task_snapshot : template);
+  return taskTemplateBlueprint(template.task_snapshot?.version ? template.task_snapshot : template);
 }
 export function blueprintPeople(blueprint, creatorId) {
   const items = blueprint.checklists.flatMap(group => group.items);
@@ -59,4 +59,13 @@ export function blueprintPeople(blueprint, creatorId) {
   const executing = new Set([creatorId, blueprint.owner_id, ...participants]);
   const observers = [...new Set([...blueprint.observer_ids, ...items.flatMap(item => item.observer_ids)])].filter(id => !executing.has(id));
   return { participants, observers };
+}
+
+export function taskTemplateBlueprint(input = {}) {
+  return normalizeTaskBlueprint({ ...input, description: taskDescriptionWithoutMedia(input.description, Array.isArray(input.files) ? input.files : []), files: [] });
+}
+
+export function cloneTaskBlueprint(task, files = []) {
+  const source = blueprintFromTask(task, files);
+  return normalizeTaskBlueprint({ ...source, title: `Cópia de ${source.title}`.slice(0,500) });
 }
