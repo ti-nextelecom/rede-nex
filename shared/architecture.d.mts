@@ -2,7 +2,7 @@ export type Point={x:number;y:number};
 export type LayerId='structure'|'security'|'network'|'notes';
 export type ElementType='wall'|'room'|'door'|'window'|'dimension'|'cable'|'text'|'equipment';
 export interface PlanElement extends Point { id:string;type:ElementType;layer:LayerId;rotation:number;label:string;notes?:string;x2?:number;y2?:number;width?:number;height?:number;thickness?:number;color?:string;fontSize?:number;equipment?:string;range?:number;fov?:number;size?:number;model?:string;address?:string }
-export interface PlanBackground {src:string;x:number;y:number;width:number;height:number;opacity:number}
+export interface PlanBackground {src:string;x:number;y:number;width:number;height:number;opacity:number;cad?:import('./architectureCad.mjs').CadMetadata}
 export interface PlanFloor {id:string;name:string;elements:PlanElement[];background:PlanBackground|null}
 export interface PlanDocument {version:1;units:'m';width:number;height:number;layers:{id:LayerId;visible:boolean;locked:boolean}[];floors:PlanFloor[]}
 export const PLAN_LAYERS:{id:LayerId;name:string;color:string}[];

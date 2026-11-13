@@ -25,6 +25,7 @@ export const NAVIGATION: NavigationItem[] = [
   { to: '/colaboradores', label: 'Colaboradores', icon: Users },
   { to: '/organograma', label: 'Organograma', icon: Network },
   { to: '/calendario', label: 'Calendário', icon: Calendar },
+  { to: '/escalas', label: 'Escalas e folgas', icon: Calendar },
   { to: '/drive', label: 'Drive', icon: FolderOpen },
   { to: '/formularios', label: 'Formulários', icon: ClipboardList },
   { to: '/assinatura', label: 'Assinatura', icon: FileSignature },

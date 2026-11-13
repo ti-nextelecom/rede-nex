@@ -1,3 +1,4 @@
+import { validateCadMetadata } from './architectureCad.mjs';
 export const PLAN_LAYERS = [
   { id: 'structure', name: 'Arquitetura', color: '#334155' },
   { id: 'security', name: 'Segurança e acesso', color: '#ea580c' },
@@ -66,7 +67,7 @@ export function validatePlan(input) {
       if (floor.background) {
         const value = floor.background;
         if (typeof value.src !== 'string' || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value.src) || value.src.length > 1_500_000) bad('Referência deve ser imagem PNG, JPEG ou WebP de até 1 MB.');
-        background = { src: value.src, x: number(value.x,-500,500), y: number(value.y,-500,500), width: number(value.width,.1,500), height: number(value.height,.1,500), opacity: number(value.opacity,.05,1,.5) };
+        background = { src: value.src, x: number(value.x,-500,500), y: number(value.y,-500,500), width: number(value.width,.1,500), height: number(value.height,.1,500), opacity: number(value.opacity,.05,1,.5), ...(value.cad ? { cad: validateCadMetadata(value.cad) } : {}) };
       }
       return { id: register(floor.id), name: text(floor.name,80) || 'Pavimento', background, elements: floor.elements.map(element => {
         if (!element || !ELEMENT_TYPES.includes(element.type) || !PLAN_LAYERS.some(layer=>layer.id===element.layer)) bad('Tipo de elemento ou camada inválida.');

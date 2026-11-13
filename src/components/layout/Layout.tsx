@@ -12,7 +12,7 @@ import { pageTitle } from './navigation';
 import { JarvesWidget } from './JarvesWidget';
 import './responsive.css';
 
-const WORKSPACES = new Set(['/tarefas', '/projetos', '/bate-papo', '/copiloto', '/notas', '/wiki', '/arquitetura', '/perfil-comportamental']);
+const WORKSPACES = new Set(['/tarefas', '/projetos', '/bate-papo', '/copiloto', '/notas', '/wiki', '/arquitetura', '/perfil-comportamental', '/escalas']);
 
 export function Layout() {
   const { pathname } = useLocation();

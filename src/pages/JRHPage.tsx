@@ -800,13 +800,15 @@ function JRHPostCard({
             </div>
           ))}
           <div className="flex items-center gap-2 pt-1">
-            <input
-              type="text"
+            <textarea
+              rows={2}
+              aria-label="Comentário na publicação"
               placeholder="Adicionar comentário..."
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(); } }}
-              className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
+              onKeyDown={e => { if (!e.nativeEvent.isComposing && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleComment(); } }}
+              title="Enter envia. Shift+Enter quebra a linha."
+              className="flex-1 min-w-0 resize-y px-3 py-2 text-xs leading-relaxed bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
             />
             <button
               onClick={handleComment}

@@ -54,6 +54,8 @@ export async function applyMigrations(client, files, { expectedDatabase, runtime
         GRANT SELECT,INSERT ON public.behavioral_assessments TO ${target};
         GRANT SELECT,INSERT,UPDATE,DELETE ON public.behavioral_drafts TO ${target};
         GRANT SELECT,INSERT,UPDATE ON public.behavioral_badges TO ${target};
+        GRANT SELECT,INSERT,UPDATE ON public.work_schedule_entries TO ${target};
+        GRANT SELECT,INSERT ON public.work_schedule_operations,public.work_schedule_history TO ${target};
         GRANT USAGE,SELECT ON SEQUENCE public.browser_push_deliveries_id_seq,public.android_push_deliveries_id_seq TO ${target}`);
       }
     }

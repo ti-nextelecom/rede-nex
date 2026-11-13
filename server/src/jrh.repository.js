@@ -1,7 +1,7 @@
 import { query, pool } from './db.js';
 
 function cleanText(value, maxLength) {
-  const text = String(value ?? '').replace(/ /g, '').trim();
+  const text = String(value ?? '').replace(/\0/g, '').trim();
   return text.length > maxLength ? text.slice(0, maxLength) : text;
 }
 
@@ -157,7 +157,7 @@ export async function createJRHComment(postId, userId, content) {
 
   const { rows } = await query(
     `INSERT INTO comments (post_id, author_id, content, created_at)
-     VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id`,
+     VALUES ($1, $2, $3, NOW()) RETURNING id`,
     [postId, userId, text]
   );
 

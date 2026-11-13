@@ -17,7 +17,7 @@ import { preserveBrandAssets, brandAssets } from '../deploy/prepare-static-asset
 
 test('hosting: migration inventory is ordered, hashed and strips only the legacy outer transaction', async () => {
   const files = await migrationFiles();
-  assert.deepEqual(files.map(file => file.name), ["20261016_hr_module.sql","20261017_runtime_tables.sql","20261026_task_collaboration.sql","20261027_hr_employee_termination.sql","20261028_chat_conversation_archives.sql","20261029_task_blueprints.sql","20261030_attention_browser_push.sql","20261031_chat_message_reactions.sql","20261101_achievement_avatar_frames.sql","20261102_user_appearance.sql","20261103_password_vault.sql","20261104_chat_message_delivery.sql","20261105_architecture.sql","20261106_behavioral_profiles.sql","20261112_android_push.sql"]);
+  assert.deepEqual(files.map(file => file.name), ["20261016_hr_module.sql","20261017_runtime_tables.sql","20261026_task_collaboration.sql","20261027_hr_employee_termination.sql","20261028_chat_conversation_archives.sql","20261029_task_blueprints.sql","20261030_attention_browser_push.sql","20261031_chat_message_reactions.sql","20261101_achievement_avatar_frames.sql","20261102_user_appearance.sql","20261103_password_vault.sql","20261104_chat_message_delivery.sql","20261105_architecture.sql","20261106_behavioral_profiles.sql","20261112_android_push.sql","20261113_work_schedules.sql"]);
   assert.match(files[0].checksum, /^[0-9a-f]{64}$/);
   assert.ok(!files[0].sql.trim().startsWith('BEGIN;'));
   assert.ok(!files[0].sql.trim().endsWith('COMMIT;'));

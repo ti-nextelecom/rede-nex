@@ -1,0 +1,7 @@
+DWG reader: @mlightcad/libredwg-web 0.8.8
+Copyright MLight Lee and the LibreDWG contributors.
+License: GNU General Public License, version 3 (see COPYING).
+Upstream source: https://github.com/mlightcad/libredwg-web
+Version source: https://github.com/mlightcad/libredwg-web/tree/v0.8.8
+Rede NEX integration: src/workers/architectureDwg.worker.ts,
+src/lib/architectureDwg.ts and shared/architectureCad.mjs.

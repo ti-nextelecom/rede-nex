@@ -17,6 +17,7 @@ import { openMedia, editImage } from '../lib/mediaTools';
 import { ImageLightbox } from '../components/ui/ImageLightbox';
 import { mergeChatOutbox } from '../../shared/chatOutbox.mjs';
 import { ChatCaptionInput } from '../components/ChatCaptionInput';
+import { ChatMessageEditor } from '../components/ChatMessageEditor';
 import { ChatAttachmentDialog } from '../components/ChatAttachmentDialog';
 import './chat-interactions.css';
 import { buildMentionMatcher, type MentionMatcher } from '../../shared/chatMentions.mjs';
@@ -347,7 +348,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {fwdHeader}
           {replyPreview}
           <ChatAudioPlayer src={audioSrc} />
-          {!!audioCaption.length && <p className="chat-message-text mt-2"><LinkText text={audioCaption.join('\n')} mentionMatcher={mentionMatcher} onMention={onMention} /></p>}
+          {!!audioCaption.length && <p className="chat-message-text mt-2 whitespace-pre-wrap break-words"><LinkText text={audioCaption.join('\n')} mentionMatcher={mentionMatcher} onMention={onMention} /></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}{readersPopup}
@@ -371,7 +372,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
             <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0"><FileText size={20} className="text-orange-500" /></div>
             <div className="min-w-0"><p className="text-sm font-semibold text-slate-800 truncate max-w-[220px]">{fileName}</p><p className="text-xs text-orange-500 font-bold">{ext}</p></div>
           </a>
-          {caption && <p className="chat-message-text mt-2"><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention} /></p>}
+          {caption && <p className="chat-message-text mt-2 whitespace-pre-wrap break-words"><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention} /></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}{readersPopup}
@@ -406,7 +407,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {replyPreview && <div className="px-3 pt-2">{replyPreview}</div>}
           <img src={src} alt="foto" className="w-full max-h-80 object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => onImageClick ? onImageClick(src) : window.open(src, '_blank', 'noopener,noreferrer')} />
-          {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention}/></p>}
+          {caption && <p className="px-3 py-2 text-sm whitespace-pre-wrap break-words" style={{ color: bubbleText }}><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention}/></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}
@@ -426,7 +427,7 @@ function MessageBubble({ message, mine, isGroup, lastReadAt, onEdit, onDelete, o
           {fwdHeader && <div className="px-3 pt-1">{fwdHeader}</div>}
           {replyPreview && <div className="px-3 pt-2">{replyPreview}</div>}
           <video controls src={src} className="w-full max-h-48 object-cover" preload="none" />
-          {caption && <p className="px-3 py-2 text-sm" style={{ color: bubbleText }}><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention}/></p>}
+          {caption && <p className="px-3 py-2 text-sm whitespace-pre-wrap break-words" style={{ color: bubbleText }}><LinkText text={caption} mentionMatcher={mentionMatcher} onMention={onMention}/></p>}
           {timestamp}
         </div>
         {menuBtn}{tooltip}{editHistory}
@@ -1111,7 +1112,6 @@ export function Chat() {
 
   // Editing
   const [editingMsg, setEditingMsg] = useState<ChatMessage | null>(null);
-  const [editText, setEditText] = useState('');
 
   // Lightbox
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -1304,7 +1304,7 @@ export function Chat() {
     knownMessageIdsRef.current = new Set();
     setHasMoreMessages(false);
     setLoadingOlder(false);
-    setReplyingTo(null);setEditingMsg(null);setEditText('');
+    setReplyingTo(null);setEditingMsg(null);
     setMentionQuery(null);setMentionParticipants([]);
     setShowGroupSettings(false);setShowNotes(false);setNotesContent('');
     setMessages([]);setMessagesError('');setMessagesLoading(!!selectedId && selectedId !== JARVIS_CONVERSATION_ID);
@@ -1644,13 +1644,12 @@ export function Chat() {
     finally {conversationActionsLock.current.delete(convId);setConversationActionsBusy(new Set(conversationActionsLock.current));}
   }
 
-  async function handleEditSave() {
-    if (!editingMsg || !selectedId || !editText.trim()) return;
-    try {
-      const updated = await editChatMessage(selectedId, editingMsg.id, editText.trim());
+  async function handleEditSave(message: ChatMessage, content: string) {
+    const updated = await editChatMessage(message.conversation_id, message.id, content);
+    if (currentConversation.current === message.conversation_id) {
       setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, content: updated.content, edited_at: updated.edited_at } : m));
-    } catch {}
-    setEditingMsg(null); setEditText('');
+    }
+    setEditingMsg(current => current?.id === message.id && current.conversation_id === message.conversation_id ? null : current);
   }
 
   async function handleDeleteMessage(msg: ChatMessage) {
@@ -1787,7 +1786,7 @@ export function Chat() {
     if (action === 'jump' && value) { goToMessage(message.conversation_id,value); return; }
     if (action === 'attention') setAttentionMessage(message);
     else if (action === 'image') setLightboxSrc(value || null);
-    else if (action === 'edit') { setEditingMsg(message); setEditText(message.content); }
+    else if (action === 'edit') setEditingMsg(message);
     else if (action === 'delete') void handleDeleteMessage(message);
     else if (action === 'reply') setReplyingTo(message);
     else if (action === 'forward') { setForwardingMsg(message); setForwardSearch(''); }
@@ -2165,19 +2164,8 @@ export function Chat() {
 
             {/* Edit message bar */}
             {editingMsg && (
-              <div className="border-t border-orange-200 bg-orange-50 px-4 py-2 flex-shrink-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <Pencil size={13} className="text-orange-500" />
-                  <p className="text-xs font-semibold text-orange-700">Editando mensagem</p>
-                  <button onClick={() => { setEditingMsg(null); setEditText(''); }} className="ml-auto text-orange-400 hover:text-orange-700"><X size={14} /></button>
-                </div>
-                <div className="flex gap-2">
-                  <input value={editText} onChange={e => setEditText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') { setEditingMsg(null); setEditText(''); } }}
-                    autoFocus className="flex-1 h-9 rounded-lg border border-orange-200 bg-white px-3 text-sm outline-none focus:border-orange-400" />
-                  <button onClick={handleEditSave} disabled={!editText.trim()} className="h-9 px-4 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-40">Salvar</button>
-                </div>
-              </div>
+              <ChatMessageEditor key={editingMsg.id} content={editingMsg.content}
+                onSave={content => handleEditSave(editingMsg, content)} onCancel={() => setEditingMsg(null)} />
             )}
 
             {/* Portaled attachment dialog stays inside the visible mobile viewport. */}
@@ -2204,7 +2192,7 @@ export function Chat() {
             )}
 
             {/* Input bar */}
-            {canSend && !pendingFile && (
+            {canSend && !pendingFile && !editingMsg && (
               <div className="chat-input-bar border-t border-slate-100 bg-white p-3 flex-shrink-0">
                 {isRecording && (
                   <div className="chat-recording-panel" role="status" aria-label="Gravando áudio">
@@ -2362,7 +2350,7 @@ export function Chat() {
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void handleSend(); }
                   }} onPaste={handlePaste}
                     placeholder="Mensagem…" aria-label="Escreva uma mensagem" disabled={isRecording}
-                    rows={1} maxLength={8000}
+                    rows={1} maxLength={8000} spellCheck lang="pt-BR" autoCorrect="on" autoCapitalize="sentences"
                     className="flex-1 min-h-[40px] max-h-[120px] rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-400 resize-none overflow-y-auto leading-5 align-middle"
                     style={darkMode ? { backgroundColor: '#2a3942', borderColor: '#3b4a54', color: '#e9edef' } : {}} />
 

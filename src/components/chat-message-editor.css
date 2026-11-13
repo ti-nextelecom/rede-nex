@@ -1,0 +1,43 @@
+.chat-message-editor {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  max-height: min(360px, 55dvh);
+  overflow-y: auto;
+}
+.chat-message-editor header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chat-message-editor header strong { font-size: 13px; font-weight: 600; }
+.chat-message-editor header > button { margin-left: auto; min-width: 36px; min-height: 36px; display: grid; place-items: center; }
+.chat-shell .chat-message-editor textarea,
+.chat-message-editor textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 100px;
+  max-height: 220px;
+  padding: 10px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: inherit;
+  font-size: var(--chat-message-font-size, 15.4px);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+.chat-message-editor textarea:focus { outline: 2px solid hsl(var(--primary)); outline-offset: 1px; }
+.chat-message-editor footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.chat-message-editor footer small { color: hsl(var(--muted-foreground)); font-size: 11px; }
+.chat-message-editor footer button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 14px; border-radius: 10px; background: hsl(var(--primary)); color: var(--nex-on-accent, white); font-size: 13px; font-weight: 600; }
+.chat-message-editor button:disabled { opacity: .5; cursor: default; }
+.chat-message-edit-error { margin-top: 8px; color: hsl(var(--destructive)); font-size: 13px; }
+@media (max-width: 640px) {
+  .chat-message-editor { padding: 8px 10px max(10px, env(safe-area-inset-bottom)); }
+  .chat-message-editor footer { flex-wrap: wrap; }
+  .chat-message-editor footer button { margin-left: auto; }
+  .chat-message-editor textarea { font-size: max(16px, var(--chat-message-font-size, 15.4px)); }
+}

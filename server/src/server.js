@@ -24,6 +24,7 @@ import { createTaskChecklistProgressRouter } from './task-checklist-progress.mjs
 import { createVaultRouter } from './password-vault.mjs';
 import { createArchitectureRouter } from './architecture.mjs';
 import { createBehavioralRouter } from './behavioral-profiles.mjs';
+import { createScheduleRouter } from './work-schedules.mjs';
 import { markChatRead } from './chat-read.mjs';
 import { pushConfiguration, savePushSubscription, startPushWorker } from './browser-push.mjs';
 import { createHrRouter } from './hr.js';
@@ -320,6 +321,7 @@ const handleTaskAuthoringRoutes=createTaskAuthoringRouter({requireUser,readJson,
 const handleVaultRoutes = createVaultRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleArchitectureRoutes = createArchitectureRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleBehavioralRoutes = createBehavioralRouter({ pool, requireUser, sendJson, sendError, readJson });
+const handleScheduleRoutes = createScheduleRouter({ pool, requireUser, sendJson, sendError, readJson });
 const handleHrRoutes = createHrRouter({ pool, requireUser, sendJson, sendError, readJson });
 
 async function route(req, res) {
@@ -346,6 +348,7 @@ async function route(req, res) {
     if (await handleVaultRoutes(req, res, path)) return;
     if (await handleArchitectureRoutes(req, res, path)) return;
     if (await handleBehavioralRoutes(req, res, path)) return;
+    if (await handleScheduleRoutes(req, res, path)) return;
     if (req.method === 'GET' && path === '/api/health') {
       await pool.query('select 1');
       return sendJson(req, res, 200, { status: 'ok', service: 'rede-nex-api', release: releaseId });

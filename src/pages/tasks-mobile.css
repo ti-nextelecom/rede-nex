@@ -73,13 +73,13 @@
   .nex-task-detail .task-checklist-item [role='checkbox']::before { content: ''; position: absolute; inset: 10px; border: 1px solid hsl(var(--muted-foreground)); border-radius: 6px; background: hsl(var(--card)); }
   .nex-task-detail .task-checklist-item [role='checkbox'][aria-checked='true']::before { background: #5cafa0; border-color: #5cafa0; }
   .nex-task-detail .task-checklist-item [role='checkbox'] > span { position: relative; z-index: 1; font-size: 13px; }
-  .nex-task-detail .task-checklist-item > button[aria-label^='Editar etapa'], .nex-task-detail .task-checklist-item > input { grid-column: 2 / -1; grid-row: 1; min-width: 0; width: 100%; font-size: 15px; line-height: 1.5; }
+  .nex-task-detail .task-checklist-item > button[aria-label^='Editar etapa'], .nex-task-detail .task-checklist-item > textarea { grid-column: 2 / -1; grid-row: 1; min-width: 0; width: 100%; font-size: 15px; line-height: 1.5; }
   .nex-task-detail .task-checklist-item > fieldset { display: block; grid-column: 2; grid-row: 2; justify-self: start; min-width: 0; }
   .nex-task-detail .task-checklist-item > fieldset > div > button { min-width: 44px; min-height: 44px; }
   .nex-task-detail .task-checklist-item > .task-checklist-remove { grid-column: 3; grid-row: 2; }
   .nex-task-detail .task-checklists-section[data-can-manage='false'] .task-checklist-item > fieldset, .nex-task-detail .task-checklists-section[data-can-manage='false'] .task-checklist-item > .task-checklist-remove { display: none; }
   .nex-task-detail .task-checklists-section[data-can-manage='false'] .task-checklist-add, .nex-task-detail .task-checklists-section[data-can-manage='false'] .task-add-checklist { display: none; }
-  .nex-task-detail .task-checklist-add input { min-height: 44px; font-size: 16px; }
+  .nex-task-detail .task-checklist-item > textarea, .nex-task-detail .task-checklist-add textarea, .nex-task-detail .task-new-checklist-steps textarea { min-height: 64px; font-size: 16px; }
   .nex-task-detail .task-checklist-add button { min-height: 44px; height: 44px; }
   .nex-task-detail .task-new-checklist-form { padding: 10px; gap: 10px; }
   .nex-task-detail .task-new-checklist-form input { min-height: 44px; font-size: 16px; }

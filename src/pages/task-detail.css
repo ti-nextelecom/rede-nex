@@ -67,12 +67,14 @@
 .task-checklist-item:hover, .task-checklist-item:focus-within { background: hsl(var(--foreground) / 0.016); }
 .task-detail-dialog .task-checklist-item [role="checkbox"] { width: 22px; height: 22px; min-width: 22px; margin-top: 3px; border-radius: 6px; background: hsl(var(--card)); border-color: hsl(var(--foreground) / 0.302); }
 .task-detail-dialog .task-checklist-item [role="checkbox"][aria-checked="true"] { background: #5cafa0; border-color: #5cafa0; }
-.task-checklist-item > button[aria-label^="Editar etapa"] { text-align: left; font-size: 14px; line-height: 1.8; color: hsl(var(--foreground)); overflow-wrap: anywhere; min-width: 0; }
+.task-checklist-item > button[aria-label^="Editar etapa"] { text-align: left; font-size: 14px; line-height: 1.8; color: hsl(var(--foreground)); overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
 .task-checklist-item[data-completed="true"] > button[aria-label^="Editar etapa"] { opacity: .65; }
 .task-checklist-item > .relative > button { width: 30px; height: 30px; }
 .task-checklist-item > .relative > .absolute { left: auto; right: 0; }
 .task-checklist-add { margin-top: 14px; }
-.task-checklist-add input { min-width: 0; }
+.task-checklist-add textarea, .task-checklist-item > textarea, .task-new-checklist-steps textarea { min-width: 0; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.task-new-checklist-steps textarea { flex: 1; min-height: 64px; padding: 8px 10px; border: 1px solid var(--task-line); border-radius: 8px; background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 13px; }
+.task-checklist-item > textarea { min-height: 64px; }
 .task-detail-dialog .task-checklist-add button { min-width: 42px; height: 42px; display: grid; place-items: center; }
 .task-checklist-empty { display: grid; justify-items: center; gap: 12px; border: 1px dashed var(--task-line); border-radius: 15px; padding: 32px 22px; text-align: center; color: hsl(var(--muted-foreground)); }
 .task-checklist-empty h4 { font-size: 15px; font-weight: 600; color: hsl(var(--foreground)); }

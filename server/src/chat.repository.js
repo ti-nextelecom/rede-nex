@@ -3,6 +3,7 @@ import { notifyUsers } from './notifications.repository.js';
 import { attachChatReactions } from './chat-reactions.mjs';
 import { insertChatMessage } from './chat-message-insert.mjs';
 import { buildChatNotices } from '../../shared/chatMessageLinks.mjs';
+import { chatMessageEditParts } from '../../shared/chatMessageEdit.mjs';
 
 function cleanText(value, maxLength) {
   const text = String(value ?? '').replace(/\u0000/g, '').trim();
@@ -283,7 +284,12 @@ export async function sendMessage(userId, conversationId, content, attachmentUrl
 }
 
 export async function editMessage(userId, messageId, newContent) {
-  const cleanContent = cleanText(newContent, 4000);
+  const cleanContent = String(newContent ?? '').replace(/\u0000/g, '').trim();
+  if (chatMessageEditParts(cleanContent).text.length > 8000) {
+    const error = new Error('A mensagem pode ter até 8.000 caracteres.');
+    error.statusCode = 400;
+    throw error;
+  }
   if (!cleanContent) return null;
 
   const existing = await query(

@@ -1009,7 +1009,7 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                       {addingCl && canEdit && (
                         <form onSubmit={handleAddChecklist} className="task-new-checklist-form">
                           <label>Nome da checklist<input autoFocus value={newCl} maxLength={200} onChange={e=>setNewCl(e.target.value)} aria-label="Nome da nova checklist" placeholder="Ex.: Instalação e testes"/></label>
-                          <div className="task-new-checklist-steps"><strong>Etapas da checklist</strong>{newClItems.map((content,index)=><div key={index}><span>{index+1}</span><input aria-label={`Etapa ${index+1} da nova checklist`} value={content} maxLength={500} placeholder="Descreva a etapa" onChange={e=>setNewClItems(previous=>previous.map((text,i)=>i===index?e.target.value:text))}/><button type="button" aria-label={`Remover etapa ${index+1}`} onClick={()=>setNewClItems(previous=>previous.length>1?previous.filter((_,i)=>i!==index):[''])}><X size={15}/></button></div>)}</div>
+                          <div className="task-new-checklist-steps"><strong>Etapas da checklist</strong>{newClItems.map((content,index)=><div key={index}><span>{index+1}</span><textarea aria-label={`Etapa ${index+1} da nova checklist`} rows={2} value={content} maxLength={500} placeholder="Descreva a etapa" onChange={e=>setNewClItems(previous=>previous.map((text,i)=>i===index?e.target.value:text))}/><button type="button" aria-label={`Remover etapa ${index+1}`} onClick={()=>setNewClItems(previous=>previous.length>1?previous.filter((_,i)=>i!==index):[''])}><X size={15}/></button></div>)}</div>
                           <button type="button" className="task-new-checklist-add" disabled={newClItems.length+totalItems>=500} onClick={()=>setNewClItems(previous=>[...previous,''])}><Plus size={16}/>Adicionar etapa</button>
                           <div className="task-new-checklist-actions"><button type="submit" disabled={saving||!newCl.trim()}>Criar checklist{newClItems.filter(text=>text.trim()).length>0?` com ${newClItems.filter(text=>text.trim()).length} etapa(s)`:''}</button><button type="button" onClick={()=>{setAddingCl(false);setNewCl('');setNewClItems(['']);}}>Cancelar</button></div>
                         </form>
@@ -1063,13 +1063,20 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                                     {item.completed && <span className="text-white text-[9px] font-bold">✓</span>}
                                   </button>
                                   {editingItem?.itemId === item.id ? (
-                                    <input
+                                    <textarea
                                       autoFocus
+                                      rows={Math.min(8, Math.max(2, editingItem.content.split('\n').length))}
+                                      maxLength={500}
+                                      aria-label="Texto da etapa"
                                       value={editingItem.content}
                                       onChange={e => setEditingItem(ei => ei ? { ...ei, content: e.target.value } : null)}
                                       onBlur={() => handleUpdateItem(cl, item, editingItem.content)}
                                       onKeyDown={e => {
-                                        if (e.key === 'Enter') handleUpdateItem(cl, item, editingItem.content);
+                                        if (e.nativeEvent.isComposing) return;
+                                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                          e.preventDefault();
+                                          void handleUpdateItem(cl, item, editingItem.content);
+                                        }
                                         if (e.key === 'Escape') setEditingItem(null);
                                       }}
                                       className="text-sm flex-1 bg-transparent outline-none border-b border-orange-400 dark:text-slate-200 dark:caret-white py-0.5 min-w-0"
@@ -1097,11 +1104,12 @@ function TaskDetail({ task, users, onClose, onUpdate, onDelete, customLists = []
                               ))}
                             </div>
                             <fieldset disabled={!canEdit} className="task-checklist-add mt-2 flex gap-2">
-                              <input
+                              <textarea
+                                rows={2} maxLength={500}
                                 autoFocus={checklistFocus===cl.id} value={newItems[cl.id] || ''}
                                 onChange={e => setNewItems(p => ({ ...p, [cl.id]: e.target.value }))}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddItem(cl); } }}
-                                aria-label={`Nova etapa em ${cl.title}`} placeholder="Adicionar uma etapa…" className="flex-1 h-8 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 text-xs outline-none focus:border-orange-400 transition-colors" />
+                                onKeyDown={e => { if (!e.nativeEvent.isComposing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void handleAddItem(cl); } }}
+                                aria-label={`Nova etapa em ${cl.title}`} placeholder="Adicionar uma etapa…" title="Enter quebra a linha. Ctrl+Enter adiciona a etapa." className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-400 px-3 py-2 text-xs outline-none focus:border-orange-400 transition-colors" />
                               <button onClick={() => handleAddItem(cl)} disabled={saving || !newItems[cl.id]?.trim()} aria-label={`Adicionar etapa em ${cl.title}`} className="h-8 px-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 hover:border-orange-200 transition-all duration-200">
                                 <Plus size={16} />
                               </button>

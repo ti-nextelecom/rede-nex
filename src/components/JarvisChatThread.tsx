@@ -55,7 +55,7 @@ export function JarvisChatThread({ userId, onBack }: { userId: string; onBack():
     {state.error && <div className="jarvis-chat-error" role="alert">{state.error}<button type="button" disabled={!input.trim() || busy} onClick={() => send()}>Tentar novamente</button></div>}
     {!messages.length && <div className="jarvis-chat-suggestions">{suggestions.map(text => <button key={text} type="button" onClick={() => { drafts.set(JARVIS_CONVERSATION_ID, text); inputRef.current?.focus(); }}>{text}</button>)}</div>}
     <form className="jarvis-chat-compose" onSubmit={send}>
-      <textarea ref={inputRef} aria-label="Mensagem para Jarvis" placeholder="Mensagem para o Jarvis…" rows={2} maxLength={2000} value={input} disabled={busy}
+      <textarea ref={inputRef} aria-label="Mensagem para Jarvis" placeholder="Mensagem para o Jarvis…" rows={2} maxLength={2000} value={input} disabled={busy} spellCheck lang="pt-BR" autoCorrect="on" autoCapitalize="sentences"
         onChange={event => drafts.set(JARVIS_CONVERSATION_ID, event.target.value)}
         onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} />
       <button type="submit" className="chat-send-button" disabled={!input.trim() || busy} aria-label="Enviar mensagem ao Jarvis"><Send size={19} /></button>

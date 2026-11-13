@@ -22,6 +22,7 @@ const Training    = lazy(() => import('./pages/Training').then(m => ({ default: 
 const PasswordVault = lazy(() => import('./pages/PasswordVault').then(m => ({ default: m.PasswordVault })));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then(m => ({ default: m.ArchitecturePage })));
 const BehavioralProfilePage = lazy(() => import('./pages/BehavioralProfilePage').then(m => ({ default: m.BehavioralProfilePage })));
+const WorkSchedules = lazy(() => import('./pages/WorkSchedules').then(m => ({ default: m.WorkSchedules })));
 const Wiki        = lazy(() => import('./pages/Wiki').then(m => ({ default: m.Wiki })));
 const Users       = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const Permissions = lazy(() => import('./pages/Permissions').then(m => ({ default: m.Permissions })));
@@ -141,6 +142,7 @@ function App() {
               <Route path="/senhas" element={<Suspense fallback={<PageFallback />}><PasswordVault /></Suspense>} />
               <Route path="/arquitetura" element={<Suspense fallback={<PageFallback />}><ArchitecturePage /></Suspense>} />
               <Route path="/perfil-comportamental" element={<Suspense fallback={<PageFallback />}><BehavioralProfilePage /></Suspense>} />
+              <Route path="/escalas" element={<Suspense fallback={<PageFallback />}><WorkSchedules /></Suspense>} />
               <Route path="/wiki" element={<Suspense fallback={<PageFallback />}><Wiki /></Suspense>} />
               <Route path="/colaboradores" element={<Suspense fallback={<PageFallback />}><Users /></Suspense>} />
               <Route path="/bate-papo" element={<Suspense fallback={<PageFallback />}><Chat /></Suspense>} />

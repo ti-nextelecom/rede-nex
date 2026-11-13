@@ -42,6 +42,7 @@ export default defineConfig(({ mode }) => {
         }
       : undefined,
     optimizeDeps: {
+      include: ['@mlightcad/libredwg-web'],
       exclude: ['lucide-react'],
     },
     build: {
