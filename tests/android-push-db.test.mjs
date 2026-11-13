@@ -8,7 +8,8 @@ test('Android durable queue binds sessions, respects mute and logout, retries wi
  try{
   await admin.query('CREATE DATABASE '+database+' OWNER rh_app');pool=new pg.Pool({host:'127.0.0.1',port:55482,user:'rh_app',database,connectionTimeoutMillis:3000});
   await pool.query(`CREATE TABLE users(id uuid PRIMARY KEY,status text);CREATE TABLE user_sessions(id uuid PRIMARY KEY,user_id uuid REFERENCES users(id),revoked_at timestamptz,expires_at timestamptz);
-    CREATE TABLE notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid REFERENCES users(id),title text,message text,type text,link text,actor_photo_url text,read boolean DEFAULT false);
+    CREATE TABLE notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid REFERENCES users(id),title text,message text,type text,link text,actor_name text DEFAULT 'Remetente ficticio',actor_photo_url text,read boolean DEFAULT false);
+    CREATE TABLE chat_conversations(id uuid PRIMARY KEY,type text,name text);
     CREATE TABLE chat_participants(conversation_id uuid,user_id uuid,is_muted boolean,PRIMARY KEY(conversation_id,user_id));
     CREATE TABLE device_fcm_tokens(token text UNIQUE,user_id uuid REFERENCES users(id),updated_at timestamptz DEFAULT now());`);
   await pool.query("INSERT INTO users VALUES($1,'active'),($2,'active')",[alice,bob]);await pool.query("INSERT INTO user_sessions VALUES($1,$2,NULL,now()+interval '1 day'),($3,$2,NULL,now()+interval '1 day'),($4,$5,NULL,now()+interval '1 day')",[sa,alice,sa2,sb,bob]);
@@ -21,8 +22,13 @@ test('Android durable queue binds sessions, respects mute and logout, retries wi
   const notice=async(userId,extra={})=>(await pool.query('INSERT INTO notifications(user_id,title,message,type,link,read) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[userId,'Teste','Mensagem ficticia',extra.type||'info',extra.link||'/',extra.read||false])).rows[0].id;
   const avatarNotice=await notice(alice);await pool.query('UPDATE notifications SET actor_photo_url=$1 WHERE id=$2',['/uploads/avatars/ficticio.png',avatarNotice]);const sent=[];let fail=true;await dispatchAndroidPushBatch(pool,async msg=>{if(msg.token===ta&&fail){fail=false;throw Error('offline');}sent.push(msg);});assert.equal(sent.length,1);assert.equal((await pool.query('SELECT count(*)::int n FROM android_push_deliveries')).rows[0].n,1);
   await pool.query('UPDATE android_push_deliveries SET next_attempt_at=now()');await dispatchAndroidPushBatch(pool,async msg=>sent.push(msg));assert.equal(sent.length,2);assert.equal(new Set(sent.map(m=>m.token)).size,2);assert.ok(sent.every(m=>m.data.senderAvatar==='https://rede.nextelecom.net.br/uploads/avatars/ficticio.png'));assert.ok(sent.every(m=>m.data.title==='Teste'&&m.android.priority==='high'&&!m.notification));assert.equal(await dispatchAndroidPushBatch(pool,async()=>{throw Error('must not resend');}),0);
+  await pool.query("INSERT INTO chat_conversations VALUES($1,'group','Grupo ficticio')",[cid]);
   await pool.query('INSERT INTO chat_participants VALUES($1,$2,true)',[cid,alice]);await notice(alice,{type:'chat',link:'/bate-papo?conversa='+cid});await dispatchAndroidPushBatch(pool,async()=>{throw Error('muted must not send');});assert.equal((await pool.query('SELECT count(*)::int n FROM android_push_deliveries')).rows[0].n,0);
-  await notice(alice,{type:'warning',link:'/bate-papo?conversa='+cid+'&atencao='+randomUUID()});let attention=0;await dispatchAndroidPushBatch(pool,async()=>attention++);assert.equal(attention,2);
+  await notice(alice,{type:'warning',link:'/bate-papo?conversa='+cid+'&atencao='+randomUUID()});const attention=[];await dispatchAndroidPushBatch(pool,async message=>attention.push(message));assert.equal(attention.length,2);
+  assert.ok(attention.every(message=>message.data.isGroup==='true'&&message.data.conversationName==='Grupo ficticio'&&message.data.senderName==='Remetente ficticio'));
+  await pool.query("UPDATE chat_conversations SET type='direct',name=NULL WHERE id=$1",[cid]);
+  await notice(alice,{type:'warning',link:'/bate-papo?conversa='+cid});const direct=[];await dispatchAndroidPushBatch(pool,async message=>direct.push(message));assert.equal(direct.length,2);
+  assert.ok(direct.every(message=>message.data.isGroup==='false'&&!message.data.conversationName&&message.data.senderName==='Remetente ficticio'));
   await notice(alice,{read:true});await dispatchAndroidPushBatch(pool,async()=>{throw Error('read must not send');});
   await notice(alice);await pool.query('UPDATE user_sessions SET revoked_at=now() WHERE id=$1',[sa]);const afterLogout=[];await dispatchAndroidPushBatch(pool,async m=>afterLogout.push(m));assert.deepEqual(afterLogout.map(m=>m.token),[ta2]);
   await notice(alice);await saveAndroidToken(pool,b,{token:ta2});await dispatchAndroidPushBatch(pool,async()=>{throw Error('old account message must not leak');});

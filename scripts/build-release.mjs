@@ -32,6 +32,8 @@ async function main() {
   }
   await checkPublic(join(root, 'public'));
   await run(process.execPath, ['--input-type=module', '-e', "globalThis.__dirname=process.cwd(); const {build}=await import('vite'); await build({configLoader:'runner', mode:'production'});"], { env });
+  // This pipeline calls Vite directly, so npm's postbuild hook does not run.
+  await writeFile(join(root, 'dist', 'version.json'), JSON.stringify({ ts: Date.now() }) + '\n');
   const release = new Date().toISOString().replace(/[:.]/g, '-');
   const output = join(root, '.cache', 'releases'); const stage = join(output, 'rede-nex-' + release);
   await mkdir(stage, { recursive: true });

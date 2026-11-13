@@ -36,7 +36,7 @@ export async function dispatchAndroidPushBatch(pool,send=sendAndroidMessage) {
     UPDATE android_push_deliveries d SET attempts=d.attempts+1,next_attempt_at=now()+interval '2 minutes' FROM claimed WHERE d.id=claimed.id RETURNING d.*`)).rows;await client.query('COMMIT');}
   catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
   for(const delivery of deliveries){
-    const data=(await pool.query(`SELECT d.token,d.user_id,n.title,n.message,n.link,n.type,n.read,n.actor_photo_url,s.revoked_at,s.expires_at,u.status
+    const data=(await pool.query(`SELECT d.token,d.user_id,n.title,n.message,n.link,n.type,n.read,n.actor_name,n.actor_photo_url,s.revoked_at,s.expires_at,u.status
       FROM device_fcm_tokens d JOIN notifications n ON n.id=$2 AND n.user_id=d.user_id
       JOIN user_sessions s ON s.id=d.session_id AND s.user_id=d.user_id JOIN users u ON u.id=d.user_id WHERE d.token=$1`,[delivery.device_token,delivery.notification_id])).rows[0];
     const remove=()=>pool.query('DELETE FROM android_push_deliveries WHERE id=$1',[delivery.id]);
